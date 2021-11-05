@@ -51,13 +51,14 @@ Usage:
 
 [mandatory]
 --vcf               Input VCF file containing all types of variants             [!]
---genome-file       File with chromosome lengths (chromosome \t size)           [!]
+--genome-file       File with chromosome lengths (chromosome <TAB> size)        [!]
 
 [optional]
 --sample            Sample name / Strain name for output files                  [loh_blocks]
 --output-dir        Output directory                                            [loh_blocks_out]
 --window            Window for heterozygous blocks definition                   [100]
 --min-size          Min. LOH block size                                         [100]
+--block-distances   Comma-sep. list of desired distances between LOH blocks     [100,1000,5000]
 --min-af            Min. allele frequency to consider a variant heterozygous    [off]
 --max-af            Max. allele frequency to consider a variant heterozygous    [off]
 --bam               BAM file (only required when filtering by coverage)         [off]
@@ -77,6 +78,7 @@ p.add_argument("--sample", default="loh_blocks")
 p.add_argument("--output-dir", default="loh_blocks_out")
 p.add_argument("--window", default=100, type=int)
 p.add_argument("--min-size", default=100, type=int)
+p.add_argument("--block-distances", default="100,1000,5000", type=str)
 p.add_argument("--min-af", default=0, type=float)
 p.add_argument("--max-af", default=1, type=float)
 p.add_argument("--bam")
@@ -87,7 +89,7 @@ p.add_argument("--print-info", action="store_true")
 args = p.parse_args()
 
 # functions
-def extract_heterozygous_snps(Lines):
+def extract_heterozygous_snps(vcf, min_af, max_af):
 
 	"""
 	v1
@@ -98,47 +100,65 @@ def extract_heterozygous_snps(Lines):
 	"""
 
 	# iterate over variants
-    for lst in Lines:
+	removed, kept, Lines, New_lines = 0, 0, [], []
 
-        # read values
-        annotations = lst[8].split(":")
-        values = lst[9].split(":")
-        dict = { annotations[i]:values[i] for i in range(0, len(annotations)) }
+	INPUT = open(vcf, "r")
+	for line in INPUT:
+		if line[0] == "#":
+			New_lines.append(line)
+		else:
+			Lines.append(line.rstrip("\n\r\b").split("\t"))
 
-        # 3. check if allele frequency (AF) >= min and <= max
-        if (dict["GT"]=="0/1"):
+	for lst in Lines:
 
-            # does AF fit the criteria?
-            if (args.min_af <= float(dict["AF"]) <= args.max_af):
+		# if it's a SNP
+		if len(lst[3]) == len(lst[4]) == 1:
 
-                # 4. write out lines that have fitting values
-                sys.stdout.write("\t".join(lst) + "\n")
-                kept += 1
+			# read values
+			annotations = lst[8].split(":")
+			values = lst[9].split(":")
+			dict = { annotations[i]:values[i] for i in range(0, len(annotations)) }
 
-            else:
-                removed += 1
+			# 3. check if allele frequency (AF) >= min and <= max
+			if (dict["GT"]=="0/1"):
 
-        # in case there is a multiallelic site
-        # which shows different alleles in the two chromosomes
-        elif ((dict["GT"] != "0/0") and (dict["GT"] != "1/1") and (dict["GT"] != "0/1") \
-        and (dict["GT"].split("/")[0] != dict["GT"].split("/")[1])):
+				# does AF fit the criteria?
+				if (min_af <= float(dict["AF"]) <= max_af):
 
-            # extract all AFs
-            Afs = dict["AF"].split(",")
-            # check if any of them has an allele frequency within range
-            if any([args.min_af <= float(af) <= args.max_af for af in Afs]):
+					# 4. write out lines that have fitting values
+					New_lines.append("\t".join(lst) + "\n")
+					kept += 1
 
-                # 4. write out lines that have fitting values
-                sys.stdout.write("\t".join(lst) + "\n")
-                kept += 1
+				else:
+					removed += 1
 
-            # remove those that don't have at least one frequency within range
-            else:
-                removed += 1
+			# in case there is a multiallelic site
+			# which shows different alleles in the two chromosomes
+			elif ((dict["GT"] != "0/0") and (dict["GT"] != "1/1") and (dict["GT"] != "0/1") \
+			and (dict["GT"].split("/")[0] != dict["GT"].split("/")[1])):
 
-        # remove homozygous
-        else:
-            removed += 1
+				# extract all AFs
+				Afs = dict["AF"].split(",")
+				# check if any of them has an allele frequency within range
+				if any([min_af <= float(af) <= max_af for af in Afs]):
+
+					# 4. write out lines that have fitting values
+					New_lines.append("\t".join(lst) + "\n")
+					kept += 1
+
+				# remove those that don't have at least one frequency within range
+				else:
+					removed += 1
+
+			# remove homozygous
+			else:
+				removed += 1
+
+		# remove non-SNPs
+		else:
+			removed += 1
+
+	return (New_lines, kept, removed)
 
 
 
@@ -237,12 +257,26 @@ def main():
 		sys.exit(1)
 
 	# -------------------------------------------
+	# Extract heterozygous snps from raw VCF file
+	sys.stderr.write("Extracting heterozygous SNPs from VCF file...\n")
+	sys.stderr.write(f"Considering only SNPs with {args.min_af} <= AF <= {args.max_af}\n")
+	het_snps_vcf = f"{args.output_dir}/{args.sample}.het_snps.vcf"
+	(Het_lines, kept, removed) = extract_heterozygous_snps(args.vcf, args.min_af, args.max_af)
+	sys.stderr.write(f"Kept {kept} heterozygous SNPs ({round((kept / (kept + removed))*100, 2)} %) out of {kept+removed} VCF records\n")
+
+	# write filtered bed file lines to an actual bed file output
+	OUT = open(het_snps_vcf, "w")
+	for line in Het_lines:
+		OUT.write(line)
+	OUT.close()
+
+	# -------------------------------------------
 	# Get heterozygous blocks with bedtools merge
 
 	# merge bed file
 	sys.stderr.write(f"Defining heterozygous blocks for {args.sample}\n")
 	merged_bed_out = f"{args.output_dir}/{args.sample}.d{args.window}bp_provisory.bed"
-	cmd_heterozygous_blocks = f"{args.bedtools} merge -d {args.window} -c 1 -o count -i {args.vcf} > {merged_bed_out}"
+	cmd_heterozygous_blocks = f"{args.bedtools} merge -d {args.window} -c 1 -o count -i {het_snps_vcf} > {merged_bed_out}"
 	try:
 	    subprocess.run([cmd_heterozygous_blocks], check=True, shell=True)
 	except subprocess.CalledProcessError:
@@ -344,7 +378,9 @@ def main():
 	blocks_file.close()
 
 	# iterate over predefined ranges
-	for block_distance in [100, 150, 200, 500, 1000, 5000]:
+	for block_distance in [int(i) for i in args.block_distances.split(",")]:
+
+		sys.stderr.write(f"Generating output file filtered at min. {block_distance} range\n")
 
 		# open output file
 		OUTPUT = open(f"{args.output_dir}/{args.sample}.homo.d{args.window}bp.cov_flt.{block_distance}bp.bed", "w")
@@ -353,7 +389,7 @@ def main():
 		for line in blocks:
 			l = line.split("\t")
 			new = line.split("\n")
-			dist = float(l[2]) - float(l[1])
+			dist = int(float(l[2]) - float(l[1]))
 			if dist >= block_distance:
 				OUTPUT.write(new[0] + "\t" + str(dist) + "\n")
 
