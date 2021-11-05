@@ -14,7 +14,6 @@ And it's ready to go!
 | Program     | Type        | Version | Links      |
 |-------------|-------------|---------|------------|
 | Bedtools    | Program     | 2.25    | [source](https://bedtools.readthedocs.io/en/latest/), [cite](https://doi.org/10.1093/bioinformatics/btq033) |
-| pandas      | Module      | 1.3.4   | [source](https://pandas.pydata.org/), [cite](https://doi.org/10.5281/zenodo.5574486) |
 | pysam       | Module      | 0.1.7   | [source](https://pypi.org/project/pysam/), [cite](https://github.com/pysam-developers/pysam) |
 | Python      | Interpreter | 3.6.1   | [source](https://www.python.org/downloads/release/python-397/), [cite](http://citebay.com/how-to-cite/python/) |
 
