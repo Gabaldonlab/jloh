@@ -4,7 +4,7 @@
 
 A tool to extract blocks of loss of heterozygosity (LOH) based on single-nucleotide polymorphisms (SNPs) and a reference genome.
 
-![JLOH workflow](src/jloh_v1.png)
+![JLOH workflow](images/jloh_v1.png)
 
 ## Install
 
