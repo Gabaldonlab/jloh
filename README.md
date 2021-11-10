@@ -8,7 +8,7 @@ A tool to extract blocks of loss of heterozygosity (LOH) based on single-nucleot
 
 ## Install
 
-As simple as: `git clone https://github.com/MatteoSchiavinato/jloh.git`
+As simple as: `git clone https://github.com/Gabaldonlab/jloh.git` or `https://github.com/MatteoSchiavinato/jloh.git`
 And it's ready to go!
 
 ### Dependencies
