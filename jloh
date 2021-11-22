@@ -16,7 +16,7 @@ Last change: 11/05/2018
 v3
 Matteo Schiavinato
 Notes: upgrade to python3, integrated three scripts in one, improved code readability
-Last change: 05/11/2021
+Last change: 22/11/2021
 ###
 """
 
@@ -38,6 +38,8 @@ J LOH
 Still the one from the block
 -
 Extact LOH blocks from SNPs and a reference genome
+-
+v 0.1
 --------------------------------------------------------------------------------
 by Matteo Schiavinato
 based on the work of Leszek Pryszcz and Veronica Mixao
@@ -56,6 +58,7 @@ Usage:
 [optional]
 --sample            Sample name / Strain name for output files                  [loh_blocks]
 --output-dir        Output directory                                            [loh_blocks_out]
+--t0-vcf            VCF with variants to ignore from --vcf                      [off]
 --window            Window for heterozygous blocks definition                   [100]
 --min-size          Min. LOH block size                                         [100]
 --block-distances   Comma-sep. list of desired distances between LOH blocks     [100,1000,5000]
@@ -67,21 +70,22 @@ Usage:
 --bedtools          Path to the bedtools executable                             [bedtools]
 --print-info        Show authors and edits with dates                           [off]
 
-	""")
+""")
 	sys.exit(0)
 
 # argument parser
 p = ap.ArgumentParser(description="")
-p.add_argument("--vcf")
+p.add_argument("--vcf", type=str)
 p.add_argument("--genome-file")
 p.add_argument("--sample", default="loh_blocks")
 p.add_argument("--output-dir", default="loh_blocks_out")
+p.add_argument("--t0-vcf", type=str, default=None)
 p.add_argument("--window", default=100, type=int)
 p.add_argument("--min-size", default=100, type=int)
 p.add_argument("--block-distances", default="100,1000,5000", type=str)
 p.add_argument("--min-af", default=0, type=float)
 p.add_argument("--max-af", default=1, type=float)
-p.add_argument("--bam")
+p.add_argument("--bam", type=str)
 p.add_argument("--min-frac-cov", type=float)
 p.add_argument("--max-frac-cov", type=float)
 p.add_argument("--bedtools", default="bedtools")
@@ -89,15 +93,69 @@ p.add_argument("--print-info", action="store_true")
 args = p.parse_args()
 
 # functions
-def extract_heterozygous_snps(vcf, min_af, max_af):
+def organize_workspace(output_dir, min_frac_cov, max_frac_cov, bam):
+
+	"""
+	Creation of folders and workspace where the script has to operate
+	Verify presence of minimal set of files to work with
+	"""
+
+	if os.path.exists(output_dir) == False:
+		os.makedirs(output_dir)
+		sys.stderr.write(f"Created output directory {output_dir}\n")
+
+	# check if bam is used or not
+	if bam and not (min_frac_cov or max_frac_cov):
+		sys.stderr.write("ERROR: If you specify a --bam file you may want to use --min-frac-cov or --max-frac-cov\n")
+		sys.exit(1)
+
+	if (min_frac_cov or max_frac_cov) and not bam:
+		sys.stderr.write("ERROR: If you use --min-frac-cov or --max-frac-cov you may want to specify a --bam file\n")
+		sys.exit(1)
+
+	return (True, output_dir)
+
+
+def select_relevant_variants(output_dir, sample, t0_vcf, bedtools, vcf):
+
+	"""
+	Removing variants annotated in the declared t0_vcf file
+	If not declared, all variants are retained
+	Which means that the whole input --vcf is assigned as filt_vcf_out
+	"""
+
+	if t0_vcf != None:
+		sys.stderr.write("Removing T0 variants...\n")
+		filt_vcf_out = f"{output_dir}/{sample}.relevant.vcf"
+		cmd = f"{bedtools} intersect -header -u -a {vcf} -b {t0_vcf} > {filt_vcf_out}"
+		try:
+		    subprocess.run([cmd], check=True, shell=True)
+		except subprocess.CalledProcessError:
+			sys.stderr.write("ERROR: bedtools intersect didn't work\n")
+			sys.exit(1)
+	else:
+		sys.stderr.write("No T0 VCF declared: preserving all variants for analysis...\n")
+		filt_vcf_out = vcf
+		try:
+		    subprocess.run([cmd], check=True, shell=True)
+		except subprocess.CalledProcessError:
+			sys.stderr.write("ERROR: couldn't copy input VCF file into output directory\n")
+			sys.exit(1)
+
+	return (True, filt_vcf_out, sample)
+
+
+def extract_heterozygous_snps(vcf, min_af, max_af, output_dir, sample):
 
 	"""
 	v1
 	Author: Matteo Schiavinato
-	Last change: 05/11/2021
-	Input: the raw VCF file containing SNPs and indels
+	Last change: 22/11/2021
+	Input: the VCF file containing SNPs and indels
 	Output: only heterozygous SNPs, including number of kept and removed lines
 	"""
+
+	het_snps_vcf = f"{output_dir}/{sample}.het_snps.vcf"
 
 	# iterate over variants
 	removed, kept, Lines, New_lines = 0, 0, [], []
@@ -111,60 +169,94 @@ def extract_heterozygous_snps(vcf, min_af, max_af):
 
 	for lst in Lines:
 
-		# if it's a SNP
-		if len(lst[3]) == len(lst[4]) == 1:
+		# read values
+		annotations = lst[8].split(":")
+		values = lst[9].split(":")
+		dict = { annotations[i]:values[i] for i in range(0, len(annotations)) }
 
-			# read values
-			annotations = lst[8].split(":")
-			values = lst[9].split(":")
-			dict = { annotations[i]:values[i] for i in range(0, len(annotations)) }
+		# if it's a single heterozygous SNP
+		if ((len(lst[3]) == len(lst[4]) == 1) and (dict["GT"]=="0/1")):
 
-			# 3. check if allele frequency (AF) >= min and <= max
-			if (dict["GT"]=="0/1"):
+			# does AF fit the criteria?
+			if (min_af <= float(dict["AF"]) <= max_af):
 
-				# does AF fit the criteria?
-				if (min_af <= float(dict["AF"]) <= max_af):
+				# 4. write out lines that have fitting values
+				New_lines.append("\t".join(lst) + "\n")
+				kept += 1
 
-					# 4. write out lines that have fitting values
-					New_lines.append("\t".join(lst) + "\n")
-					kept += 1
-
-				else:
-					removed += 1
-
-			# in case there is a multiallelic site
-			# which shows different alleles in the two chromosomes
-			elif ((dict["GT"] != "0/0") and (dict["GT"] != "1/1") and (dict["GT"] != "0/1") \
-			and (dict["GT"].split("/")[0] != dict["GT"].split("/")[1])):
-
-				# extract all AFs
-				Afs = dict["AF"].split(",")
-				# check if any of them has an allele frequency within range
-				if any([min_af <= float(af) <= max_af for af in Afs]):
-
-					# 4. write out lines that have fitting values
-					New_lines.append("\t".join(lst) + "\n")
-					kept += 1
-
-				# remove those that don't have at least one frequency within range
-				else:
-					removed += 1
-
-			# remove homozygous
+			# remove those without the frequency in range
 			else:
 				removed += 1
 
-		# remove non-SNPs
+		# consider multiallelic sites
+		elif ((len(lst[3]) == 1) and (len(lst[4].split(",")) > 1)):
+
+			# this means that there are two annotations for AF
+			# and that both have to be checked
+			# so it is a variation on the previous block
+			# which could be rendered into a function
+			# assuming that there are > 1 AF annotation
+			# splitting the field based on the comma
+			# and converting to float the content
+			AFs = [ float(x) for x in dict["AF"].split(",") ]
+
+			# all it takes is one of the variants to be heterozygous
+			# for the locus to be conserved
+			# where het = AF comprised between --min-af and --max-af
+			Conditions = [ float(args.min_af) <= af <= float(args.max_af) for af in AFs]
+			if any(Conditions) == True:
+
+				# 4. write out lines that have fitting values
+				New_lines.append("\t".join(lst) + "\n")
+				kept += 1
+
+			# remove those without any heterozygous snp
+			# among those available
+			else:
+				removed += 1
+
+		# remove homozygous SNPs
+		# and indels
 		else:
 			removed += 1
 
-	return (New_lines, kept, removed)
+	sys.stderr.write(f"Kept {kept} heterozygous SNPs ({round((kept / (kept + removed))*100, 2)} %) out of {kept+removed} VCF records\n")
+
+	# write filtered bed file lines to an actual bed file output
+	OUT = open(het_snps_vcf, "w")
+	for line in New_lines:
+		OUT.write(line)
+	OUT.close()
+
+	return (True, het_snps_vcf)
 
 
-
-def bed2count_filter( handle, minC, maxC, minL ):
+def merge_bed_intervals(sample, output_dir, window, bedtools, het_snps_vcf):
 
 	"""
+	Create BED regions based on the input VCF rows after their filtering
+	These regions are --window large and centered on the SNPs
+	For each window, the number of variants contained in it are counted
+	Sort of like a coverage
+	"""
+
+	merged_bed_out = f"{output_dir}/{sample}.d{args.window}bp_provisory.bed"
+	cmd = f"{bedtools} merge -d {window} -c 1 -o count -i {het_snps_vcf} > {merged_bed_out}"
+	try:
+	    subprocess.run([cmd], check=True, shell=True)
+	except subprocess.CalledProcessError:
+		sys.stderr.write("ERROR: bedtools merge didn't work\n")
+		sys.exit(1)
+
+	return (True, merged_bed_out, window)
+
+
+def bed2count_filter(in_bed, out_bed, output_dir, sample, window, minC, maxC, minL):
+
+	"""
+	Filter regions based on the number of variants found in them
+	Which were counted in the previous function
+
 	v1
 	Author: Leszek Pryszcz
 	Notes: Parse BED and print stats
@@ -173,8 +265,10 @@ def bed2count_filter( handle, minC, maxC, minL ):
 	v2
 	Author: Matteo Schiavinato
 	Notes: included a return statement to fit the new code, update to python3
-	Last change: 05/11/2021
+	Last change: 22/11/2021
 	"""
+
+	handle = open(in_bed, "r")
 
 	out = []
 	i, skipped = 0, 0
@@ -190,7 +284,33 @@ def bed2count_filter( handle, minC, maxC, minL ):
 		else:
 			skipped += 1
 
-	return out
+	# write filtered bed file lines to an actual bed file output
+	OUT = open(out_bed, "w")
+	for line in out:
+		OUT.write(line)
+	OUT.close()
+
+	return (True, out_bed, minC, maxC, minL)
+
+
+def get_complementary_regions(output_dir, sample, window, bedtools, filt_bed, genome_file):
+
+	"""
+	Run bedtools complement to obtain BED intervals
+	These intervals represent the complement of the original regions
+	Which in turn represented the heterozygous blocks
+	Hence, the output of this function are the homozygous blocks
+	"""
+
+	complement_bed = f"{output_dir}/{sample}.d{window}bp.complement.bed"
+	cmd_complement = f"{bedtools} complement -i {filt_bed} -g {genome_file} > {complement_bed}"
+	try:
+	    subprocess.run([cmd_complement], check=True, shell=True)
+	except subprocess.CalledProcessError:
+		sys.stderr.write("ERROR: bedtools complement didn't work\n")
+		sys.exit(1)
+
+	return (True, complement_bed)
 
 
 def filter_by_coverage(bam_file, bed_file, covfr, cmax):
@@ -234,105 +354,96 @@ def filter_by_coverage(bam_file, bed_file, covfr, cmax):
 
 def main():
 
-	# -----------
-	# preparation
+	"""
+	Function carrying on the main operations
+	"""
 
+	# --------------------------------------
 	# if required print script info and quit
 	if args.print_info:
 		print(script_info)
 		sys.exit(0)
 
+	# ---------------------------------------
 	# create output directory if not existing
-	if os.path.exists(args.output_dir) == False:
-		os.makedirs(args.output_dir)
-		sys.stderr.write(f"Created output directory {args.output_dir}\n")
+	sys.stderr.write("Preparing workspace...\n")
+	(result, output_dir) = organize_workspace(	args.output_dir,
+												args.min_frac_cov,
+												args.max_frac_cov,
+												args.bam)
 
-	# check if bam is used or not
-	if args.bam and not (args.min_frac_cov or args.max_frac_cov):
-		sys.stderr.write("ERROR: If you specify a --bam file you may want to use --min-frac-cov or --max-frac-cov\n")
-		sys.exit(1)
-
-	if (args.min_frac_cov or args.max_frac_cov) and not args.bam:
-		sys.stderr.write("ERROR: If you use --min-frac-cov or --max-frac-cov you may want to specify a --bam file\n")
-		sys.exit(1)
+	# ---------------------------------------
+	# filter out variants from t0 if required
+	sys.stderr.write("Selecting relevant variants...\n")
+	(result, filt_vcf_out, sample) = select_relevant_variants(	output_dir,
+																args.sample,
+																args.t0_vcf,
+																args.bedtools,
+																args.vcf)
 
 	# -------------------------------------------
 	# Extract heterozygous snps from raw VCF file
 	sys.stderr.write("Extracting heterozygous SNPs from VCF file...\n")
 	sys.stderr.write(f"Considering only SNPs with {args.min_af} <= AF <= {args.max_af}\n")
-	het_snps_vcf = f"{args.output_dir}/{args.sample}.het_snps.vcf"
-	(Het_lines, kept, removed) = extract_heterozygous_snps(args.vcf, args.min_af, args.max_af)
-	sys.stderr.write(f"Kept {kept} heterozygous SNPs ({round((kept / (kept + removed))*100, 2)} %) out of {kept+removed} VCF records\n")
-
-	# write filtered bed file lines to an actual bed file output
-	OUT = open(het_snps_vcf, "w")
-	for line in Het_lines:
-		OUT.write(line)
-	OUT.close()
+	(result, het_snps_vcf) = extract_heterozygous_snps(	filt_vcf_out,
+														args.min_af,
+														args.max_af,
+														output_dir,
+														sample)
 
 	# -------------------------------------------
 	# Get heterozygous blocks with bedtools merge
-
 	# merge bed file
-	sys.stderr.write(f"Defining heterozygous blocks for {args.sample}\n")
-	merged_bed_out = f"{args.output_dir}/{args.sample}.d{args.window}bp_provisory.bed"
-	cmd_heterozygous_blocks = f"{args.bedtools} merge -d {args.window} -c 1 -o count -i {het_snps_vcf} > {merged_bed_out}"
-	try:
-	    subprocess.run([cmd_heterozygous_blocks], check=True, shell=True)
-	except subprocess.CalledProcessError:
-		sys.stderr.write("ERROR: bedtools merge didn't work\n")
-		sys.exit(1)
+	sys.stderr.write(f"Defining heterozygous blocks for {sample}\n")
+	(result, merged_bed_out, window) = merge_bed_intervals(	sample,
+															output_dir,
+															args.window,
+															args.bedtools,
+															het_snps_vcf)
 
 	# ---------------------------------------------
 	# run filtering function on the merged bed file
-
 	# setting loose parameters for filtering
 	# set by Veronica in her script
-	minC, maxC, minL = 2, float("inf"), 0
-
-	Filt_lines = bed2count_filter( open(merged_bed_out, "r"), float(minC), float(maxC), int(minL) )
-	filt_bed = f"{args.output_dir}/{args.sample}.d{args.window}bp.bed"
-
-	# write filtered bed file lines to an actual bed file output
-	OUT = open(filt_bed, "w")
-	for line in Filt_lines:
-		OUT.write(line)
-	OUT.close()
+	sys.stderr.write("Keeping only blocks with > 1 SNP...\n")
+	minC, maxC, minL = float(2), float("inf"), float(0)
+	filt_bed = f"{output_dir}/{sample}.d{window}bp.bed"
+	(result, filt_bed, minC, maxC, minL) = bed2count_filter(merged_bed_out,
+															filt_bed,
+															output_dir,
+															sample,
+															window,
+															minC,
+															maxC,
+															minL)
 
 	# ------------------------------------------------------
 	# Obtaining complementary regions to heterozygous blocks
-
 	# get complementary bed file
 	sys.stderr.write("Getting complementary regions...\n")
-	complement_bed = f"{args.output_dir}/{args.sample}.d{args.window}bp.complement.bed"
-	cmd_complement = f"{args.bedtools} complement -i {filt_bed} -g {args.genome_file} > {complement_bed}"
-	try:
-	    subprocess.run([cmd_complement], check=True, shell=True)
-	except subprocess.CalledProcessError:
-		sys.stderr.write("ERROR: bedtools complement didn't work\n")
-		sys.exit(1)
+	(result, complement_bed) = get_complementary_regions(	output_dir,
+															sample,
+															window,
+															args.bedtools,
+															filt_bed,
+															args.genome_file)
 
 	# --------------------------------------------------
 	# Filter the complement to get the homozygous blocks
-
-	# setting loose parameters for filtering
-	# set by Veronica in her script
+	sys.stderr.write("Getting candidate LOH blocks...\n")
 	minC, maxC, minL = float("-inf"), float("inf"), 0
+	filt_compl_bed = f"{output_dir}/{sample}.homo.d{window}bp.bed"
+	(result, filt_bed, minC, maxC, minL) = bed2count_filter(merged_bed_out,
+															filt_compl_bed,
+															output_dir,
+															sample,
+															window,
+															minC,
+															maxC,
+															minL)
 
-	# filter bed file
-	sys.stderr.write("Getting the homozygous blocks...\n")
-	Filt_compl_lines = bed2count_filter( open(complement_bed, "r"), float(minC), float(maxC), int(args.min_size) )
-	filt_compl_bed = f"{args.output_dir}/{args.sample}.homo.d{args.window}bp.bed"
-
-	# write filtered complement bed file lines to an actual bed file output
-	OUT = open(filt_compl_bed, "w")
-	for line in Filt_compl_lines:
-		OUT.write(line)
-	OUT.close()
-
-	# ------------------
-	# filter by coverage
-
+	# -----------------------------------------
+	# filter by real coverage from the BAM file
 	if (args.min_frac_cov or args.max_frac_cov) and args.bam:
 
 		# check what values were passed
@@ -353,7 +464,7 @@ def main():
 
 		# use the filtered bed file as input for next step
 		Final_bed_lines = filter_by_coverage(args.bam, filt_compl_bed, min_frac_cov, max_frac_cov)
-		final_bed_file = f"{args.output_dir}/{args.sample}.homo.d{args.window}bp.cov_flt.bed"
+		final_bed_file = f"{output_dir}/{sample}.homo.d{window}bp.cov_flt.bed"
 
 		# write final bed file lines to an actual bed file output
 		OUT = open(final_bed_file, "w")
@@ -362,7 +473,7 @@ def main():
 		OUT.close()
 
 	else:
-		final_bed_file = f"{args.output_dir}/{args.sample}.homo.d{args.window}bp.cov_flt.bed"
+		final_bed_file = f"{output_dir}/{sample}.homo.d{window}bp.cov_flt.bed"
 		try:
 		    subprocess.run([f"cp {filt_compl_bed} {final_bed_file}"], check=True, shell=True)
 		except subprocess.CalledProcessError:
@@ -383,7 +494,7 @@ def main():
 		sys.stderr.write(f"Generating output file filtered at min. {block_distance} range\n")
 
 		# open output file
-		OUTPUT = open(f"{args.output_dir}/{args.sample}.homo.d{args.window}bp.cov_flt.{block_distance}bp.bed", "w")
+		OUTPUT = open(f"{output_dir}/{sample}.homo.d{window}bp.cov_flt.{block_distance}bp.bed", "w")
 
 		# extract corresponding regions
 		for line in blocks:
