@@ -124,9 +124,10 @@ def select_relevant_variants(output_dir, sample, t0_vcf, bedtools, vcf):
 	Which means that the whole input --vcf is assigned as filt_vcf_out
 	"""
 
+	filt_vcf_out = f"{output_dir}/{sample}.relevant.vcf"
+
 	if t0_vcf != None:
 		sys.stderr.write("Removing T0 variants...\n")
-		filt_vcf_out = f"{output_dir}/{sample}.relevant.vcf"
 		cmd = f"{bedtools} intersect -header -u -a {vcf} -b {t0_vcf} > {filt_vcf_out}"
 		try:
 		    subprocess.run([cmd], check=True, shell=True)
@@ -135,7 +136,7 @@ def select_relevant_variants(output_dir, sample, t0_vcf, bedtools, vcf):
 			sys.exit(1)
 	else:
 		sys.stderr.write("No T0 VCF declared: preserving all variants for analysis...\n")
-		filt_vcf_out = vcf
+		cmd = f"cp {vcf} {filt_vcf_out}"
 		try:
 		    subprocess.run([cmd], check=True, shell=True)
 		except subprocess.CalledProcessError:
