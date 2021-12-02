@@ -16,7 +16,7 @@ Last change: 11/05/2018
 v3
 Matteo Schiavinato
 Notes: upgrade to python3, integrated three scripts in one, improved code readability
-Last change: 26/11/2021
+Last change: 02/12/2021
 ###
 """
 
@@ -39,7 +39,7 @@ Still the one from the block
 -
 Extact LOH blocks from SNPs and a reference genome
 -
-v 0.1
+v 0.1.0
 --------------------------------------------------------------------------------
 by Matteo Schiavinato
 based on the work of Leszek Pryszcz and Veronica Mixao
@@ -49,22 +49,23 @@ Mixao et al., 2019		https://doi.org/10.3389/fgene.2019.00383
 --------------------------------------------------------------------------------
 
 Usage:
-./jloh --vcf <VCF> --genome-file <GENOME_FILE> [options]
+./jloh --vcf <VCF> --genome-file <GENOME_FILE> --bam <BAM> [options]
 
 [mandatory]
 --vcf               Input VCF file containing all types of variants             [!]
 --genome-file       File with chromosome lengths (chromosome <TAB> size)        [!]
+--bam               BAM file used to call the --vcf variants                    [!]
 
 [optional]
 --sample            Sample name / Strain name for output files                  [loh_blocks]
 --output-dir        Output directory                                            [loh_blocks_out]
 --t0-vcf            VCF with variants to ignore from --vcf                      [off]
+--min-het-snps      Min. num. of heterozygous SNPs in heterozygous region       [2]
 --snp-distance      Min. distance (bp between SNPs for blocks definition        [100]
 --min-size          Min. LOH block size                                         [100]
 --block-lengths     Comma-sep. list of desired distances between LOH blocks     [100,1000,5000]
 --min-af            Min. allele frequency to consider a variant heterozygous    [0.3]
 --max-af            Max. allele frequency to consider a variant heterozygous    [0.7]
---bam               BAM file (only required when filtering by coverage)         [off]
 --min-frac-cov      Min. mean coverage fraction for LOH blocks                  [0.75]
                     (used only if --bam specified)
 --max-frac-cov      Max. mean coverage fraction for LOH blocks                  [1.25]
@@ -82,6 +83,7 @@ p.add_argument("--genome-file")
 p.add_argument("--sample", default="loh_blocks")
 p.add_argument("--output-dir", default="loh_blocks_out")
 p.add_argument("--t0-vcf", type=str, default=None)
+p.add_argument("--min-het-snps", type=float, default=2)
 p.add_argument("--snp-distance", default=100, type=int)
 p.add_argument("--min-size", default=100, type=int)
 p.add_argument("--block-lengths", default="100,1000,5000", type=str)
@@ -106,6 +108,9 @@ def organize_workspace(output_dir, min_frac_cov, max_frac_cov, bam):
 		os.makedirs(output_dir)
 		sys.stderr.write(f"Created output directory {output_dir}\n")
 
+	if os.path.exists(f"{output_dir}/process") == False:
+		os.mkdir(f"{output_dir}/process")
+
 	# check if bam is used or not
 	if bam and not (min_frac_cov or max_frac_cov):
 		sys.stderr.write("ERROR: If you specify a --bam file you may want to use --min-frac-cov or --max-frac-cov\n")
@@ -118,15 +123,16 @@ def organize_workspace(output_dir, min_frac_cov, max_frac_cov, bam):
 	return (True, output_dir)
 
 
-def select_relevant_variants(output_dir, sample, t0_vcf, bedtools, vcf):
+def select_relevant_variants(output_dir, sample, t0_vcf, bedtools, vcf, filt_vcf_out):
 
 	"""
+	v1
+	Author: Matteo Schiavinato
+	Last change: 02/12/2021
 	Removing variants annotated in the declared t0_vcf file
 	If not declared, all variants are retained
 	Which means that the whole input --vcf is assigned as filt_vcf_out
 	"""
-
-	filt_vcf_out = f"{output_dir}/{sample}.relevant.vcf"
 
 	if t0_vcf != None:
 		sys.stderr.write("Removing T0 variants...\n")
@@ -148,17 +154,15 @@ def select_relevant_variants(output_dir, sample, t0_vcf, bedtools, vcf):
 	return (True, filt_vcf_out, sample)
 
 
-def extract_heterozygous_snps(vcf, min_af, max_af, output_dir, sample):
+def extract_heterozygous_snps(vcf, min_af, max_af, output_dir, sample, het_snps_vcf):
 
 	"""
 	v1
 	Author: Matteo Schiavinato
-	Last change: 22/11/2021
+	Last change: 02/12/2021
 	Input: the VCF file containing SNPs and indels
 	Output: only heterozygous SNPs, including number of kept and removed lines
 	"""
-
-	het_snps_vcf = f"{output_dir}/{sample}.het_snps.vcf"
 
 	# iterate over variants
 	removed, kept, Lines, New_lines = 0, 0, [], []
@@ -382,7 +386,7 @@ def filter_by_coverage(bam_file, bed_file, covfr, cmax):
 		#unload bed coordinate
 		chrom, start, end, length = bed.rstrip("\n\b\r").split('\t')
 		start, end = int(start), int(end)
-		#get read count within range of bed file 
+		#get read count within range of bed file
 		c = sam.count(chrom, start, end)
 		#check if correct coverage
 		cov = c *1.0 / (end-start)
@@ -416,27 +420,34 @@ def main():
 	# ---------------------------------------
 	# filter out variants from t0 if required
 	sys.stderr.write("Selecting relevant variants...\n")
+	filt_vcf_out = f"{output_dir}/process/{args.sample}.relevant.vcf"
+
 	(result, filt_vcf_out, sample) = select_relevant_variants(	output_dir,
 																args.sample,
 																args.t0_vcf,
 																args.bedtools,
-																args.vcf)
+																args.vcf,
+																filt_vcf_out)
 
 	# -------------------------------------------
 	# Extract heterozygous snps from raw VCF file
 	sys.stderr.write("Extracting heterozygous SNPs from VCF file...\n")
 	sys.stderr.write(f"Considering only SNPs with {args.min_af} <= AF <= {args.max_af}\n")
+	het_snps_vcf = f"{output_dir}/{sample}.het_snps.vcf"
+
 	(result, het_snps_vcf) = extract_heterozygous_snps(	filt_vcf_out,
 														args.min_af,
 														args.max_af,
 														output_dir,
-														sample)
+														sample,
+														het_snps_vcf)
 
 	# -------------------------------------------
 	# Get heterozygous blocks with bedtools merge
 	# merge bed file
 	sys.stderr.write(f"Defining heterozygous blocks for {sample}...\n")
-	merged_bed_out = f"{output_dir}/{sample}.d{args.snp_distance}bp_provisory.bed"
+	merged_bed_out = f"{output_dir}/process/{sample}.d{args.snp_distance}bp_provisory.bed"
+
 	(result, snp_distance) = merge_bed_intervals(sample,
 												output_dir,
 												args.snp_distance,
@@ -446,14 +457,16 @@ def main():
 
 	# add length to BED file
 	sys.stderr.write(f"Calculating length of BED intervals...\n")
-	bed_with_length = f"{output_dir}/{sample}.d{args.snp_distance}bp_provisory_w_len.bed"
+	bed_with_length = f"{output_dir}/process/{sample}.d{args.snp_distance}bp_provisory_w_len.bed"
+
 	result = add_length(merged_bed_out, bed_with_length)
 
 	# ---------------------------------------------
 	# run filtering function on the merged bed file
 	sys.stderr.write("Keeping only blocks with > 1 SNP...\n")
-	minC, maxC, minL = float(2), float("inf"), float(0)
-	filt_bed = f"{output_dir}/{sample}.d{snp_distance}bp.bed"
+	minC, maxC, minL = float(args.min_het_snps), float("inf"), float(0)
+	filt_bed = f"{output_dir}/process/{sample}.d{snp_distance}bp.bed"
+
 	(result, minC, maxC, minL) = filter_by_snp_density(bed_with_length,
 														filt_bed,
 														output_dir,
@@ -467,7 +480,8 @@ def main():
 	# Obtaining complementary regions to heterozygous blocks
 	# get complementary bed file
 	sys.stderr.write("Getting complementary regions...\n")
-	complement_bed = f"{output_dir}/{sample}.d{snp_distance}bp.complement.bed"
+	complement_bed = f"{output_dir}/process/{sample}.d{snp_distance}bp.complement.bed"
+
 	result = get_complementary_regions(complement_bed,
 										args.bedtools,
 										filt_bed,
@@ -476,74 +490,33 @@ def main():
 	# --------------------------------------------------
 	# Filter the complement to get the homozygous blocks
 	sys.stderr.write("Getting candidate LOH blocks...\n")
-	filt_compl_bed = f"{output_dir}/{sample}.homo.d{snp_distance}bp.bed"
+	filt_compl_bed = f"{output_dir}/process/{sample}.homo.d{snp_distance}bp.bed"
+
 	result = filter_by_length(complement_bed,
 							filt_compl_bed,
 							args.min_size)
 
 	# -----------------------------------------
 	# filter by real coverage from the BAM file
-	if (args.min_frac_cov or args.max_frac_cov) and args.bam:
+	# index bam file
+	if os.path.exists(f"{args.bam}.bai") == False:
+		sys.stderr.write("BAM index not found. Indexing BAM file...\n")
+		pysam.index(args.bam)
 
-		# check what values were passed
-		if args.min_frac_cov:
-			min_frac_cov = float(args.min_frac_cov)
-		else:
-			min_frac_cov = float(0)
+	# use the filtered bed file as input for next step
+	Final_bed_lines = filter_by_coverage(	args.bam,
+											filt_compl_bed,
+											args.min_frac_cov,
+											args.max_frac_cov)
 
-		if args.max_frac_cov:
-			max_frac_cov = float(args.max_frac_cov)
-		else:
-			max_frac_cov = float("inf")
+	final_bed_file = f"{output_dir}/{sample}.LOH_blocks.bed"
 
-		# index bam file
-		if os.path.exists(f"{args.bam}.bai") == False:
-			sys.stderr.write("BAM index not found. Indexing BAM file...\n")
-			pysam.index(args.bam)
-
-		# use the filtered bed file as input for next step
-		Final_bed_lines = filter_by_coverage(args.bam, filt_compl_bed, min_frac_cov, max_frac_cov)
-		final_bed_file = f"{output_dir}/{sample}.homo.d{snp_distance}bp.cov_flt.bed"
-
-		# write final bed file lines to an actual bed file output
-		OUT = open(final_bed_file, "w")
-		for line in Final_bed_lines:
-			OUT.write(line)
-		OUT.close()
-
-	else:
-		final_bed_file = f"{output_dir}/{sample}.homo.d{snp_distance}bp.cov_flt.bed"
-		try:
-		    subprocess.run([f"cp {filt_compl_bed} {final_bed_file}"], check=True, shell=True)
-		except subprocess.CalledProcessError:
-			sys.stderr.write("ERROR: file copying didn't work\n")
-			sys.exit(1)
-
-	# --------------------------------------------------------
-	# write output files with specific window range thresholds
-
-	# open input file
-	blocks_file = open(final_bed_file, "r")
-	blocks = blocks_file.readlines()
-	blocks_file.close()
-
-	# iterate over predefined ranges
-	for block_length in [int(i) for i in args.block_lengths.split(",")]:
-
-		sys.stderr.write(f"Generating output file filtered at min. {block_length} range\n")
-
-		# open output file
-		OUTPUT = open(f"{output_dir}/{sample}.homo.d{snp_distance}bp.cov_flt.{block_length}bp.bed", "w")
-
-		# extract corresponding regions
-		for line in blocks:
-			chrom, start, end, cov, length = line.rstrip("\b\r\n").split("\t")
-			length = int(length)
-			if length >= block_length:
-				OUTPUT.write(line)
-
-		# close output file
-		OUTPUT.close()
+	# write final bed file lines to an actual bed file output
+	OUT = open(final_bed_file, "w")
+	OUT.write("Chromosome\tStart\tEnd\tCoverage\tLength\n")
+	for line in Final_bed_lines:
+		OUT.write(line)
+	OUT.close()
 
 	sys.stderr.write("Done!\n")
 
