@@ -3,20 +3,9 @@
 # version and info
 script_info = """
 ###
-v1
-Author: Leszek Pryszcz
-Notes: Heterozygous variant extraction
-Last change: 14/02/2014
-###
-v2
-Author: Veronica Mixao
-Notes: LOH blocks extraction
-Last change: 11/05/2018
-###
-v3
-Matteo Schiavinato
-Notes: upgrade to python3, integrated three scripts in one, improved code readability
-Last change: 02/12/2021
+Author: Matteo Schiavinato
+Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2018)
+Last change: 03/12/2021
 ###
 """
 
