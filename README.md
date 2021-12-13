@@ -2,9 +2,14 @@
 
 *[Still the one from the block](https://www.youtube.com/watch?v=dly6p4Fu5TE)*
 
-A tool to extract blocks of loss of heterozygosity (LOH) based on single-nucleotide polymorphisms (SNPs) and a reference genome.
+A tool to extract blocks of loss of heterozygosity (LOH) based on single-nucleotide polymorphisms (SNPs), read mapping, and a reference genome. The main assumption behind this tool is that a true LOH event will be found where two conditions are verified in a specific DNA region:
 
-![JLOH workflow](images/jloh_v1.png)
+- No heterozygous SNPs are called
+- The region mean coverage increases (or decreases) by at least a certain amount when compared to the global mean coverage
+
+Additionally, JLOH allows you to pass a list of known variants that will be used to filter the output depending on the option you set with `--t0-filter-type` ("keep" or "remove").
+
+![JLOH workflow](images/workflow.png)
 
 ## Install
 
@@ -45,44 +50,56 @@ Usage:
 [mandatory]
 --vcf               Input VCF file containing all types of variants             [!]
 --genome-file       File with chromosome lengths (chromosome <TAB> size)        [!]
+--bam               BAM file used to call the --vcf variants                    [!]
 
 [optional]
 --sample            Sample name / Strain name for output files                  [loh_blocks]
 --output-dir        Output directory                                            [loh_blocks_out]
 --t0-vcf            VCF with variants to ignore from --vcf                      [off]
+--t0-bam            BAM file used to call the --t0-vcf variants                 [off]
+--t0-filter-type    What to do with t0 LOH events? "keep" or "remove"           [remove]
 --min-het-snps      Min. num. of heterozygous SNPs in heterozygous region       [2]
 --snp-distance      Min. distance (bp between SNPs for blocks definition        [100]
 --min-size          Min. LOH block size                                         [100]
+--block-lengths     Comma-sep. list of desired distances between LOH blocks     [100,1000,5000]
 --min-af            Min. allele frequency to consider a variant heterozygous    [0.3]
 --max-af            Max. allele frequency to consider a variant heterozygous    [0.7]
---bam               BAM file (only required when filtering by coverage)         [off]
 --min-frac-cov      Min. mean coverage fraction for LOH blocks                  [0.75]
                     (used only if --bam specified)
 --max-frac-cov      Max. mean coverage fraction for LOH blocks                  [1.25]
                     (used only if --bam specified)
---block-lengths     Comma-sep. list of desired distances between LOH blocks     [100,1000,5000]
 --bedtools          Path to the bedtools executable                             [bedtools]
 --print-info        Show authors and edits with dates                           [off]
 ```
 
 ## Output
 
-#### selection of relevant variants
-
-The program produces many output files. First, the variants passed as input VCF file are compared to those (if any) passed as `--t0-vcf`. If the latter option is used, all variants contained in both VCF files are excluded, as a means to exclude variation preexisting the experiment. If the `--t0-vcf` option is not used, then all variants passed as input are retained. In both cases, the retained variants are saved in a VCF file called `<sample>.relevant.vcf`.
-
 #### selection of heterozygous SNPs
 
-The relevant variants are then filtered, retaining only heterozygous SNPs. Indels and homozygous SNPs are filtered out as they aren't normally used to extract LOH blocks. The selection of heterozygous SNPs is conducted based on their FORMAT field (field number 9 and 10 of a VCF file). The first column of this field carries a series of annotations separated by colons (e.g. GT:AF) the values of which are annotated the same way on the second column (e.g.` 0/1:0.60`). If a SNP is annotated as heterozygous, it will carry a genotype (`GT`) such as `0/1` or `1/2`. It should also have an allele frequency (`AF`) annotation. SNPs are considered heterozygous if their `AF` annotation falls between the values specified with `--min-af` and `--max-af`. The heterozygous SNPs are then saved in a VCF file called `<sample>.het_snps.vcf`.
+The variants passed with `--vcf` are filtered, retaining only heterozygous SNPs. Indels and homozygous SNPs are filtered out as they aren't normally used to extract LOH blocks. The selection of heterozygous SNPs is conducted based on their FORMAT field (field number 9 and 10 of a VCF file). The first column of this field carries a series of annotations separated by colons (e.g. GT:AF) the values of which are annotated the same way on the second column (e.g.` 0/1:0.60`). If a SNP is annotated as heterozygous, it will carry a genotype (`GT`) such as `0/1` or `1/2`. It should also have an allele frequency (`AF`) annotation. SNPs are considered heterozygous if their `AF` annotation falls between the values specified with `--min-af` and `--max-af`. The heterozygous SNPs are then saved in a VCF file called `<sample>.het_snps.vcf`, which is one of the two output files of the program.
 
 #### extraction of heterozygosity regions
 
-The putative heterozygosity regions are extracted based on the number of heterozygous SNPs they contain, and the maximum distance between these SNPs for them to be considered part of the same region. These parameters are controlled with the `--min-het-snps` and the `--snp-distance` parameters. The default values for these two parameters (`--min-het-snps 2 --snp-distance 100`) are those used in many studies. This step uses **bedtools merge** to create BED intervals that fit these criteria. The number of SNPs is assessed with the `bedtools merge -c 1 -o count` option, while the distance is assessed with the `-d` parameter. This step produces three output files: 1) a file called `<sample>.d<snp_distance>bp_provisory.bed` where sample and snp distance depend on the parameters the used passed; 2) output BED file that contains the length of each interval, called the same way but with a `*w_len.bed` ending; 3) the actual output file, filtered by `--min-het-snps` and `--snp-distance`, called `<sample>.d<snp_distance>bp.bed`.
+The putative heterozygosity regions are extracted based on the number of heterozygous SNPs they contain, and the minimum distance between them. The minimum number of SNPs eliminates regions with too little SNPs to be considered true positives, while the minimum SNP distance rules out read mapping artifacts. These parameters are controlled with the `--min-het-snps` and the `--snp-distance` parameters. The number of SNPs is assessed with the `bedtools merge -c 1 -o count` option, while the distance is assessed with the `-d` parameter. This step produces three temporary files in the `/process` folder:
+
+1) `<sample>.d<snp_distance>bp_provisory.bed`: BED intervals surrounding heterozygous SNPs, including the SNP count inside the interval.
+2) `<sample>.d<snp_distance>bp_provisory.w_len.bed`: the same file but containing the length of each interval.
+3) `<sample>.d<snp_distance>bp.bed`: BED intervals defining regions with sufficient number of SNPs (`--min-het-snps`) and sufficiently far apart (`--snp-distance`).
+
+Note that the SNP distance has nothing to do with the length of an interval.
 
 #### extract complementary homozygous regions
 
-The objective of this tool is to extract LOH blocks, which are defined by the *loss* of  heterozygosity. Hence, the tool at this point selects the complementary intervals to those that were labelled as heterozygous. This is done with **bedtools complement**. The output file is called `<sample>.d<snp_distance>bp.complement.bed`. These regions are then filtered by their length, retaining only those with a length larger or equal to `--min-size`. This produces an output file called `<sample>.homo.d<snp_distance>bp.bed`.
+The objective of this tool is to extract LOH blocks, which are defined by the *loss* of  heterozygosity. Hence, the tool at this point selects the *complementary* intervals of the heterozygous ones. This is done with **bedtools complement**. The output file is called `<sample>.d<snp_distance>bp.complement.bed`. These regions are then filtered by their length, retaining only those with a length larger or equal to `--min-size`. This produces an output file called `<sample>.homo.d<snp_distance>bp.bed`.
 
 #### filter by coverage
 
-Each region that is considered as a candidate LOH region is screened by coverage using the BAM file passed with `--bam`. First, a mean coverage is computed for the whole BAM file. To do that, JLOH checks if the BAM file is indexed, and if not, it indexes it using the **pysam** module. Then, reads mapping inside each region are extracted using the **pysam** module, and compared against the general mean coverage. Candidate LOH blocks are retained in the output only if they have a coverage *below* or *above* what is considered "normal" coverage. The "normal" coverage range is defined via two parameters: `--min-frac-cov` and `--max-frac-cov`. The defaults of these two parameters (0.75 and 1.25) are used in many studies. The global mean coverage computed from the BAM file is multiplied by these two values to obtained the two boundaries of "normal" coverage. Every candidate LOH block falling above or below these two thresholds will be considered a true LOH block. True LOH blocks are placed in an output file called `<sample>.LOH_blocks.bed`. This is the true output of the program, and one of the only two that are not placed in the `process` folder, where temporary files are stored.
+Each region that is considered as a candidate LOH region is screened by coverage using the BAM file passed with `--bam`. First, a mean coverage is computed for the whole BAM file. To do that, JLOH checks if the BAM file is indexed, and if not, it indexes it using the **pysam** module. Then, reads mapping inside each region are extracted using the **pysam** module, and compared against the general mean coverage. Candidate LOH blocks are retained in the output only if they have a coverage *below* or *above* what is considered "normal" coverage. The "normal" coverage range is defined via two parameters: `--min-frac-cov` and `--max-frac-cov`. The global mean coverage computed from the BAM file is multiplied by these two values to obtained the two boundaries of "normal" coverage. Every candidate LOH block falling above or below these two thresholds will be considered a candidate LOH block. LOH blocks are placed in an temporary file called `<sample>.LOH_blocks.bed`.
+
+### deal with known pre-existing LOH blocks
+
+If the user passes another VCF file with the `-t0-vcf` option, this file will be considered as variation that pre-dates the one listed in `--vcf`. This "t0" variation is used to extract LOH blocks the same way as described for the input VCF file. The user can then choose what to do with it with the `--t0-filter-type` option. The default ("remove") will remove any overlapping LOH block found between the "t0" VCF and the input VCF. This reduces the output LOH blocks only to those unique to the input VCF. Some users however may want to keep only blocks that are found in "t0" too. To do that, one just has to specity `--t0-filter-type keep`. In both cases, an output file is produced, called `<sample>.LOH_blocks.filt.bed`. This is the real output of the program.
+
+If the user did not specify any `--t0-vcf`, this file will be identical to `<sample>.LOH_blocks.bed`.
+
+![JLOH workflow](images/schematic.png)
