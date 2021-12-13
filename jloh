@@ -15,6 +15,9 @@ import os
 import sys
 import pysam
 import subprocess
+from time import asctime as at
+import pybedtools
+from pybedtools import BedTool
 
 # help section
 if len(sys.argv) == 1:
@@ -28,7 +31,7 @@ Still the one from the block
 -
 Extact LOH blocks from SNPs and a reference genome
 -
-v 0.2.0
+v 0.3.0
 --------------------------------------------------------------------------------
 by Matteo Schiavinato
 largely based on:
@@ -60,7 +63,6 @@ Usage:
                     (used only if --bam specified)
 --max-frac-cov      Max. mean coverage fraction for LOH blocks                  [1.25]
                     (used only if --bam specified)
---bedtools          Path to the bedtools executable                             [bedtools]
 --print-info        Show authors and edits with dates                           [off]
 
 """)
@@ -84,7 +86,6 @@ p.add_argument("--max-af", default=0.7, type=float)
 p.add_argument("--bam", type=str)
 p.add_argument("--min-frac-cov", type=float, default=0.75)
 p.add_argument("--max-frac-cov", type=float, default=1.25)
-p.add_argument("--bedtools", default="bedtools")
 p.add_argument("--print-info", action="store_true")
 args = p.parse_args()
 
@@ -98,18 +99,18 @@ def organize_workspace(output_dir, min_frac_cov, max_frac_cov, bam):
 
 	if os.path.exists(output_dir) == False:
 		os.makedirs(output_dir)
-		sys.stderr.write(f"Created output directory {output_dir}\n")
+		sys.stderr.write(f"[{at()}] Created output directory {output_dir}\n")
 
 	if os.path.exists(f"{output_dir}/process") == False:
 		os.mkdir(f"{output_dir}/process")
 
 	# check if bam is used or not
 	if bam and not (min_frac_cov or max_frac_cov):
-		sys.stderr.write("ERROR: If you specify a --bam file you may want to use --min-frac-cov or --max-frac-cov\n")
+		sys.stderr.write(f"[{at()}] ERROR: If you specify a --bam file you may want to use --min-frac-cov or --max-frac-cov\n")
 		sys.exit()
 
 	if (min_frac_cov or max_frac_cov) and not bam:
-		sys.stderr.write("ERROR: If you use --min-frac-cov or --max-frac-cov you may want to specify a --bam file\n")
+		sys.stderr.write(f"[{at()}] ERROR: If you use --min-frac-cov or --max-frac-cov you may want to specify a --bam file\n")
 		sys.exit()
 
 	return (True, output_dir)
@@ -189,7 +190,7 @@ def extract_heterozygous_snps(vcf, min_af, max_af, output_dir, sample, het_snps_
 		else:
 			removed += 1
 
-	sys.stderr.write(f"Kept {kept} heterozygous SNPs ({round((kept / (kept + removed))*100, 2)} %) out of {kept+removed} VCF records\n")
+	sys.stderr.write(f"[{at()}] Kept {kept} heterozygous SNPs ({round((kept / (kept + removed))*100, 2)} %) out of {kept+removed} VCF records\n")
 
 	# write filtered bed file lines to an actual bed file output
 	OUT = open(het_snps_vcf, "w")
@@ -200,7 +201,7 @@ def extract_heterozygous_snps(vcf, min_af, max_af, output_dir, sample, het_snps_
 	return (True, het_snps_vcf)
 
 
-def merge_bed_intervals(sample, output_dir, snp_distance, bedtools_exec, het_snps_vcf, bed_out):
+def merge_bed_intervals(sample, output_dir, snp_distance, het_snps_vcf, bed_out):
 
 	"""
 	Create BED regions based on the input VCF rows after their filtering
@@ -209,12 +210,9 @@ def merge_bed_intervals(sample, output_dir, snp_distance, bedtools_exec, het_snp
 	The output is: chr | start | end | count
 	"""
 
-	cmd = f"{bedtools_exec} merge -d {snp_distance} -c 1 -o count -i {het_snps_vcf} > {bed_out}"
-	try:
-	    subprocess.run([cmd], check=True, shell=True)
-	except subprocess.CalledProcessError:
-		sys.stderr.write("ERROR: bedtools merge didn't work\n")
-		sys.exit()
+	bt = BedTool(het_snps_vcf)
+	bt_merged = bt.merge(d=100, c=1, o="count")
+	bt_merged.saveas(bed_out)
 
 	return (True, snp_distance)
 
@@ -279,7 +277,7 @@ def filter_by_snp_density(in_bed, out_bed, output_dir, sample, snp_distance, min
 	return (True, minC, maxC, minL)
 
 
-def get_complementary_regions(complement_bed, bedtools_exec, filt_bed, genome_file):
+def get_complementary_regions(complement_bed, filt_bed, genome_file):
 
 	"""
 	Run bedtools complement to obtain BED intervals
@@ -288,12 +286,9 @@ def get_complementary_regions(complement_bed, bedtools_exec, filt_bed, genome_fi
 	Hence, the output of this function are the homozygous blocks
 	"""
 
-	cmd_complement = f"{bedtools_exec} complement -i {filt_bed} -g {genome_file} > {complement_bed}"
-	try:
-	    subprocess.run([cmd_complement], check=True, shell=True)
-	except subprocess.CalledProcessError:
-		sys.stderr.write("ERROR: bedtools complement didn't work\n")
-		sys.exit()
+	bt = BedTool(filt_bed)
+	bt_comp = bt.complement(g=genome_file)
+	bt_comp.saveas(complement_bed)
 
 	return True
 
@@ -361,8 +356,7 @@ def filter_by_coverage(bam_file, bed_file, covfr, cmax):
 
 def process_vcf_file(	in_vcf, output_dir, genome_file, bam, sample, handle,
 						min_af, max_af, min_het_snps, snp_distance,
-						min_frac_cov, max_frac_cov, min_size,
-						bedtools_exec):
+						min_frac_cov, max_frac_cov, min_size):
 
 	"""
 	v1
@@ -371,8 +365,8 @@ def process_vcf_file(	in_vcf, output_dir, genome_file, bam, sample, handle,
 	"""
 
 	# Extract heterozygous snps from raw VCF file
-	sys.stderr.write("Extracting heterozygous SNPs from VCF file...\n")
-	sys.stderr.write(f"Considering only SNPs with {min_af} <= AF <= {max_af}\n")
+	sys.stderr.write(f"[{at()}] Extracting heterozygous SNPs from VCF file...\n")
+	sys.stderr.write(f"[{at()}] Considering only SNPs with {min_af} <= AF <= {max_af}\n")
 	het_snps_vcf = f"{output_dir}/{sample}.{handle}.het_snps.vcf"
 
 	(result, het_snps_vcf) = extract_heterozygous_snps(	in_vcf,
@@ -383,27 +377,26 @@ def process_vcf_file(	in_vcf, output_dir, genome_file, bam, sample, handle,
 														het_snps_vcf)
 
 	# -------------------------------------------
-	# Get heterozygous blocks with bedtools_exec merge
+	# Get heterozygous blocks with bedtools merge
 	# merge bed file
-	sys.stderr.write(f"Defining heterozygous blocks for {sample}...\n")
+	sys.stderr.write(f"[{at()}] Defining heterozygous blocks for {sample}...\n")
 	merged_bed_out = f"{output_dir}/process/{sample}.{handle}.d{snp_distance}bp_provisory.bed"
 
 	(result, snp_distance) = merge_bed_intervals(sample,
 												output_dir,
 												snp_distance,
-												bedtools_exec,
 												het_snps_vcf,
 												merged_bed_out)
 
 	# add length to BED file
-	sys.stderr.write(f"Calculating length of BED intervals...\n")
+	sys.stderr.write(f"[{at()}] Calculating length of BED intervals...\n")
 	bed_with_length = f"{output_dir}/process/{sample}.{handle}.d{snp_distance}bp_provisory_w_len.bed"
 
 	result = add_length(merged_bed_out, bed_with_length)
 
 	# ---------------------------------------------
 	# run filtering function on the merged bed file
-	sys.stderr.write("Keeping only blocks with > 1 SNP...\n")
+	sys.stderr.write(f"[{at()}] Keeping only blocks with > 1 SNP...\n")
 	minC, maxC, minL = float(min_het_snps), float("inf"), float(0)
 	filt_bed = f"{output_dir}/process/{sample}.{handle}.d{snp_distance}bp.bed"
 
@@ -419,17 +412,16 @@ def process_vcf_file(	in_vcf, output_dir, genome_file, bam, sample, handle,
 	# ------------------------------------------------------
 	# Obtaining complementary regions to heterozygous blocks
 	# get complementary bed file
-	sys.stderr.write("Getting complementary regions...\n")
+	sys.stderr.write(f"[{at()}] Getting complementary regions...\n")
 	complement_bed = f"{output_dir}/process/{sample}.{handle}.d{snp_distance}bp.complement.bed"
 
 	result = get_complementary_regions(complement_bed,
-										bedtools_exec,
 										filt_bed,
 										genome_file)
 
 	# --------------------------------------------------
 	# Filter the complement to get the homozygous blocks
-	sys.stderr.write("Getting candidate LOH blocks...\n")
+	sys.stderr.write(f"[{at()}] Getting candidate LOH blocks...\n")
 	filt_compl_bed = f"{output_dir}/process/{sample}.{handle}.homo.d{snp_distance}bp.bed"
 
 	result = filter_by_length(complement_bed,
@@ -440,7 +432,7 @@ def process_vcf_file(	in_vcf, output_dir, genome_file, bam, sample, handle,
 	# filter by real coverage from the BAM file
 	# index bam file
 	if os.path.exists(f"{bam}.bai") == False:
-		sys.stderr.write("BAM index not found. Indexing BAM file...\n")
+		sys.stderr.write(f"[{at()}] BAM index not found. Indexing BAM file...\n")
 		pysam.index(bam)
 
 	# use the filtered bed file as input for next step
@@ -453,7 +445,7 @@ def process_vcf_file(	in_vcf, output_dir, genome_file, bam, sample, handle,
 
 	# write final bed file lines to an actual bed file output
 	OUT = open(final_bed_file, "w")
-	OUT.write("Chromosome\tStart\tEnd\tCoverage\tLength\n")
+	# OUT.write("Chromosome\tStart\tEnd\tCoverage\tLength\n")
 	for line in Final_bed_lines:
 		OUT.write(line)
 	OUT.close()
@@ -461,7 +453,7 @@ def process_vcf_file(	in_vcf, output_dir, genome_file, bam, sample, handle,
 	return (True, final_bed_file)
 
 
-def remove_intersection_intervals(Out, unique_t1000_bed, bedtools_exec):
+def remove_intersection_intervals(Out, unique_t1000_bed):
 
 	"""
 	v1
@@ -473,19 +465,15 @@ def remove_intersection_intervals(Out, unique_t1000_bed, bedtools_exec):
 	t1000_bed = Out["exp"]
 	t0_bed = Out["t0"]
 
-	cmd_intersect = "{" + f"head -n1 {t1000_bed}; {bedtools_exec} intersect -v \
-					-a <(tail -n+2 {t1000_bed}) -b <(tail -n+2 {t0_bed})" \
-					+ "; } > " + unique_t1000_bed
-	try:
-	    subprocess.run([cmd_intersect], check=True, shell=True)
-	except subprocess.CalledProcessError:
-		sys.stderr.write("ERROR: bedtools intersect with t0 didn't work\n")
-		sys.exit()
+	bt_A = BedTool(t1000_bed)
+	bt_B = BedTool(t0_bed)
+	bt_inter = bt_A.intersect(bt_B, v=True)
+	bt_inter.saveas(unique_t1000_bed)
 
-	return True
+	return (True, unique_t1000_bed)
 
 
-def keep_intersection_intervals(Out, unique_t1000_bed, bedtools_exec):
+def keep_intersection_intervals(Out, unique_t1000_bed):
 
 	"""
 	v1
@@ -497,16 +485,12 @@ def keep_intersection_intervals(Out, unique_t1000_bed, bedtools_exec):
 	t1000_bed = Out["exp"]
 	t0_bed = Out["t0"]
 
-	cmd_intersect = "{" + f"head -n1 {t1000_bed}; {bedtools_exec} intersect -u \
-					-a <(tail -n+2 {t1000_bed}) -b <(tail -n+2 {t0_bed})" \
-					+ "; } > " + unique_t1000_bed
-	try:
-	    subprocess.run([cmd_intersect], check=True, shell=True)
-	except subprocess.CalledProcessError:
-		sys.stderr.write("ERROR: bedtools intersect with t0 didn't work\n")
-		sys.exit()
+	bt_A = BedTool(t1000_bed)
+	bt_B = BedTool(t0_bed)
+	bt_inter = bt_A.intersect(bt_B, u=True)
+	bt_inter.saveas(unique_t1000_bed)
 
-	return True
+	return (True, unique_t1000_bed)
 
 
 def main():
@@ -523,7 +507,7 @@ def main():
 
 	# ---------------------------------------
 	# create output directory if not existing
-	sys.stderr.write("Preparing workspace...\n")
+	sys.stderr.write(f"[{at()}] Preparing workspace...\n")
 	(result, output_dir) = organize_workspace(	args.output_dir,
 												args.min_frac_cov,
 												args.max_frac_cov,
@@ -541,7 +525,7 @@ def main():
 
 	for in_vcf in Vcfs.keys():
 
-		sys.stderr.write(f"\nWorking on: {in_vcf}\n\n")
+		sys.stderr.write(f"[{at()}] Working on: {in_vcf}\n")
 
 		handle = Vcfs[in_vcf]
 		bam = Bams[in_vcf]
@@ -550,8 +534,7 @@ def main():
 							in_vcf, args.output_dir, args.genome_file,
 							bam, args.sample, handle,
 							args.min_af, args.max_af, args.min_het_snps, args.snp_distance,
-							args.min_frac_cov, args.max_frac_cov, args.min_size,
-							args.bedtools)
+							args.min_frac_cov, args.max_frac_cov, args.min_size)
 
 		Out[handle] = out_vcf
 
@@ -559,18 +542,20 @@ def main():
 	# these are the background noise of pre-existing LOH blocks
 	# that are found at both t0 and t1000
 	# we're interested only in those found at t1000 which have evolved after t0
-	unique_t1000_bed = f"{output_dir}/{sample}.LOH_blocks.filt.bed"
+	unique_t1000_bed = f"{output_dir}/{args.sample}.LOH_blocks.filt.bed"
 
 	if args.t0_vcf:
 
+		sys.stderr.write(f"[{at()}] Handling blocks found in \"t0\" with mode: \"{args.t0_filter_type}\"\n")
+
 		if args.t0_filter_type == "remove":
-			(result, output_loh_bed) = remove_intersection_intervals(Out, unique_t1000_bed, args.bedtools)
+			(result, output_loh_bed) = remove_intersection_intervals(Out, unique_t1000_bed)
 
 		elif args.t0_filter_type == "keep":
-			(result, output_loh_bed) = keep_intersection_intervals(Out, unique_t1000_bed, args.bedtools)
+			(result, output_loh_bed) = keep_intersection_intervals(Out, unique_t1000_bed)
 
 		else:
-			sys.stderr.write(f"ERROR: the --t0-filter-type option had a strange specification: \"{args.t0_filter_type}\". Only \"keep\" or \"remove\" can be specified.\n")
+			sys.stderr.write(f"[{at()}] ERROR: the --t0-filter-type option had a strange specification: \"{args.t0_filter_type}\". Only \"keep\" or \"remove\" can be specified.\n")
 			sys.exit()
 
 	# if no t0, just copy the previous output file
@@ -579,7 +564,7 @@ def main():
 		cmd_copy = f"cp {output_loh_bed} {unique_t1000_bed}"
 		subprocess.run([cmd_copy], check=True, shell=True)
 
-	sys.stderr.write("Done!\n")
+	sys.stderr.write(f"[{at()}] Done!\n")
 
 # run the script
 if __name__=='__main__':
