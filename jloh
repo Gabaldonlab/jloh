@@ -445,7 +445,6 @@ def process_vcf_file(	in_vcf, output_dir, genome_file, bam, sample, handle,
 
 	# write final bed file lines to an actual bed file output
 	OUT = open(final_bed_file, "w")
-	# OUT.write("Chromosome\tStart\tEnd\tCoverage\tLength\n")
 	for line in Final_bed_lines:
 		OUT.write(line)
 	OUT.close()

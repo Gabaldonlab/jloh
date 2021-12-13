@@ -74,6 +74,18 @@ Usage:
 
 ## Output
 
+### In Short
+
+**JLOH** produces two output files and places them in the directory specified with `--output-dir`. Everything else is placed inside the `process` directory which, in turn, is inside `--output-dir`. The two output files are:
+
+- `*.het_snps.vcf`: VCF file containing only the selected heterozygous SNPs that are used to extract LOH blocks. If the user specified a `--t0-vcf`, these will be two files: one deriving from `--vcf` (containing the `exp` keyword in the filename) and one derived from `-t0-vcf` (containing the `t0` keyword).
+
+- `*.LOH_blocks.filt.bed`: BED file containing the identified candidate LOH blocks. The BED file has 5 columns: chromosome, start position, end position, coverage change, length. The "coverage change" indicates the LOH block's coverage relative to the global mean coverage (i.e. if it says 2.1, it means that the coverage of this LOH block was 210% of the global mean coverage).
+
+Note that a proper BED file would not have coverage and length on the 4th and 5th column. If using this output file as input to another program, make sure to remove these two columns (e.g. `cut -f 1,2,3`). 
+
+### All output explained
+
 #### selection of heterozygous SNPs
 
 The variants passed with `--vcf` are filtered, retaining only heterozygous SNPs. Indels and homozygous SNPs are filtered out as they aren't normally used to extract LOH blocks. The selection of heterozygous SNPs is conducted based on their FORMAT field (field number 9 and 10 of a VCF file). The first column of this field carries a series of annotations separated by colons (e.g. GT:AF) the values of which are annotated the same way on the second column (e.g.` 0/1:0.60`). If a SNP is annotated as heterozygous, it will carry a genotype (`GT`) such as `0/1` or `1/2`. It should also have an allele frequency (`AF`) annotation. SNPs are considered heterozygous if their `AF` annotation falls between the values specified with `--min-af` and `--max-af`. The heterozygous SNPs are then saved in a VCF file called `<sample>.het_snps.vcf`, which is one of the two output files of the program. This file is placed in `--output-dir`.
