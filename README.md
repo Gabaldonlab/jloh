@@ -96,10 +96,8 @@ The objective of this tool is to extract LOH blocks, which are defined by the *l
 
 Each region that is considered as a candidate LOH region is screened by coverage using the BAM file passed with `--bam`. First, a mean coverage is computed for the whole BAM file. To do that, JLOH checks if the BAM file is indexed, and if not, it indexes it using the **pysam** module. Then, reads mapping inside each region are extracted using the **pysam** module, and compared against the general mean coverage. Candidate LOH blocks are retained in the output only if they have a coverage *below* or *above* what is considered "normal" coverage. The "normal" coverage range is defined via two parameters: `--min-frac-cov` and `--max-frac-cov`. The global mean coverage computed from the BAM file is multiplied by these two values to obtained the two boundaries of "normal" coverage. Every candidate LOH block falling above or below these two thresholds will be considered a candidate LOH block. LOH blocks are placed in an temporary file called `<sample>.LOH_blocks.bed`.
 
-### deal with known pre-existing LOH blocks
+#### deal with known pre-existing LOH blocks
 
 If the user passes another VCF file with the `-t0-vcf` option, this file will be considered as variation that pre-dates the one listed in `--vcf`. This "t0" variation is used to extract LOH blocks the same way as described for the input VCF file. The user can then choose what to do with it with the `--t0-filter-type` option. The default ("remove") will remove any overlapping LOH block found between the "t0" VCF and the input VCF. This reduces the output LOH blocks only to those unique to the input VCF. Some users however may want to keep only blocks that are found in "t0" too. To do that, one just has to specity `--t0-filter-type keep`. In both cases, an output file is produced, called `<sample>.LOH_blocks.filt.bed`. This is the real output of the program.
 
 If the user did not specify any `--t0-vcf`, this file will be identical to `<sample>.LOH_blocks.bed`.
-
-![JLOH workflow](images/schematic.png)
