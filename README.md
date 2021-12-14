@@ -82,7 +82,7 @@ Usage:
 
 - `*.LOH_blocks.filt.bed`: BED file containing the identified candidate LOH blocks. The BED file has 5 columns: chromosome, start position, end position, coverage change, length. The "coverage change" indicates the LOH block's coverage relative to the global mean coverage (i.e. if it says 2.1, it means that the coverage of this LOH block was 210% of the global mean coverage).
 
-Note that a proper BED file would not have coverage and length on the 4th and 5th column. If using this output file as input to another program, make sure to remove these two columns (e.g. `cut -f 1,2,3`). 
+Note that a proper BED file would not have coverage and length on the 4th and 5th column. If using this output file as input to another program, make sure to remove these two columns (e.g. `cut -f 1,2,3`).
 
 ### All output explained
 

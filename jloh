@@ -5,7 +5,7 @@ script_info = """
 ###
 Author: Matteo Schiavinato
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2018)
-Last change: 13/12/2021
+Last change: 14/12/2021
 ###
 """
 
@@ -31,7 +31,7 @@ Still the one from the block
 -
 Extact LOH blocks from SNPs and a reference genome
 -
-v 0.3.0
+v 0.3.1
 --------------------------------------------------------------------------------
 by Matteo Schiavinato
 largely based on:
@@ -89,6 +89,7 @@ p.add_argument("--max-frac-cov", type=float, default=1.25)
 p.add_argument("--print-info", action="store_true")
 args = p.parse_args()
 
+
 # functions
 def organize_workspace(output_dir, min_frac_cov, max_frac_cov, bam):
 
@@ -120,75 +121,94 @@ def organize_workspace(output_dir, min_frac_cov, max_frac_cov, bam):
 def extract_heterozygous_snps(vcf, min_af, max_af, output_dir, sample, het_snps_vcf):
 
 	"""
-	v1
+	v2
 	Author: Matteo Schiavinato
-	Last change: 02/12/2021
-	Input: the VCF file containing SNPs and indels
-	Output: only heterozygous SNPs, including number of kept and removed lines
+	Last change: 14/12/2021
+	Note: Read the VCF file containing SNPs and indels
+	Output only heterozygous SNPs, including number of kept and removed lines
 	"""
 
-	# iterate over variants
-	removed, kept, Lines, New_lines = 0, 0, [], []
-
-	INPUT = open(vcf, "r")
-	for line in INPUT:
+	def extract_header_line(line):
 		if line[0] == "#":
-			New_lines.append(line)
+			return line
 		else:
-			Lines.append(line.rstrip("\n\r\b").split("\t"))
+			return False
 
-	for lst in Lines:
+	def extract_heterozygous_line(line):
 
-		# read values
-		annotations = lst[8].split(":")
-		values = lst[9].split(":")
-		dict = { annotations[i]:values[i] for i in range(0, len(annotations)) }
+		if line[0] != "#":
 
-		# if it's a single heterozygous SNP
-		if ((len(lst[3]) == len(lst[4]) == 1) and (dict["GT"]=="0/1")):
+			# split by field
+			lst = line.rstrip("\b\r\n").split("\t")
 
-			# does AF fit the criteria?
-			if (min_af <= float(dict["AF"]) <= max_af):
+			# read values
+			annotations = lst[8].split(":")
+			values = lst[9].split(":")
+			dict = { annotations[i]:values[i] for i in range(0, len(annotations)) }
 
-				# 4. write out lines that have fitting values
-				New_lines.append("\t".join(lst) + "\n")
-				kept += 1
+			# if it's a single heterozygous SNP
+			if ((len(lst[3]) == len(lst[4]) == 1) and (dict["GT"]=="0/1")):
 
-			# remove those without the frequency in range
+				# does AF fit the criteria?
+				if (min_af <= float(dict["AF"]) <= max_af):
+
+					# 4. write out lines that have fitting values
+					return line
+
+				# remove those without the frequency in range
+				else:
+					return False
+
+			# consider multiallelic sites
+			elif ((len(lst[3]) == 1) and (len(lst[4].split(",")) > 1)):
+
+				# this means that there are two annotations for AF
+				# and that both have to be checked
+				# so it is a variation on the previous block
+				# which could be rendered into a function
+				# assuming that there are > 1 AF annotation
+				# splitting the field based on the comma
+				# and converting to float the content
+				AFs = [ float(x) for x in dict["AF"].split(",") ]
+
+				# all it takes is one of the variants to be heterozygous
+				# for the locus to be conserved
+				# where het = AF comprised between --min-af and --max-af
+				Conditions = [ float(args.min_af) <= af <= float(args.max_af) for af in AFs]
+				if any(Conditions) == True:
+
+					# 4. write out lines that have fitting values
+					return line
+
+				# remove those without any heterozygous snp
+				# among those available
+				else:
+					return False
+
+			# remove homozygous SNPs
+			# and indels
 			else:
-				removed += 1
-
-		# consider multiallelic sites
-		elif ((len(lst[3]) == 1) and (len(lst[4].split(",")) > 1)):
-
-			# this means that there are two annotations for AF
-			# and that both have to be checked
-			# so it is a variation on the previous block
-			# which could be rendered into a function
-			# assuming that there are > 1 AF annotation
-			# splitting the field based on the comma
-			# and converting to float the content
-			AFs = [ float(x) for x in dict["AF"].split(",") ]
-
-			# all it takes is one of the variants to be heterozygous
-			# for the locus to be conserved
-			# where het = AF comprised between --min-af and --max-af
-			Conditions = [ float(args.min_af) <= af <= float(args.max_af) for af in AFs]
-			if any(Conditions) == True:
-
-				# 4. write out lines that have fitting values
-				New_lines.append("\t".join(lst) + "\n")
-				kept += 1
-
-			# remove those without any heterozygous snp
-			# among those available
-			else:
-				removed += 1
-
-		# remove homozygous SNPs
-		# and indels
+				return False
+		# exclude header lines starting with "#"
 		else:
-			removed += 1
+			return False
+
+	# read header
+	INPUT = open(vcf, "r")
+	New_lines_header = [ extract_header_line(line) for line in INPUT ]
+	New_lines_header = [ i for i in New_lines_header if i != False ]
+	INPUT.close()
+
+	# read heterozygous lines
+	INPUT = open(vcf, "r")
+	New_lines_vcf = [ extract_heterozygous_line(line) for line in INPUT ]
+	removed = len([i for i in New_lines_vcf if i == False])
+	New_lines_vcf = [ i for i in New_lines_vcf if i != False ]
+	kept = len(New_lines_vcf)
+	INPUT.close()
+
+	# merge
+	New_lines = New_lines_header + New_lines_vcf
 
 	sys.stderr.write(f"[{at()}] Kept {kept} heterozygous SNPs ({round((kept / (kept + removed))*100, 2)} %) out of {kept+removed} VCF records\n")
 
@@ -324,22 +344,17 @@ def filter_by_coverage(bam_file, bed_file, covfr, cmax):
 	###
 	v2
 	Author: Matteo Schiavinato
-	Notes: included a return statement to fit the new code, update to python3
+	Notes: update to python3
 	Last change: 26/11/2021
+	###
+	v3
+	Author: Matteo Schiavinato
+	Notes: Minor syntax adjustments
+	Last change: 14/12/2021
 	"""
 
-	# open bed file
-	bedstream = open(bed_file, "r")
+	def check_region_coverage(bed, sam, covfr, meancov, cmax):
 
-	#calculate mean cov
-	sam = pysam.Samfile(bam_file)
-
-	#mean covevarage  = aligned reads / genome size
-	meancov = 1.0 * sam.mapped / sum(sam.lengths)
-
-	#select windows
-	Out = []
-	for bed in bedstream:
 		#unload bed coordinate
 		chrom, start, end, length = bed.rstrip("\n\b\r").split('\t')
 		start, end = int(start), int(end)
@@ -349,7 +364,38 @@ def filter_by_coverage(bam_file, bed_file, covfr, cmax):
 		cov = c *1.0 / (end-start)
 		if cov < float(covfr) * meancov or cov > float(cmax) * meancov:
 			cov = round(cov, 2)
-			Out.append(f"{chrom}\t{start}\t{end}\t{cov}\t{length}\n")
+			bed_line = f"{chrom}\t{start}\t{end}\t{cov}\t{length}\n"
+			return bed_line
+		else:
+			return False
+
+	# open bed file
+	bedstream = open(bed_file, "r")
+
+	#calculate mean cov
+	if bam_file[-3:] == "bam":
+		sam = pysam.AlignmentFile(bam_file, "rb")
+	elif bam_file[-3:] == "sam":
+		sam = pysam.AlignmentFile(bam_file, "r")
+	else:
+		sys.stderr.write(f"ERROR: {bam_file} does not end in \"sam\" or \"bam\". Can't determine the file type")
+
+	# this has to be fixed
+	# veronica computes the genome size from the sam file
+	# this is not correct because the sam file could contain only a subset
+	# hence, we must compute the number of covered positions only
+	# and divide the number of reads by that
+	# must be fixed in next version
+	meancov = 1.0 * sam.mapped / sum(sam.lengths)
+	sys.stderr.write(f"[{at()}] Mean coverage: {round(meancov, 2)}x\n")
+
+	#select windows
+	Out = [ check_region_coverage(bed, sam, covfr, meancov, cmax) for bed in bedstream ]
+	removed = len([ i for i in Out if i == False ])
+	Out = [ i for i in Out if i != False ]
+	kept = len(Out)
+
+	sys.stderr.write(f"[{at()}] Kept {kept} candidate LOH regions based on their coverage ({round((kept / (kept + removed))*100, 2)} %) out of {kept+removed} regions\n")
 
 	return Out
 
@@ -361,12 +407,12 @@ def process_vcf_file(	in_vcf, output_dir, genome_file, bam, sample, handle,
 	"""
 	v1
 	Series of operations that a VCF file goes through to extract LOH blocks
-	Last edit: 10/12/2021
+	Last edit: 14/12/2021
 	"""
 
 	# Extract heterozygous snps from raw VCF file
 	sys.stderr.write(f"[{at()}] Extracting heterozygous SNPs from VCF file...\n")
-	sys.stderr.write(f"[{at()}] Considering only SNPs with {min_af} <= AF <= {max_af}\n")
+	sys.stderr.write(f"[{at()}] Considering only SNPs with {min_af} <= AF <= {max_af}...\n")
 	het_snps_vcf = f"{output_dir}/{sample}.{handle}.het_snps.vcf"
 
 	(result, het_snps_vcf) = extract_heterozygous_snps(	in_vcf,
@@ -376,17 +422,17 @@ def process_vcf_file(	in_vcf, output_dir, genome_file, bam, sample, handle,
 														sample,
 														het_snps_vcf)
 
-	# -------------------------------------------
+	# -------------------------------------------extract_heterozygous_snps
 	# Get heterozygous blocks with bedtools merge
 	# merge bed file
 	sys.stderr.write(f"[{at()}] Defining heterozygous blocks for {sample}...\n")
 	merged_bed_out = f"{output_dir}/process/{sample}.{handle}.d{snp_distance}bp_provisory.bed"
 
 	(result, snp_distance) = merge_bed_intervals(sample,
-												output_dir,
-												snp_distance,
-												het_snps_vcf,
-												merged_bed_out)
+												 output_dir,
+												 snp_distance,
+												 het_snps_vcf,
+												 merged_bed_out)
 
 	# add length to BED file
 	sys.stderr.write(f"[{at()}] Calculating length of BED intervals...\n")
@@ -400,7 +446,7 @@ def process_vcf_file(	in_vcf, output_dir, genome_file, bam, sample, handle,
 	minC, maxC, minL = float(min_het_snps), float("inf"), float(0)
 	filt_bed = f"{output_dir}/process/{sample}.{handle}.d{snp_distance}bp.bed"
 
-	(result, minC, maxC, minL) = filter_by_snp_density(bed_with_length,
+	(result, minC, maxC, minL) = filter_by_snp_density(	bed_with_length,
 														filt_bed,
 														output_dir,
 														sample,
@@ -415,7 +461,7 @@ def process_vcf_file(	in_vcf, output_dir, genome_file, bam, sample, handle,
 	sys.stderr.write(f"[{at()}] Getting complementary regions...\n")
 	complement_bed = f"{output_dir}/process/{sample}.{handle}.d{snp_distance}bp.complement.bed"
 
-	result = get_complementary_regions(complement_bed,
+	result = get_complementary_regions(	complement_bed,
 										filt_bed,
 										genome_file)
 
@@ -425,8 +471,8 @@ def process_vcf_file(	in_vcf, output_dir, genome_file, bam, sample, handle,
 	filt_compl_bed = f"{output_dir}/process/{sample}.{handle}.homo.d{snp_distance}bp.bed"
 
 	result = filter_by_length(complement_bed,
-							filt_compl_bed,
-							min_size)
+							  filt_compl_bed,
+							  min_size)
 
 	# -----------------------------------------
 	# filter by real coverage from the BAM file
