@@ -60,9 +60,9 @@ Usage:
 --t0-bam            BAM file used to call the --t0-vcf variants                 [off]
 --t0-filter-type    What to do with t0 LOH events? "keep" or "remove"           [remove]
 --min-het-snps      Min. num. of heterozygous SNPs in heterozygous region       [2]
---snp-distance      Min. distance (bp between SNPs for blocks definition        [100]
+--snp-distance      Max. distance (bp between SNPs for blocks definition        [100]
+--block-dist        Combine LOH blocks into one if closer than this distance    [100]
 --min-size          Min. LOH block size                                         [100]
---block-lengths     Comma-sep. list of desired distances between LOH blocks     [100,1000,5000]
 --min-af            Min. allele frequency to consider a variant heterozygous    [0.3]
 --max-af            Max. allele frequency to consider a variant heterozygous    [0.7]
 --min-frac-cov      Min. mean coverage fraction for LOH blocks                  [0.75]
@@ -92,19 +92,22 @@ The variants passed with `--vcf` are filtered, retaining only heterozygous SNPs.
 
 #### extraction of heterozygosity regions
 
-The putative heterozygosity regions are extracted based on the number of heterozygous SNPs they contain, and the maximum distance between them. The minimum number of SNPs eliminates regions with too little SNPs to be considered true positives, while the maximum SNP distance rules out artifacts. These parameters are controlled with the `--min-het-snps` and the `--snp-distance` parameters. This step produces three temporary files in the `<output_dir>/process` folder:
+The putative heterozygosity regions are extracted based on the number of heterozygous SNPs they contain, and the maximum distance between them. The minimum number of SNPs eliminates regions with too little SNPs to be considered true positives, while the maximum SNP distance rules out artifacts. These parameters are controlled with the `--min-het-snps` and the `--snp-distance` parameters. This step produces the following temporary files in the `<output_dir>/process` folder:
 
-1) `<sample>.d<snp_distance>bp_provisory.bed`: BED intervals surrounding heterozygous SNPs, including the SNP count inside the interval.
-2) `<sample>.d<snp_distance>bp_provisory.w_len.bed`: the same file but containing the length of each interval.
-3) `<sample>.d<snp_distance>bp.bed`: BED intervals defining regions with sufficient number of SNPs (`--min-het-snps`) and sufficiently close (`--snp-distance`).
+- `<sample>.d<snp_distance>bp_provisory.bed`: BED intervals surrounding heterozygous SNPs, including the SNP count inside the interval.
+- `<sample>.d<snp_distance>bp.bed`: BED intervals defining regions with sufficient number of SNPs (`--min-het-snps`) and sufficiently close (`--snp-distance`).
 
 #### extract complementary homozygous regions
 
-The objective of this tool is to extract LOH blocks, which are defined by the *loss* of  heterozygosity. Hence, the tool at this point selects the *complementary* intervals of the heterozygous ones. This step produces a temporary file in the `<output_dir>/process` folder called `<sample>.d<snp_distance>bp.complement.bed`. These regions are then filtered by their length, retaining only those with a length larger or equal to `--min-size`. This produces a temporary file in the `<output_dir>/process` folder called `<sample>.homo.d<snp_distance>bp.bed`.
+The objective of this tool is to extract LOH blocks, which are defined by the *loss* of  heterozygosity. Hence, the tool at this point selects the *complementary* intervals of the heterozygous ones. This step produces a temporary file in the `<output_dir>/process` folder called `<sample>.d<snp_distance>bp.complement.bed`. These regions are then analyzed by their proximity and merged if closer than `--block-dist`. This produces a temporary file called `<sample>.d<snp_distance>bp.complement.merged.bed`. The length of each merged block is then assessed, retaining only those blocks with a length larger or equal to `--min-size`. This produces a temporary file called `<sample>.homo.d<snp_distance>bp.bed`.
 
 #### filter by coverage
 
 Each region that is considered as a candidate LOH region is screened by coverage using the BAM file passed with `--bam`. First, a mean coverage is computed for the whole BAM file. To do that, JLOH checks if the BAM file is indexed, and if not, it indexes it using the **pysam** module. Then, reads mapping inside each region are extracted using the **pysam** module, and compared against the general mean coverage. Candidate LOH blocks are retained in the output only if they have a coverage *below* or *above* what is considered "normal" coverage. The "normal" coverage range is defined via two parameters: `--min-frac-cov` and `--max-frac-cov`. The global mean coverage computed from the BAM file is multiplied by these two values to obtained the two boundaries of "normal" coverage. Every candidate LOH block falling above or below these two thresholds will be considered a candidate LOH block. LOH blocks are placed in a temporary file in the `<output_dir>/process` folder  called `<sample>.LOH_blocks.bed`.
+
+For your own debugging, **JLOH** produces also another temporary file called `<sample>.exp.chrom_coverage.tsv`. This file contains the mean coverage calculated for each chromosome featured in the `--bam` file. If the user passed a `--t0-bam`, then there will be a similar file called `<sample>.t0.chrom_coverage.tsv`, with the mean coverage as computed from the `--t0-bam`. 
+
+Note that mean coverage is computed only using covered positions (i.e. positions with coverage = 0 are left out of the calculation).
 
 #### deal with known pre-existing LOH blocks
 
