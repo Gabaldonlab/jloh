@@ -92,13 +92,11 @@ The variants passed with `--vcf` are filtered, retaining only heterozygous SNPs.
 
 #### extraction of heterozygosity regions
 
-The putative heterozygosity regions are extracted based on the number of heterozygous SNPs they contain, and the minimum distance between them. The minimum number of SNPs eliminates regions with too little SNPs to be considered true positives, while the minimum SNP distance rules out read mapping artifacts. These parameters are controlled with the `--min-het-snps` and the `--snp-distance` parameters. This step produces three temporary files in the `<output_dir>/process` folder:
+The putative heterozygosity regions are extracted based on the number of heterozygous SNPs they contain, and the maximum distance between them. The minimum number of SNPs eliminates regions with too little SNPs to be considered true positives, while the maximum SNP distance rules out artifacts. These parameters are controlled with the `--min-het-snps` and the `--snp-distance` parameters. This step produces three temporary files in the `<output_dir>/process` folder:
 
 1) `<sample>.d<snp_distance>bp_provisory.bed`: BED intervals surrounding heterozygous SNPs, including the SNP count inside the interval.
 2) `<sample>.d<snp_distance>bp_provisory.w_len.bed`: the same file but containing the length of each interval.
-3) `<sample>.d<snp_distance>bp.bed`: BED intervals defining regions with sufficient number of SNPs (`--min-het-snps`) and sufficiently far apart (`--snp-distance`).
-
-Note that the SNP distance has nothing to do with the length of an interval.
+3) `<sample>.d<snp_distance>bp.bed`: BED intervals defining regions with sufficient number of SNPs (`--min-het-snps`) and sufficiently close (`--snp-distance`).
 
 #### extract complementary homozygous regions
 

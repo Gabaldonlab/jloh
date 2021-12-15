@@ -5,7 +5,7 @@ script_info = """
 ###
 Author: Matteo Schiavinato
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2018)
-Last change: 14/12/2021
+Last change: 15/12/2021
 ###
 """
 
@@ -31,7 +31,7 @@ Still the one from the block
 -
 Extact LOH blocks from SNPs and a reference genome
 -
-v 0.3.1
+v 0.3.2
 --------------------------------------------------------------------------------
 by Matteo Schiavinato
 largely based on:
@@ -54,7 +54,7 @@ Usage:
 --t0-bam            BAM file used to call the --t0-vcf variants                 [off]
 --t0-filter-type    What to do with t0 LOH events? "keep" or "remove"           [remove]
 --min-het-snps      Min. num. of heterozygous SNPs in heterozygous region       [2]
---snp-distance      Min. distance (bp between SNPs for blocks definition        [100]
+--snp-distance      Max. distance (bp between SNPs for blocks definition        [100]
 --min-size          Min. LOH block size                                         [100]
 --block-lengths     Comma-sep. list of desired distances between LOH blocks     [100,1000,5000]
 --min-af            Min. allele frequency to consider a variant heterozygous    [0.3]
@@ -225,8 +225,8 @@ def merge_bed_intervals(sample, output_dir, snp_distance, het_snps_vcf, bed_out)
 
 	"""
 	Create BED regions based on the input VCF rows after their filtering
-	These regions are --snp-distance large and centered on the SNPs
-	For each snp_distance, the number of variants contained in it are counted
+	These regions merge together SNPs as long as they are within --snp-distance
+	For each, the number of variants contained in it are counted
 	The output is: chr | start | end | count
 	"""
 
