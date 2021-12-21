@@ -5,7 +5,7 @@ script_info = """
 ###
 Author: Matteo Schiavinato
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2018)
-Last change: 15/12/2021
+Last change: 21/12/2021
 ###
 """
 
@@ -30,9 +30,9 @@ if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
 J LOH
 Still the one from the block
 -
-Extact LOH blocks from SNPs and a reference genome
+Extact LOH blocks from SNPs, coverage, and a reference genome
 -
-v 0.5.0
+v 0.6.0
 --------------------------------------------------------------------------------
 by Matteo Schiavinato
 largely based on:
@@ -56,16 +56,11 @@ Usage:
 --t0-bam            BAM file used to call the --t0-vcf variants                 [off]
 --t0-filter-type    What to do with t0 LOH events? "keep" or "remove"           [remove]
 --min-het-snps      Min. num. heterozygous SNPs in heterozygous region          [2]
---homo-snps-kbp     Min. homoyzgous SNPs/kbp to assign block to parent          [5]
 --snp-distance      Max. distance (bp between SNPs for blocks definition        [100]
 --block-dist        Combine LOH blocks into one if closer than this distance    [100]
 --min-size          Min. LOH block size                                         [100]
 --min-af            Min. allele frequency to consider a variant heterozygous    [0.3]
 --max-af            Max. allele frequency to consider a variant heterozygous    [0.7]
---min-frac-cov      Min. mean coverage fraction for LOH blocks                  [0.75]
-                    (used only if --bam specified)
---max-frac-cov      Max. mean coverage fraction for LOH blocks                  [1.25]
-                    (used only if --bam specified)
 --print-info        Show authors and edits with dates                           [off]
 
 """)
@@ -74,6 +69,7 @@ Usage:
 # argument parser
 p = ap.ArgumentParser(description="")
 p.add_argument("--vcf", type=str)
+p.add_argument("--bam", type=str)
 p.add_argument("--genome-file")
 p.add_argument("--sample", default="loh_blocks")
 p.add_argument("--filter-mode", choices=["all","pass"], default="all")
@@ -82,23 +78,20 @@ p.add_argument("--t0-vcf", type=str, default=None)
 p.add_argument("--t0-bam", type=str, default=None)
 p.add_argument("--t0-filter-type", choices=["keep", "remove"], default="remove")
 p.add_argument("--min-het-snps", type=float, default=2)
-p.add_argument("--homo-snps-kbp", type=float, default=5)
 p.add_argument("--snp-distance", default=100, type=int)
 p.add_argument("--block-dist", default=100, type=int)
 p.add_argument("--min-size", default=100, type=int)
 p.add_argument("--min-af", default=0.3, type=float)
 p.add_argument("--max-af", default=0.7, type=float)
-p.add_argument("--bam", type=str)
-p.add_argument("--min-frac-cov", type=float, default=0.75)
-p.add_argument("--max-frac-cov", type=float, default=1.25)
 p.add_argument("--print-info", action="store_true")
 args = p.parse_args()
 
 
 # functions
-def organize_workspace(output_dir, min_frac_cov, max_frac_cov, bam):
+def organize_workspace(output_dir):
 
 	"""
+	Last update: 21/12/2021
 	Creation of folders and workspace where the script has to operate
 	Verify presence of minimal set of files to work with
 	"""
@@ -107,27 +100,13 @@ def organize_workspace(output_dir, min_frac_cov, max_frac_cov, bam):
 		os.makedirs(output_dir)
 		sys.stderr.write(f"[{at()}] Created output directory {output_dir}\n")
 
-	if os.path.exists(f"{output_dir}/process") == False:
-		os.mkdir(f"{output_dir}/process")
-
-	# check if bam is used or not
-	if bam and not (min_frac_cov or max_frac_cov):
-		sys.stderr.write(f"[{at()}] ERROR: If you specify a --bam file you may want to use --min-frac-cov or --max-frac-cov\n")
-		sys.exit()
-
-	if (min_frac_cov or max_frac_cov) and not bam:
-		sys.stderr.write(f"[{at()}] ERROR: If you use --min-frac-cov or --max-frac-cov you may want to specify a --bam file\n")
-		sys.exit()
-
 	return (True, output_dir)
 
 
 def extract_heterozygous_snps(vcf, min_af, max_af, output_dir, sample, het_snps_vcf, homo_snps_vcf, filter_mode):
 
 	"""
-	v3
-	Author: Matteo Schiavinato
-	Last change: 16/12/2021
+	Last update: 16/12/2021
 	Note: Read the VCF file containing SNPs and indels
 	Output only heterozygous SNPs, including number of kept and removed lines
 	"""
@@ -135,7 +114,7 @@ def extract_heterozygous_snps(vcf, min_af, max_af, output_dir, sample, het_snps_
 	def keep_heterozygous(Vcf_lines, filter_mode):
 
 		"""
-		v1
+		Last update: 16/12/2021
 		Filtering variants based on three criteria:
 		- are they SNPs?
 		- are they heterozygous?
@@ -254,85 +233,224 @@ def extract_heterozygous_snps(vcf, min_af, max_af, output_dir, sample, het_snps_
 	return True
 
 
-def count_snps_in_intervals(sample, output_dir, het_snps_vcf, bed_out, snp_distance):
+def get_intervals_of_snps(snps_vcf, snp_distance):
 
 	"""
-	v1
+	Last update: 21/12/2021
 	Create BED regions based on the input VCF rows after their filtering
 	These regions merge together SNPs as long as they are within --snp-distance
 	For each, the number of variants contained in it are counted
+	This function is used both with hetero and homozygous SNPs
 	The output is: chr | start | end | count
-	Last update: 15/12/2021
 	"""
 
-	bt = BedTool(het_snps_vcf)
-	bt_merged = bt.merge(d=snp_distance, c=1, o="count")
-	bt_merged.saveas(bed_out)
+	bt_merged = snps_vcf.merge(d=snp_distance, c=1, o="count")
 
-	return True
+	return bt_merged
 
 
-def filter_by_snp_density(in_bed, out_bed, min_num_snps):
+def count_snps_in_bed_interval(bed, vcf):
+
+	"""
+	Last update: 21/12/2021
+	Note: Count how many SNPs are found inside a BED interval
+	by intersecting a BED file with a VCF file
+	"""
+
+	# bt_A = BedTool(bed)
+	# bt_B = BedTool(vcf)
+	bt_inter = bed.intersect(vcf, c=True)
+
+	return bt_inter
+
+
+def filter_by_snp_density(bt, min_num_snps):
 
 	"""
 	Filter regions based on the number of variants found in them
 	Which were counted in the previous function
 
 	v1
+	Last update: 14/02/2014
 	Author: Leszek Pryszcz
 	Notes: Parse BED and print stats
-	Last change: 14/02/2014
 	###
 	v2
+	Last update: 21/12/2021
 	Author: Matteo Schiavinato
 	Notes: included a return statement to fit the new code, update to python3
-	Last change: 15/12/2021
 	"""
-
-	handle = open(in_bed, "r")
 
 	out = []
 	skipped = 0
-	for l in handle:
-		ref,start,end,count = l.split()
+	for row in bt:
+		ref,start,end,count = str(row).rstrip("\n\r\b").split("\t")
 		ref,start,end,count = str(ref),int(start),int(end),float(count)
-		if count >= min_num_snps:
-			out.append(l)
+		if count >= float(min_num_snps):
+			out.append(row)
 		else:
 			skipped += 1
 
-	# write filtered bed file lines to an actual bed file output
-	OUT = open(out_bed, "w")
-	for line in out:
-		OUT.write(line)
-	OUT.close()
+	new_bt = BedTool(out)
 
-	return (True, skipped)
+	return(new_bt, skipped)
 
 
-def get_complementary_regions(in_bed, out_bed, genome_file):
+def filter_snps(vcf, bed):
 
 	"""
+	Last update: 21/12/2021
+	Remove SNPs overlapping BED regions
+	"""
+
+	vcf = BedTool(vcf)
+	bed = BedTool(bed)
+
+	filt_vcf = vcf.intersect(bed, header=True, v=True)
+
+	return filt_vcf
+
+
+def remove_overlapping_regions(bt_A, bt_B):
+
+	"""
+	Last update: 21/12/2021
+	Note: remove BED regions overlapping in two files
+	"""
+
+	def remove_intersection(bed_lst_A, bed_lst_B):
+
+		"""
+		Last update: 21/12/2021
+		Note: remove overlapping region of the B interval from the A interval
+		A intervals: homozygous blocks
+		B intervals: heterozygous blocks
+		"""
+
+		Out = []
+
+		# get coordinates
+		A_chrom, A_start, A_end = bed_lst_A
+		B_chrom, B_start, B_end = bed_lst_B
+		A_chrom, A_start, A_end = str(A_chrom), int(A_start), int(A_end)
+		B_chrom, B_start, B_end = str(B_chrom), int(B_start), int(B_end)
+
+		# if there is no overlap
+		# report bed interval as it is
+		if ((B_start < 0) and (B_end < 0)):
+			Out.append((A_chrom, A_start, A_end))
+
+		# if the whole B interval is contained in A
+		# which means: the whole hetero block is contained in the homo block
+		# split the homo block in two
+		elif ((A_start <= B_start <= A_end) and (A_start <= B_end <= A_end)):
+
+			A1_start = A_start
+			A1_end = B_start
+			Out.append((A_chrom, A1_start, A1_end))
+			A2_start = B_start
+			A2_end = A_end
+			Out.append((A_chrom, A2_start, A2_end))
+
+		# if the whole A interval is contained in B
+		# that is: the whole homo block is contained in the hetero block
+		# discard the interval entirely
+		elif ((B_start <= A_start <= B_end) and (B_start <= A_end <= B_end)):
+			pass
+
+		# if only beginning of B is contained in A
+		# keep only from A_start to B_start
+		elif ((A_start <= B_start <= A_end) and (B_end > A_end)):
+
+			Out.append((A_chrom, A_start, B_start))
+
+		# if only end of B is contained in A
+		# keep only from B_end to A_end
+		elif ((B_start < A_start) and (A_start <= B_end <= A_end)):
+
+			Out.append((A_chrom, B_end, A_end))
+
+		else:
+			sys.stderr.write("ERROR: detected an overlap that I can't solve.\n\n")
+			sys.stderr.write(str(bed_lst_A) + "\n")
+			sys.stderr.write(str(bed_lst_B) + "\n")
+			sys.exit()
+
+		return Out
+
+	# -------------------------------------------------
+
+	# get intersection
+	# with "wao", you get the two bed features adjacent in the output
+	# and their overlap
+	# in case of no overlap, the feature is reported as is, with an overlap of "-1"
+	# you can easily remove the intersection
+	bt_leftover = bt_A.intersect(bt_B, wao=True)
+
+	# remove intersections from BED intervals of homozygous blocks
+	New_intervals = []
+	for row in bt_leftover:
+		row = str(row)
+		lst = row.rstrip("\b\r\n").split("\t")
+		bed_lst_A = str(lst[0]), int(lst[1]), int(lst[2])
+		bed_lst_B = str(lst[4]), int(lst[5]), int(lst[6])
+		New_beds = remove_intersection(bed_lst_A, bed_lst_B)
+		New_intervals = New_intervals + New_beds
+
+
+	# merge together homo-blocks
+	bt = BedTool(New_intervals)
+	bt_merge = bt.sort().merge()
+
+	return bt_merge
+
+
+def get_complementary_regions(bt_A, bt_B, genome_file):
+
+	"""
+	Last update: 21/12/2021
 	Run bedtools complement to obtain BED intervals
 	These intervals represent the complement of the original regions
 	Which in turn represented the heterozygous blocks
 	Hence, the output of this function are the homozygous blocks
 	"""
 
-	bt = BedTool(in_bed)
-	bt_comp = bt.complement(g=genome_file)
-	bt_comp.saveas(out_bed)
+	bt_comp = bt_A.merge(i=bt_B).complement(g=genome_file)
+	return bt_comp
 
-	return True
+
+def add_column(bt, annot):
+
+	"""
+	Last update: 21/12/2021
+	Note: Add the "annot" value as extra column to a BED file
+	"""
+
+	x = [ str(row).rstrip("\b\r\n") + "\t" + str(annot) for row in bt ]
+	new_bt = BedTool(x)
+	return new_bt
+
+
+def combine_beds(bt_A, bt_B):
+
+	"""
+	Last update: 21/12/2021
+	Note: combine two bed files into one
+	"""
+
+	x = list(bt_A)
+	y = list(bt_B)
+	z = x + y
+	bt = BedTool(z).sort()
+
+	return bt
 
 
 def merge_bed_homo_intervals(sample, output_dir, in_bed, out_bed, block_dist):
 
 	"""
-	v1
-	Author: Matteo Schiavinato
-	Note: Combine neighboring homoyzgous blocks if their distance < block_dist
 	Last update: 15/12/2021
+	Note: Combine neighboring homoyzgous blocks if their distance < block_dist
 	"""
 
 	bt = BedTool(in_bed)
@@ -342,34 +460,80 @@ def merge_bed_homo_intervals(sample, output_dir, in_bed, out_bed, block_dist):
 	return True
 
 
-def filter_by_length(in_bed, out_bed, min_size):
+def filter_by_length(bt, min_size):
 
 	"""
-	Keep only candidate LOH regions of a certain minimum size
+	Last update: 21/12/2021
+	Note: Keep only candidate LOH regions of a certain minimum size
 	"""
 
-	INPUT = open(in_bed, "r")
-	OUTPUT = open(out_bed, "w")
-	removed = 0
+	lst = [ str(row).rstrip("\b\r\n").split("\t") for row in bt ]
+	lst = [ (str(x[0]), int(x[1]), int(x[2]), str(x[3])) for x in lst ]
+	lst = [ x for x in lst if x[2]-x[1] >= min_size ]
+	new_bt = BedTool(lst)
+	return new_bt
 
-	for line in INPUT:
-		chr,start,end = line.rstrip("\n\r\b").split("\t")
-		length = int(end) - int(start)
 
-		if length >= min_size:
-			out_lst = [str(i) for i in [chr,start,end,length]]
-			OUTPUT.write("\t".join(out_lst) + "\n")
+def index_bam_file(input_bam):
+
+	"""
+	Last update: 20/12/2021
+	Note: indexing bam file if index is not found
+	"""
+
+	# index bam file
+	try:
+		pysam.check_index(input_bam)
+
+	except AttributeError:
+		sys.stderr.write(f"[{at()}] BAM index not found. Indexing file...\n")
+		#calculate mean cov
+		if input_bam[-3:] == "bam":
+			bam = input_bam
+			pysam.index(bam)
+
+		elif input_bam[-3:] == "sam":
+			output_bam = f"{output_dir}/process/{sample}.{handle}.bam"
+			pysam.view("-h", "-b", "-o", output_bam, input_bam, catch_stdout=False)
+			bam = output_bam
+			pysam.index(bam)
 
 		else:
-			removed += 1
+			sys.stderr.write(f"[{at()}] ERROR: {input_bam} does not end in \"sam\" or \"bam\". Can't determine the file type")
 
-	INPUT.close()
-	OUTPUT.close()
-
-	return (True, removed)
+	return bam
 
 
-def filter_by_coverage(input_bam, bed_file, covfr, cmax, output_dir, sample, handle):
+def get_global_coverage(bamfile, output_dir, sample, handle):
+
+	"""
+	Last update: 20/12/2021
+	Note: Get global mean coverage per position of a reference genome
+	Based on the number of positions that are covered
+	And the number of reads covering them
+	"""
+
+	bam = pysam.AlignmentFile(bamfile, "rb")
+
+	Covs = {}
+	for chrom in list(bam.references):
+		cov_count = bam.count_coverage(chrom, quality_threshold=0, read_callback="all")
+		cov_count = [ [i for i in cov_count[k] if int(i) > 0] for k in (0,1,2,3) ]
+		tot_pos = sum([ len(x) for x in cov_count ])
+		tot_cov = sum([ sum(x) for x in cov_count ])
+		try:
+			cov = float(tot_cov) / float(tot_pos)
+		except ZeroDivisionError:
+			cov = float(0)
+		Covs[chrom] = cov
+
+	Covs  = { chrom : Covs[chrom] for chrom in Covs.keys() if Covs[chrom] > 0 }
+	global_cov = sum(Covs.values()) / len(Covs.values())
+
+	return global_cov
+
+
+def assess_coverage(input_bam, bt, meancov):
 
 	"""
 	v1
@@ -379,71 +543,12 @@ def filter_by_coverage(input_bam, bed_file, covfr, cmax, output_dir, sample, han
 	###
 	v2
 	Author: Matteo Schiavinato
-	Notes: update to python3
-	Last change: 26/11/2021
-	###
-	v3
-	Author: Matteo Schiavinato
-	Notes: Changed how global coverage is calculated; syntax adjustments
-	Last change: 15/12/2021
+	Last change: 21/12/2021
+	Notes: Now addressing ALT and REF homoblock alleles in relation to coverage
 	"""
 
-	def index_bam_file(input_bam):
 
-		# index bam file
-		try:
-			pysam.check_index(input_bam)
-
-		except AttributeError:
-			sys.stderr.write(f"[{at()}] BAM index not found. Indexing file...\n")
-			#calculate mean cov
-			if input_bam[-3:] == "bam":
-				bam = input_bam
-				sys.stderr.write(f"[{at()}] Input alignment is BAM format: indexing it...\n")
-				pysam.index(bam)
-
-			elif input_bam[-3:] == "sam":
-				sys.stderr.write(f"[{at()}] Input alignment is SAM format: converting to BAM and indexing it...\n")
-				output_bam = f"{output_dir}/process/{sample}.{handle}.bam"
-				pysam.view("-h", "-b", "-o", output_bam, input_bam, catch_stdout=False)
-				bam = output_bam
-				pysam.index(bam)
-
-			else:
-				sys.stderr.write(f"[{at()}] ERROR: {input_bam} does not end in \"sam\" or \"bam\". Can't determine the file type")
-
-		return bam
-
-
-	def get_global_coverage(bam):
-
-		"""
-		v1
-		Author: Matteo Schiavinato
-		Note: Get global mean coverage per position of a reference genome
-		Based on the number of positions that are covered
-		And the number of reads covering them
-		Last update: 15/12/2021
-		"""
-
-		Covs = {}
-		for chrom in list(bam.references):
-			cov_count = bam.count_coverage(chrom, quality_threshold=0, read_callback="all")
-			cov_count = [ [i for i in cov_count[k] if int(i) > 0] for k in (0,1,2,3) ]
-			tot_pos = sum([ len(x) for x in cov_count ])
-			tot_cov = sum([ sum(x) for x in cov_count ])
-			try:
-				cov = float(tot_cov) / float(tot_pos)
-			except ZeroDivisionError:
-				cov = float(0)
-			Covs[chrom] = cov
-
-		Covs  = { chrom : Covs[chrom] for chrom in Covs.keys() if Covs[chrom] > 0 }
-		global_cov = sum(Covs.values()) / len(Covs.values())
-		return (global_cov, Covs)
-
-
-	def check_region_coverage(bed, bam, covfr, meancov, cmax):
+	def get_region_coverage(bed, bam, meancov):
 
 		"""
 		v1
@@ -455,12 +560,13 @@ def filter_by_coverage(input_bam, bed_file, covfr, cmax, output_dir, sample, han
 		Note: Updated to python3
 		Updated to new version of pysam
 		Now using coverage per position instead of raw read count
-		Last Update: 15/12/2021
+		Last Update: 21/12/2021
 		"""
 
 		# unload bed coordinate
-		chrom, start, end, length = bed.rstrip("\n\b\r").split('\t')
+		chrom, start, end, block_type = bed.rstrip("\n\b\r").split('\t')
 		start, end = int(start), int(end)
+		length = end-start
 
 		# get coverage per position
 		# count_coverage() returns a tuple with 4 tuples, each one containing the coverage per position
@@ -469,62 +575,61 @@ def filter_by_coverage(input_bam, bed_file, covfr, cmax, output_dir, sample, han
 		cov_count = [ [i for i in cov_count[k] if int(i) > 0] for k in (0,1,2,3) ]
 		tot_pos = sum([ len(x) for x in cov_count ])
 		tot_cov = sum([ sum(x) for x in cov_count ])
-		cov = float(tot_cov) / float(tot_pos)
-		cov_ratio = round(log10(cov / meancov), 2)
+		try:
+			cov = float(tot_cov) / float(tot_pos)
+		except ZeroDivisionError:
+			cov = float(0)
 
-		# check if within boundaries
-		if cov < float(covfr) * meancov or cov > float(cmax) * meancov:
-			cov = round(cov, 2)
-			bed_line = f"{chrom}\t{start}\t{end}\t{cov_ratio}\t{length}\n"
-			return bed_line
-		else:
-			return False
+		try:
+			cov_ratio = round((cov/meancov)*100, 2)
+		except ZeroDivisionError:
+			cov_ratio = round(float(0), 2)
+
+		bed_line = f"{chrom}\t{start}\t{end}\t{cov_ratio}%\t{length}\t{block_type}\n"
+		return bed_line
 
 	# -------------------------------------------
 
-	# index and open bam file
-	indexed_bam = index_bam_file(input_bam)
-	bam = pysam.AlignmentFile(indexed_bam, "rb")
+	# open bam file
+	bam = pysam.AlignmentFile(input_bam, "rb")
+	Out = []
+	total = len(bt)
+	for row in bt:
+		bed = str(row)
+		x = get_region_coverage(bed, bam, meancov)
+		Out.append(x)
 
-	# get mean global coverage
-	(meancov, Covs) = get_global_coverage(bam)
-	sys.stderr.write(f"[{at()}] Mean coverage: {round(meancov, 2)}x\n")
+	bt = BedTool(Out)
 
-	# create file with chromosomal coverages
-	OUTPUT = open(f"{output_dir}/process/{sample}.{handle}.chrom_coverage.tsv", "w")
-	for chrom in Covs:
-		OUTPUT.write(f"{chrom}\t{Covs[chrom]}\n")
-	OUTPUT.close()
+	# filter by coverage
+	Out, kept, removed = [], 0, 0
+	for row in bt:
+		lst = str(row).rstrip("\n\r\b").split("\t")
+		if (((float(lst[3].rstrip("%")) < float(100)) and (lst[5] == "ALT")) \
+		or ((float(lst[3].rstrip("%")) > float(0)) and (lst[5] == "REF"))):
+			Out.append(row)
+			kept += 1
+		else:
+			removed += 1
 
-	# open bed file
-	bedstream = open(bed_file, "r")
+	bt = BedTool(Out)
 
-	#select windows
-	Out = [ check_region_coverage(bed, bam, covfr, meancov, cmax) for bed in bedstream ]
-	removed = len([ i for i in Out if i == False ])
-	Out = [ i for i in Out if i != False ]
-	kept = len(Out)
-
-	sys.stderr.write(f"[{at()}] Kept {kept} LOH regions based on their coverage ({round((kept / (kept + removed))*100, 2)} %) out of {kept+removed} regions\n")
-
-	return Out
+	return (bt, kept, removed)
 
 
-def process_vcf_file(	in_vcf, output_dir, genome_file, bam, sample, handle,
-						min_af, max_af, min_het_snps, snp_distance,
-						min_frac_cov, max_frac_cov, min_size):
+def process_vcf_file(	args, in_vcf, output_dir, genome_file, bam, sample, handle,
+						min_af, max_af, min_het_snps, snp_distance, min_size):
 
 	"""
-	v2
-	Series of operations that a VCF file goes through to extract LOH blocks
-	Last edit: 16/12/2021
+	Last update: 21/12/2021
+	Note: Series of operations that a VCF file goes through to extract LOH blocks
 	"""
 
 	# Extract heterozygous snps from raw VCF file
 	sys.stderr.write(f"[{at()}] Extracting heterozygous SNPs from VCF file...\n")
 	sys.stderr.write(f"[{at()}] Considering only SNPs with {min_af} <= AF <= {max_af}...\n")
 	het_snps_vcf = f"{output_dir}/{sample}.{handle}.het_snps.vcf"
-	homo_snps_vcf = f"{output_dir}/process/{sample}.{handle}.homo_snps.vcf"
+	homo_snps_vcf = f"{output_dir}/{sample}.{handle}.homo_snps.vcf"
 
 	result = extract_heterozygous_snps(	in_vcf,
 										min_af,
@@ -538,88 +643,108 @@ def process_vcf_file(	in_vcf, output_dir, genome_file, bam, sample, handle,
 	# -------------------------------------------
 	# Get heterozygous blocks with bedtools merge
 	# merge bed file
-	sys.stderr.write(f"[{at()}] Defining heterozygous blocks for {sample}...\n")
-	merged_bed_out = f"{output_dir}/process/{sample}.{handle}.d{snp_distance}bp_provisory.bed"
+	# then filter it by SNP density
+	sys.stderr.write(f"[{at()}] Defining heterozygous blocks...\n")
 
-	result = count_snps_in_intervals(	sample,
-								 		output_dir,
-								 		het_snps_vcf,
-								 		merged_bed_out,
-								 		snp_distance)
+	snps_vcf = BedTool(het_snps_vcf)
+	Het_bed_blocks = get_intervals_of_snps(	snps_vcf,
+							 				snp_distance)
 
-	# ---------------------------------------------
-	# run filtering function on the merged bed file
-	sys.stderr.write(f"[{at()}] Keeping only blocks with > {args.min_het_snps} SNP...\n")
-	filt_bed = f"{output_dir}/process/{sample}.{handle}.d{snp_distance}bp.bed"
 
-	(result, skipped) = filter_by_snp_density(	merged_bed_out,
-												filt_bed,
-												args.min_het_snps)
+	sys.stderr.write(f"[{at()}] Keeping only blocks with >= {args.min_het_snps} SNPs...\n")
+
+	(Het_bed_snp_filt, skipped) = filter_by_snp_density(Het_bed_blocks,
+														args.min_het_snps)
 
 	sys.stderr.write(f"[{at()}] {skipped} regions were removed due to insufficient SNP count\n")
+
+	# ------------------------------------------------------
+	# get homozygous blocks
+	sys.stderr.write(f"[{at()}] Defining alternative allele (ALT) homozygous blocks...\n")
+
+	homo_snps_vcf_filt = filter_snps(homo_snps_vcf, Het_bed_snp_filt)
+	sys.stderr.write(f"[{at()}] Using only {len(homo_snps_vcf_filt)} homo-SNPs non-overlapping heterozygous regions...\n")
+
+	Homo_ALT_bed_blocks = get_intervals_of_snps(	homo_snps_vcf_filt,
+								 					snp_distance)
+
+	sys.stderr.write(f"[{at()}] Keeping only blocks with >= {args.min_het_snps} SNPs...\n")
+
+	(Homo_ALT_bed_snp_filt, skipped) = filter_by_snp_density(	Homo_ALT_bed_blocks,
+																args.min_het_snps)
+
+	sys.stderr.write(f"[{at()}] {skipped} regions were removed due to insufficient SNP count\n")
+
+	# ------------------------------------------------------
+	# remove homo ALT block if overlapping a hetero block
+	# it could be that there are hetero- and homo-zygous SNPs
+	# interleaved between each other
+	# these must not be considered blocks
+	sys.stderr.write(f"[{at()}] Removing homozygous blocks largely overlapping heterozygous blocks...\n")
+
+	Homo_ALT_bed_blocks = remove_overlapping_regions(	Homo_ALT_bed_snp_filt,
+														Het_bed_snp_filt)
+
+	sys.stderr.write(f"[{at()}] Left with {len(Homo_ALT_bed_blocks)} homo-blocks after intersecting with hetero-blocks\n")
 
 	# ------------------------------------------------------
 	# Obtaining complementary regions to heterozygous blocks
 	# get complementary bed file
 	sys.stderr.write(f"[{at()}] Getting homozygous regions (i.e. candidate LOH blocks)...\n")
-	complement_bed = f"{output_dir}/process/{sample}.{handle}.d{snp_distance}bp.complement.bed"
+	homo_REF_bed = f"{output_dir}/process/{sample}.{handle}.d{snp_distance}bp.homo_REF.bed"
 
-	result = get_complementary_regions(	filt_bed,
-										complement_bed,
-										genome_file)
-
-	# -------------------------------------------
-	# Get heterozygous blocks with bedtools merge
-	# merge bed file
-	sys.stderr.write(f"[{at()}] Combining homoyzgous regions closer than: {args.block_dist} bp...\n")
-	merged_homo_bed_out = f"{output_dir}/process/{sample}.{handle}.d{snp_distance}bp.complement.merged.bed"
-
-	result = merge_bed_homo_intervals(	sample,
-								 		output_dir,
-								 		complement_bed,
-								 		merged_homo_bed_out,
-										args.block_dist)
+	Homo_REF_bed_blocks = get_complementary_regions(Het_bed_snp_filt,
+													Homo_ALT_bed_blocks,
+													genome_file)
 
 	# --------------------------------------------------
-	# Filter the complement to get the homozygous blocks
-	sys.stderr.write(f"[{at()}] Removing candidate blocks shorter than: {min_size} bp...\n")
-	filt_compl_bed = f"{output_dir}/process/{sample}.{handle}.homo.d{snp_distance}bp.bed"
+	# add REF or ALT annotation
+	# and then combine REF and ALT homozygous blocks
+	# and then filter by length
+	sys.stderr.write(f"[{at()}] Combining {len(Homo_REF_bed_blocks)} REF and {len(Homo_ALT_bed_blocks)} ALT blocks into a single BED file...\n")
+	Homo_REF = add_column(Homo_REF_bed_blocks, "REF")
+	Homo_ALT = add_column(Homo_ALT_bed_blocks, "ALT")
+	Homo_blocks = combine_beds(	Homo_REF, Homo_ALT)
+	total = len(Homo_blocks)
+	sys.stderr.write(f"[{at()}] Now working with {total} REF & ALT blocks\n")
 
-	(result, removed) = filter_by_length(	complement_bed,
-							  				filt_compl_bed,
-							  				min_size)
-
-	sys.stderr.write(f"[{at()}] {removed} candidate blocks were removed due to insufficient length\n")
+	Homo_blocks_filt = filter_by_length(Homo_blocks, args.min_size)
+	filtered = len(Homo_blocks_filt)
+	discarded = total - filtered
+	sys.stderr.write(f"[{at()}] {discarded} blocks were discarded because shorter than {args.min_size} bp\n")
 
 	# -----------------------------------------
 	# filter by real coverage from the BAM file
-	# use the filtered bed file as input for next step
-	Final_bed_lines = filter_by_coverage(	bam,
-											filt_compl_bed,
-											min_frac_cov,
-											max_frac_cov,
-											output_dir,
-											sample,
-											handle)
 
-	final_bed_file = f"{output_dir}/process/{sample}.{handle}.LOH_blocks.bed"
+	# get mean global coverage
+	indexed_bam = index_bam_file(bam)
+	meancov = get_global_coverage(indexed_bam, output_dir, sample, handle)
 
-	# write final bed file lines to an actual bed file output
-	OUT = open(final_bed_file, "w")
-	for line in Final_bed_lines:
-		OUT.write(line)
-	OUT.close()
-
-	return (True, final_bed_file, homo_snps_vcf)
+	sys.stderr.write(f"[{at()}] Mean coverage: {round(meancov, 2)}x\n")
 
 
-def remove_intersection_intervals(Out, unique_t1000_bed):
+	# REF homo blocks
+	# their coverage must increase
+	(LOH, kept, removed) = assess_coverage(	indexed_bam,
+											Homo_blocks_filt,
+											meancov)
+
+	try:
+		frac = round((kept / (kept + removed))*100, 2)
+	except ZeroDivisionError:
+		frac = round(0, 2)
+
+	tot = kept + removed
+	sys.stderr.write(f"[{at()}] Kept {kept} LOH regions based on their coverage ({frac} %)\n")
+
+	return (LOH, homo_snps_vcf_filt, het_snps_vcf)
+
+
+def use_intersection_intervals(Out, filter_type):
 
 	"""
-	v1
+	Last update: 21/12/2021
 	Intersect t0 and t1000 VCF files
-	Keep only LOH events found in t1000 but not in t0
-	Last edit: 16/12/2021
 	"""
 
 	# take heterozygous VCF files
@@ -629,90 +754,30 @@ def remove_intersection_intervals(Out, unique_t1000_bed):
 	# intersect files
 	bt_A = BedTool(t1000_bed)
 	bt_B = BedTool(t0_bed)
-	bt_inter = bt_A.intersect(bt_B, v=True)
-	bt_inter.saveas(unique_t1000_bed)
 
-	return (True, unique_t1000_bed)
+	if filter_type == "remove":
+		bt_inter = bt_A.intersect(bt_B, v=True)
+	elif filter_type == "keep":
+		bt_inter = bt_A.intersect(bt_B, u=True)
 
+	return bt_inter
 
-def keep_intersection_intervals(Out, unique_t1000_bed):
-
-	"""
-	v1
-	Intersect t0 and t1000 VCF files
-	Keep only LOH events found in both t1000 and t0
-	Last edit: 16/12/2021
-	"""
-
-	# take heterozygous VCF files
-	t1000_bed = Out["exp"][0]
-	t0_bed = Out["t0"][0]
-
-	# intersect files
-	bt_A = BedTool(t1000_bed)
-	bt_B = BedTool(t0_bed)
-	bt_inter = bt_A.intersect(bt_B, u=True)
-	bt_inter.saveas(unique_t1000_bed)
-
-	return (True, unique_t1000_bed)
-
-
-def assign_blocks(Files, handle, min_snp_density, bed_count_out, bed_assigned_out):
-
-	"""
-	v1
-	Author: Matteo Schiavinato
-	Last update: 16/12/2021
-	Notes: using homozygous SNPs to assign blocks to REF or ALT
-	In case of hybrid species, ALT could correspond to the other subgenome
-	"""
-
-	# calculate number of overlapping homozygous SNPs
-	bed = BedTool(Files[handle][0])
-	vcf = BedTool(Files[handle][1])
-	bed_inter = bed.intersect(vcf, c=True)
-	bed_inter.saveas(bed_count_out)
-
-	# calculating SNP density
-	INPUT = open(bed_count_out, "r")
-	OUTPUT = open(bed_assigned_out, "w")
-	Bed_lines = [ line.rstrip("\b\r\n").split("\t") for line in INPUT ]
-	INPUT.close()
-	for lst in Bed_lines:
-		chrom, start, end, cov_ratio, length, snp_count = lst
-		snp_density = str(round((float(lst[5]) / float(lst[4]))*1000, 2))
-		# assign to REF or ALT
-		if float(snp_density) >= float(min_snp_density):
-			assign = "ALT"
-		else:
-			assign = "REF"
-		row = "\t".join([chrom, start, end, cov_ratio, length, snp_count, snp_density, assign])
-		OUTPUT.write(row + "\n")
-
-	INPUT.close()
-	OUTPUT.close()
-
-	return True
 
 def main():
 
 	"""
-	Function carrying on the main operations
+	Last update: 21/12/2021
+	Note: Function carrying on the main operations
 	"""
 
-	# --------------------------------------
 	# if required print script info and quit
 	if args.print_info:
 		print(script_info)
 		sys.exit(0)
 
-	# ---------------------------------------
 	# create output directory if not existing
 	sys.stderr.write(f"[{at()}] Preparing workspace...\n")
-	(result, output_dir) = organize_workspace(	args.output_dir,
-												args.min_frac_cov,
-												args.max_frac_cov,
-												args.bam)
+	(result, output_dir) = organize_workspace(args.output_dir)
 
 	# iterate over all provided Vcfs
 	if args.t0_vcf:
@@ -731,44 +796,42 @@ def main():
 		handle = Vcfs[in_vcf]
 		bam = Bams[in_vcf]
 
-		(result, het_bed, homo_vcf) = process_vcf_file(
-							in_vcf, args.output_dir, args.genome_file,
-							bam, args.sample, handle,
-							args.min_af, args.max_af, args.min_het_snps, args.snp_distance,
-							args.min_frac_cov, args.max_frac_cov, args.min_size)
+		(LOH, homo_snps, hetero_snps) = process_vcf_file(
+										args, in_vcf, args.output_dir, args.genome_file,
+										bam, args.sample, handle,
+										args.min_af, args.max_af, args.min_het_snps,
+										args.snp_distance, args.min_size)
 
-		Out[handle] = [het_bed, homo_vcf]
+		Out[handle] = [LOH, homo_snps, hetero_snps]
+		out = f"{output_dir}/{args.sample}.{handle}.LOH_candidates.tsv"
+		LOH.saveas(out)
 
 	# if t0 is provided, remove LOH blocks found in t0 from those found in t1000
 	# these are the background noise of pre-existing LOH blocks
 	# that are found at both t0 and t1000
 	# we're interested only in those found at t1000 which have evolved after t0
-	unique_t1000_bed = f"{output_dir}/process/{args.sample}.LOH_blocks.filt.bed"
-
 	if args.t0_vcf:
-
 		sys.stderr.write(f"[{at()}] Handling blocks found in \"t0\" with mode: \"{args.t0_filter_type}\"\n")
-
-		if args.t0_filter_type == "remove":
-			(result, output_loh_bed) = remove_intersection_intervals(Out, unique_t1000_bed)
-
-		elif args.t0_filter_type == "keep":
-			(result, output_loh_bed) = keep_intersection_intervals(Out, unique_t1000_bed)
-
-		else:
-			sys.stderr.write(f"[{at()}] ERROR: the --t0-filter-type option had a strange specification: \"{args.t0_filter_type}\". Only \"keep\" or \"remove\" can be specified.\n")
-			sys.exit()
-
-	# if no t0, just copy the previous output file
+		LOH_filt = use_intersection_intervals(Out, args.t0_filter_type)
 	else:
-		output_loh_bed = Out["exp"][0]
-		cmd_copy = f"cp {output_loh_bed} {unique_t1000_bed}"
-		subprocess.run([cmd_copy], check=True, shell=True)
+		LOH_filt = Out["exp"][0]
 
-	# assign blocks to REF or ALT
-	count_t1000_bed = f"{output_dir}/process/{args.sample}.LOH_blocks.count_homo.bed"
-	assigned_t1000_bed = f"{output_dir}/{args.sample}.LOH_blocks.assigned.bed"
-	result = assign_blocks(Out, handle, args.homo_snps_kbp, count_t1000_bed, assigned_t1000_bed)
+	# count SNPs in selected blocks
+	# counting heterozygous
+	# and then counting homozygous
+	bt_homo = BedTool(Out["exp"][1])
+	bt_hetero = BedTool(Out["exp"][2])
+	LOH_w_snps = count_snps_in_bed_interval(LOH_filt, bt_homo)
+	LOH_w_snps = count_snps_in_bed_interval(LOH_w_snps, bt_hetero)
+
+	# write to output
+	# including a header
+	out = f"{output_dir}/{args.sample}.LOH_blocks.tsv"
+	OUTPUT = open(out, "w")
+	OUTPUT.write("\t".join(["#Chrom", "Start", "End", "Cov", "Length", "Allele", "Homo_snps", "Hetero_snps"]) + "\n")
+	for row in LOH_w_snps:
+		OUTPUT.write(str(row))
+	OUTPUT.close()
 
 	sys.stderr.write(f"[{at()}] Done!\n")
 
