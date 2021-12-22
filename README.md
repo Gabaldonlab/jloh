@@ -80,11 +80,15 @@ A third list of intervals is then produced, which contains all those intervals c
 
 All intervals (`REF` and `ALT`) are then checked against the heterozygous blocks and their margins are **edited** until they don't overlap with heterozygous blocks anymore.
 
-### filter by coverage
+### computing coverage
 
 Each region that is considered as a candidate LOH region is screened by coverage using the BAM file passed with `--bam`. First, a mean coverage is computed for the whole BAM file. To do that, JLOH checks if the BAM file is indexed, and if not, it indexes it using the **pysam** module. Then, reads mapping inside each region are extracted using the **pysam** module, and compared against the general mean coverage.
 
-Candidate `REF` LOH blocks are kept only if their mean coverage is *higher than* 50% of the global mean coverage. Candidate `ALT` LOH blocks, instead, must be at *most* 50% of the global mean coverage. 
+No assumption is made on what coverage should be within an LOH block. However, a general rule would say that:
+- if the REF allele is retained, coverage should be higher than the mean coverage
+- if the ALT allele is retained, coverage should be lower because fewer reads are able to map
+
+However, depending on how the user conducted the mapping, this may or may not be true for each case. Hence, a decision was made to let the user decide how to filter the output file at will. 
 
 ### deal with known pre-existing LOH blocks
 

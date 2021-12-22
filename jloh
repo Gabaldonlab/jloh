@@ -613,21 +613,22 @@ def assess_coverage(input_bam, bt, meancov, args):
 		Out.append(x)
 
 	bt = BedTool(Out)
+	return bt
 
-	# filter by coverage
-	Out, kept, removed = [], 0, 0
-	for row in bt:
-		lst = str(row).rstrip("\n\r\b").split("\t")
-		if (((0 <= float(lst[3].rstrip("%")) <= 50) and (lst[5] == "ALT")) \
-		or ((50 < float(lst[3].rstrip("%"))) and (lst[5] == "REF"))):
-			Out.append(row)
-			kept += 1
-		else:
-			removed += 1
+	# # filter by coverage
+	# Out, kept, removed = [], 0, 0
+	# for row in bt:
+	# 	lst = str(row).rstrip("\n\r\b").split("\t")
+	# 	if (((0 <= float(lst[3].rstrip("%")) <= 50) and (lst[5] == "ALT")) \
+	# 	or ((50 < float(lst[3].rstrip("%"))) and (lst[5] == "REF"))):
+	# 		Out.append(row)
+	# 		kept += 1
+	# 	else:
+	# 		removed += 1
+	#
+	# bt = BedTool(Out)
 
-	bt = BedTool(Out)
-
-	return (bt, kept, removed)
+	# return (bt, kept, removed)
 
 
 def process_vcf_file(	args, in_vcf, output_dir, genome_file, bam, sample, handle,
@@ -806,25 +807,32 @@ def process_vcf_file(	args, in_vcf, output_dir, genome_file, bam, sample, handle
 
 	# REF homo blocks
 	# their coverage must increase
-	(LOH, kept, removed) = assess_coverage(	indexed_bam,
-											Homo_blocks,
-											meancov,
-											args)
+	# (LOH, kept, removed) = assess_coverage(	indexed_bam,
+	# 										Homo_blocks,
+	# 										meancov,
+	# 										args)
+	LOH = assess_coverage(	indexed_bam,
+							Homo_blocks,
+							meancov,
+							args)
+
+	sys.stderr.write(f"[{at()}] Computed coverage for selected LOH blocks\n")
 
 	if args.debug:
 		out = f"{output_dir}/debug/10.{handle}.LOH_candidates.bed"
 		tmp = LOH
 		tmp.saveas(out)
 
-	try:
-		frac = round((kept / (kept + removed))*100, 2)
-	except ZeroDivisionError:
-		frac = round(0, 2)
-
-	tot = kept + removed
-	sys.stderr.write(f"[{at()}] Kept {kept} LOH regions based on their coverage ({frac} %)\n")
-
 	return (LOH, homo_snps_vcf, het_snps_vcf)
+
+	# try:
+	# 	frac = round((kept / (kept + removed))*100, 2)
+	# except ZeroDivisionError:
+	# 	frac = round(0, 2)
+	#
+	# tot = kept + removed
+	# sys.stderr.write(f"[{at()}] Kept {kept} LOH regions based on their coverage ({frac} %)\n")
+
 
 
 def use_intersection_intervals(Out, filter_type):
