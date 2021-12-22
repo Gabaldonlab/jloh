@@ -32,7 +32,7 @@ Still the one from the block
 -
 Extact LOH blocks from SNPs, coverage, and a reference genome
 -
-v 0.7.0
+v 0.7.1
 --------------------------------------------------------------------------------
 by Matteo Schiavinato
 largely based on:
@@ -266,10 +266,7 @@ def count_snps_in_bed_interval(bed, vcf):
 	by intersecting a BED file with a VCF file
 	"""
 
-	# bt_A = BedTool(bed)
-	# bt_B = BedTool(vcf)
 	bt_inter = bed.intersect(vcf, c=True)
-
 	return bt_inter
 
 
@@ -442,7 +439,7 @@ def get_complementary_regions(bt_A, bt_B, genome_file):
 	Hence, the output of this function are the homozygous blocks
 	"""
 
-	bt_comp = bt_A.cat(bt_B).merge().complement(g=genome_file)
+	bt_comp = bt_A.cat(bt_B).sort(g=genome_file).merge().complement(g=genome_file)
 	return bt_comp
 
 
@@ -614,21 +611,6 @@ def assess_coverage(input_bam, bt, meancov, args):
 
 	bt = BedTool(Out)
 	return bt
-
-	# # filter by coverage
-	# Out, kept, removed = [], 0, 0
-	# for row in bt:
-	# 	lst = str(row).rstrip("\n\r\b").split("\t")
-	# 	if (((0 <= float(lst[3].rstrip("%")) <= 50) and (lst[5] == "ALT")) \
-	# 	or ((50 < float(lst[3].rstrip("%"))) and (lst[5] == "REF"))):
-	# 		Out.append(row)
-	# 		kept += 1
-	# 	else:
-	# 		removed += 1
-	#
-	# bt = BedTool(Out)
-
-	# return (bt, kept, removed)
 
 
 def process_vcf_file(	args, in_vcf, output_dir, genome_file, bam, sample, handle,
@@ -805,12 +787,6 @@ def process_vcf_file(	args, in_vcf, output_dir, genome_file, bam, sample, handle
 
 	sys.stderr.write(f"[{at()}] Mean coverage: {round(meancov, 2)}x\n")
 
-	# REF homo blocks
-	# their coverage must increase
-	# (LOH, kept, removed) = assess_coverage(	indexed_bam,
-	# 										Homo_blocks,
-	# 										meancov,
-	# 										args)
 	LOH = assess_coverage(	indexed_bam,
 							Homo_blocks,
 							meancov,
@@ -824,15 +800,6 @@ def process_vcf_file(	args, in_vcf, output_dir, genome_file, bam, sample, handle
 		tmp.saveas(out)
 
 	return (LOH, homo_snps_vcf, het_snps_vcf)
-
-	# try:
-	# 	frac = round((kept / (kept + removed))*100, 2)
-	# except ZeroDivisionError:
-	# 	frac = round(0, 2)
-	#
-	# tot = kept + removed
-	# sys.stderr.write(f"[{at()}] Kept {kept} LOH regions based on their coverage ({frac} %)\n")
-
 
 
 def use_intersection_intervals(Out, filter_type):
