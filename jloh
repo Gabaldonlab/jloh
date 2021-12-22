@@ -5,7 +5,7 @@ script_info = """
 ###
 Author: Matteo Schiavinato
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2018)
-Last change: 21/12/2021
+Last change: 22/12/2021
 ###
 """
 
@@ -32,7 +32,7 @@ Still the one from the block
 -
 Extact LOH blocks from SNPs, coverage, and a reference genome
 -
-v 0.6.0
+v 0.7.0
 --------------------------------------------------------------------------------
 by Matteo Schiavinato
 largely based on:
@@ -61,6 +61,7 @@ Usage:
 --min-size          Min. LOH block size                                         [100]
 --min-af            Min. allele frequency to consider a variant heterozygous    [0.3]
 --max-af            Max. allele frequency to consider a variant heterozygous    [0.7]
+--debug             Activate generation of several intermediate files           [off]
 --print-info        Show authors and edits with dates                           [off]
 
 """)
@@ -83,27 +84,34 @@ p.add_argument("--block-dist", default=100, type=int)
 p.add_argument("--min-size", default=100, type=int)
 p.add_argument("--min-af", default=0.3, type=float)
 p.add_argument("--max-af", default=0.7, type=float)
+p.add_argument("--debug", action="store_true")
 p.add_argument("--print-info", action="store_true")
 args = p.parse_args()
 
 
 # functions
-def organize_workspace(output_dir):
+def organize_workspace(args):
 
 	"""
-	Last update: 21/12/2021
+	Last update: 22/12/2021
 	Creation of folders and workspace where the script has to operate
 	Verify presence of minimal set of files to work with
 	"""
 
-	if os.path.exists(output_dir) == False:
-		os.makedirs(output_dir)
-		sys.stderr.write(f"[{at()}] Created output directory {output_dir}\n")
+	if os.path.exists(args.output_dir) == False:
+		os.makedirs(args.output_dir)
+		sys.stderr.write(f"[{at()}] Created output directory {args.output_dir}\n")
 
-	return (True, output_dir)
+	if args.debug:
+		if os.path.exists(f"{args.output_dir}/debug") == False:
+			os.makedirs(f"{args.output_dir}/debug")
+			sys.stderr.write(f"[{at()}] Created debug directory {args.output_dir}/debug\n")
+
+	return (True, args.output_dir)
 
 
-def extract_heterozygous_snps(vcf, min_af, max_af, output_dir, sample, het_snps_vcf, homo_snps_vcf, filter_mode):
+def extract_heterozygous_snps(	vcf, min_af, max_af, output_dir,
+								sample, het_snps_vcf, homo_snps_vcf, filter_mode):
 
 	"""
 	Last update: 16/12/2021
@@ -236,7 +244,7 @@ def extract_heterozygous_snps(vcf, min_af, max_af, output_dir, sample, het_snps_
 def get_intervals_of_snps(snps_vcf, snp_distance):
 
 	"""
-	Last update: 21/12/2021
+	Last update: 22/12/2021
 	Create BED regions based on the input VCF rows after their filtering
 	These regions merge together SNPs as long as they are within --snp-distance
 	For each, the number of variants contained in it are counted
@@ -244,6 +252,7 @@ def get_intervals_of_snps(snps_vcf, snp_distance):
 	The output is: chr | start | end | count
 	"""
 
+	snps_vcf = BedTool(snps_vcf)
 	bt_merged = snps_vcf.merge(d=snp_distance, c=1, o="count")
 
 	return bt_merged
@@ -311,17 +320,17 @@ def filter_snps(vcf, bed):
 	return filt_vcf
 
 
-def remove_overlapping_regions(bt_A, bt_B):
+def remove_overlapping_regions(bt_A, bt_B, homo_vcf):
 
 	"""
-	Last update: 21/12/2021
+	Last update: 22/12/2021
 	Note: remove BED regions overlapping in two files
 	"""
 
 	def remove_intersection(bed_lst_A, bed_lst_B):
 
 		"""
-		Last update: 21/12/2021
+		Last update: 22/12/2021
 		Note: remove overlapping region of the B interval from the A interval
 		A intervals: homozygous blocks
 		B intervals: heterozygous blocks
@@ -345,12 +354,8 @@ def remove_overlapping_regions(bt_A, bt_B):
 		# split the homo block in two
 		elif ((A_start <= B_start <= A_end) and (A_start <= B_end <= A_end)):
 
-			A1_start = A_start
-			A1_end = B_start
-			Out.append((A_chrom, A1_start, A1_end))
-			A2_start = B_start
-			A2_end = A_end
-			Out.append((A_chrom, A2_start, A2_end))
+			Out.append((A_chrom, A_start, B_start))
+			Out.append((A_chrom, B_end, A_end))
 
 		# if the whole A interval is contained in B
 		# that is: the whole homo block is contained in the hetero block
@@ -385,37 +390,59 @@ def remove_overlapping_regions(bt_A, bt_B):
 	# and their overlap
 	# in case of no overlap, the feature is reported as is, with an overlap of "-1"
 	# you can easily remove the intersection
-	bt_leftover = bt_A.intersect(bt_B, wao=True)
 
 	# remove intersections from BED intervals of homozygous blocks
-	New_intervals = []
-	for row in bt_leftover:
-		row = str(row)
-		lst = row.rstrip("\b\r\n").split("\t")
-		bed_lst_A = str(lst[0]), int(lst[1]), int(lst[2])
-		bed_lst_B = str(lst[4]), int(lst[5]), int(lst[6])
-		New_beds = remove_intersection(bed_lst_A, bed_lst_B)
-		New_intervals = New_intervals + New_beds
+	bt_int = bt_A.intersect(bt_B, u=True)
+	bt_nonint = bt_A.intersect(bt_B, v=True)
+	num_intersections = len(bt_int)
 
+	sys.stderr.write(f"[{at()}] Found {num_intersections} intersections between homo- and hetero-blocks\n")
 
-	# merge together homo-blocks
-	bt = BedTool(New_intervals)
-	bt_merge = bt.sort().merge()
+	# operate this lengthy part only if there actually are intersections
+	while (num_intersections > 0):
+		bt_int = bt_int.intersect(bt_B, wo=True)
+		New_intervals = []
 
-	return bt_merge
+		for row in bt_int:
+			row = str(row)
+			lst = row.rstrip("\b\r\n").split("\t")
+			bed_lst_A = str(lst[0]), int(lst[1]), int(lst[2])
+			bed_lst_B = str(lst[4]), int(lst[5]), int(lst[6])
+			New_beds = remove_intersection(bed_lst_A, bed_lst_B)
+			New_intervals = New_intervals + New_beds
+
+		# merge together homo-blocks
+		bt_int = BedTool(New_intervals).sort()
+		bt_int = count_snps_in_bed_interval(bt_int, homo_vcf)
+		num_intersections = len(bt_int.intersect(bt_B, wo=True))
+		sys.stderr.write(f"[{at()}] Broken into {num_intersections} smaller intersections\n")
+
+	# merge together intersecting and non-intersecting
+	bt_int = bt_int.sort().merge()
+	bt_final = bt_int.cat(bt_nonint).sort()
+
+	# check that all have been eliminated
+	num_intersections = len(bt_int.intersect(bt_B, wo=True))
+	sys.stderr.write(f"[{at()}] Final number of intersections: {num_intersections}\n")
+
+	if (num_intersections == 0):
+		return bt_final
+	else:
+		sys.stderr.write(f"[{at()}] ERROR: could not remove all intersections. Report bug to GitHub page issues. Sorry!\n")
+		sys.exit()
 
 
 def get_complementary_regions(bt_A, bt_B, genome_file):
 
 	"""
-	Last update: 21/12/2021
+	Last update: 22/12/2021
 	Run bedtools complement to obtain BED intervals
 	These intervals represent the complement of the original regions
 	Which in turn represented the heterozygous blocks
 	Hence, the output of this function are the homozygous blocks
 	"""
 
-	bt_comp = bt_A.merge(i=bt_B).complement(g=genome_file)
+	bt_comp = bt_A.cat(bt_B).merge().complement(g=genome_file)
 	return bt_comp
 
 
@@ -444,20 +471,6 @@ def combine_beds(bt_A, bt_B):
 	bt = BedTool(z).sort()
 
 	return bt
-
-
-def merge_bed_homo_intervals(sample, output_dir, in_bed, out_bed, block_dist):
-
-	"""
-	Last update: 15/12/2021
-	Note: Combine neighboring homoyzgous blocks if their distance < block_dist
-	"""
-
-	bt = BedTool(in_bed)
-	bt_merged = bt.merge(d=block_dist)
-	bt_merged.saveas(out_bed)
-
-	return True
 
 
 def filter_by_length(bt, min_size):
@@ -533,7 +546,7 @@ def get_global_coverage(bamfile, output_dir, sample, handle):
 	return global_cov
 
 
-def assess_coverage(input_bam, bt, meancov):
+def assess_coverage(input_bam, bt, meancov, args):
 
 	"""
 	v1
@@ -605,8 +618,8 @@ def assess_coverage(input_bam, bt, meancov):
 	Out, kept, removed = [], 0, 0
 	for row in bt:
 		lst = str(row).rstrip("\n\r\b").split("\t")
-		if (((float(lst[3].rstrip("%")) < float(100)) and (lst[5] == "ALT")) \
-		or ((float(lst[3].rstrip("%")) > float(0)) and (lst[5] == "REF"))):
+		if (((0 <= float(lst[3].rstrip("%")) <= 50) and (lst[5] == "ALT")) \
+		or ((50 < float(lst[3].rstrip("%"))) and (lst[5] == "REF"))):
 			Out.append(row)
 			kept += 1
 		else:
@@ -621,7 +634,7 @@ def process_vcf_file(	args, in_vcf, output_dir, genome_file, bam, sample, handle
 						min_af, max_af, min_het_snps, snp_distance, min_size):
 
 	"""
-	Last update: 21/12/2021
+	Last update: 22/12/2021
 	Note: Series of operations that a VCF file goes through to extract LOH blocks
 	"""
 
@@ -650,40 +663,69 @@ def process_vcf_file(	args, in_vcf, output_dir, genome_file, bam, sample, handle
 	Het_bed_blocks = get_intervals_of_snps(	snps_vcf,
 							 				snp_distance)
 
+	if args.debug:
+		out = f"{output_dir}/debug/1.{handle}.het_bed_blocks.bed"
+		tmp = Het_bed_blocks
+		tmp.saveas(out)
 
 	sys.stderr.write(f"[{at()}] Keeping only blocks with >= {args.min_het_snps} SNPs...\n")
 
-	(Het_bed_snp_filt, skipped) = filter_by_snp_density(Het_bed_blocks,
+	(Het_bed_blocks, skipped) = filter_by_snp_density(	Het_bed_blocks,
 														args.min_het_snps)
 
 	sys.stderr.write(f"[{at()}] {skipped} regions were removed due to insufficient SNP count\n")
+	sys.stderr.write(f"[{at()}] Keeping only blocks >= {args.min_size} bp...\n")
+
+	Het_bed_blocks = filter_by_length(	Het_bed_blocks,
+										args.min_size)
+
+	if args.debug:
+		out = f"{output_dir}/debug/2.{handle}.het_bed_blocks.filt.bed"
+		tmp = Het_bed_blocks
+		tmp.saveas(out)
 
 	# ------------------------------------------------------
 	# get homozygous blocks
 	sys.stderr.write(f"[{at()}] Defining alternative allele (ALT) homozygous blocks...\n")
 
-	homo_snps_vcf_filt = filter_snps(homo_snps_vcf, Het_bed_snp_filt)
-	sys.stderr.write(f"[{at()}] Using only {len(homo_snps_vcf_filt)} homo-SNPs non-overlapping heterozygous regions...\n")
-
-	Homo_ALT_bed_blocks = get_intervals_of_snps(	homo_snps_vcf_filt,
+	Homo_ALT_bed_blocks = get_intervals_of_snps(	homo_snps_vcf,
 								 					snp_distance)
+
+	if args.debug:
+		out = f"{output_dir}/debug/3.{handle}.homo_bed_blocks.ALT.bed"
+		tmp = Homo_ALT_bed_blocks
+		tmp.saveas(out)
 
 	sys.stderr.write(f"[{at()}] Keeping only blocks with >= {args.min_het_snps} SNPs...\n")
 
-	(Homo_ALT_bed_snp_filt, skipped) = filter_by_snp_density(	Homo_ALT_bed_blocks,
-																args.min_het_snps)
+	(Homo_ALT_bed_blocks, skipped) = filter_by_snp_density(	Homo_ALT_bed_blocks,
+															args.min_het_snps)
 
 	sys.stderr.write(f"[{at()}] {skipped} regions were removed due to insufficient SNP count\n")
+
+	Homo_ALT_bed_blocks = filter_by_length(	Homo_ALT_bed_blocks,
+											args.min_size)
+
+	if args.debug:
+		out = f"{output_dir}/debug/4.{handle}.homo_bed_blocks.ALT.filt.bed"
+		tmp = Homo_ALT_bed_blocks
+		tmp.saveas(out)
 
 	# ------------------------------------------------------
 	# remove homo ALT block if overlapping a hetero block
 	# it could be that there are hetero- and homo-zygous SNPs
 	# interleaved between each other
 	# these must not be considered blocks
-	sys.stderr.write(f"[{at()}] Removing homozygous blocks largely overlapping heterozygous blocks...\n")
+	sys.stderr.write(f"[{at()}] Adjusting ALT homozygous blocks to not overlap heterozygous blocks...\n")
 
-	Homo_ALT_bed_blocks = remove_overlapping_regions(	Homo_ALT_bed_snp_filt,
-														Het_bed_snp_filt)
+	Homo_ALT_bed_blocks = remove_overlapping_regions(Homo_ALT_bed_blocks,
+													Het_bed_blocks,
+													homo_snps_vcf)
+
+	if args.debug:
+		out = f"{output_dir}/debug/5.{handle}.homo_bed_blocks.ALT.filt.no_overlap.bed"
+		tmp = Homo_ALT_bed_blocks
+		tmp.saveas(out)
 
 	sys.stderr.write(f"[{at()}] Left with {len(Homo_ALT_bed_blocks)} homo-blocks after intersecting with hetero-blocks\n")
 
@@ -693,9 +735,37 @@ def process_vcf_file(	args, in_vcf, output_dir, genome_file, bam, sample, handle
 	sys.stderr.write(f"[{at()}] Getting homozygous regions (i.e. candidate LOH blocks)...\n")
 	homo_REF_bed = f"{output_dir}/process/{sample}.{handle}.d{snp_distance}bp.homo_REF.bed"
 
-	Homo_REF_bed_blocks = get_complementary_regions(Het_bed_snp_filt,
+	Homo_REF_bed_blocks = get_complementary_regions(Het_bed_blocks,
 													Homo_ALT_bed_blocks,
 													genome_file)
+
+	if args.debug:
+		out = f"{output_dir}/debug/6.{handle}.homo_bed_blocks.REF.bed"
+		tmp = Homo_REF_bed_blocks
+		tmp.saveas(out)
+
+	# ------------------------------------------------------
+	# remove homo REF block if overlapping a hetero block
+	# it could be that there are hetero- and homo-zygous SNPs
+	# interleaved between each other
+	# these must not be considered blocks
+	sys.stderr.write(f"[{at()}] Adjusting REF homozygous blocks to not overlap heterozygous blocks...\n")
+
+	bt_homo = BedTool(homo_snps_vcf)
+	Homo_REF_bed_blocks = count_snps_in_bed_interval(Homo_REF_bed_blocks,
+													bt_homo)
+	Homo_REF_bed_blocks = filter_by_length(	Homo_REF_bed_blocks,
+											args.min_size)
+	Homo_REF_bed_blocks = remove_overlapping_regions(Homo_REF_bed_blocks,
+													Het_bed_blocks,
+													homo_snps_vcf)
+
+	if args.debug:
+		out = f"{output_dir}/debug/7.{handle}.homo_bed_blocks.REF.no_overlap.bed"
+		tmp = Homo_REF_bed_blocks
+		tmp.saveas(out)
+
+	sys.stderr.write(f"[{at()}] Left with {len(Homo_REF_bed_blocks)} homo-blocks after intersecting with hetero-blocks\n")
 
 	# --------------------------------------------------
 	# add REF or ALT annotation
@@ -706,11 +776,23 @@ def process_vcf_file(	args, in_vcf, output_dir, genome_file, bam, sample, handle
 	Homo_ALT = add_column(Homo_ALT_bed_blocks, "ALT")
 	Homo_blocks = combine_beds(	Homo_REF, Homo_ALT)
 	total = len(Homo_blocks)
+
+	if args.debug:
+		out = f"{output_dir}/debug/8.{handle}.homo_bed_blocks.REF_and_ALT.bed"
+		tmp = Homo_blocks
+		tmp.saveas(out)
+
 	sys.stderr.write(f"[{at()}] Now working with {total} REF & ALT blocks\n")
 
-	Homo_blocks_filt = filter_by_length(Homo_blocks, args.min_size)
-	filtered = len(Homo_blocks_filt)
+	Homo_blocks = filter_by_length(Homo_blocks, args.min_size)
+	filtered = len(Homo_blocks)
 	discarded = total - filtered
+
+	if args.debug:
+		out = f"{output_dir}/debug/9.{handle}.homo_bed_blocks.REF_and_ALT.filt.bed"
+		tmp = Homo_blocks
+		tmp.saveas(out)
+
 	sys.stderr.write(f"[{at()}] {discarded} blocks were discarded because shorter than {args.min_size} bp\n")
 
 	# -----------------------------------------
@@ -722,12 +804,17 @@ def process_vcf_file(	args, in_vcf, output_dir, genome_file, bam, sample, handle
 
 	sys.stderr.write(f"[{at()}] Mean coverage: {round(meancov, 2)}x\n")
 
-
 	# REF homo blocks
 	# their coverage must increase
 	(LOH, kept, removed) = assess_coverage(	indexed_bam,
-											Homo_blocks_filt,
-											meancov)
+											Homo_blocks,
+											meancov,
+											args)
+
+	if args.debug:
+		out = f"{output_dir}/debug/10.{handle}.LOH_candidates.bed"
+		tmp = LOH
+		tmp.saveas(out)
 
 	try:
 		frac = round((kept / (kept + removed))*100, 2)
@@ -737,7 +824,7 @@ def process_vcf_file(	args, in_vcf, output_dir, genome_file, bam, sample, handle
 	tot = kept + removed
 	sys.stderr.write(f"[{at()}] Kept {kept} LOH regions based on their coverage ({frac} %)\n")
 
-	return (LOH, homo_snps_vcf_filt, het_snps_vcf)
+	return (LOH, homo_snps_vcf, het_snps_vcf)
 
 
 def use_intersection_intervals(Out, filter_type):
@@ -766,7 +853,7 @@ def use_intersection_intervals(Out, filter_type):
 def main():
 
 	"""
-	Last update: 21/12/2021
+	Last update: 22/12/2021
 	Note: Function carrying on the main operations
 	"""
 
@@ -777,7 +864,7 @@ def main():
 
 	# create output directory if not existing
 	sys.stderr.write(f"[{at()}] Preparing workspace...\n")
-	(result, output_dir) = organize_workspace(args.output_dir)
+	(result, output_dir) = organize_workspace(args)
 
 	# iterate over all provided Vcfs
 	if args.t0_vcf:
@@ -815,6 +902,11 @@ def main():
 		LOH_filt = use_intersection_intervals(Out, args.t0_filter_type)
 	else:
 		LOH_filt = Out["exp"][0]
+
+	if args.debug:
+		out = f"{output_dir}/debug/11.exp.LOH_blocks.bed"
+		tmp = LOH_filt
+		tmp.saveas(out)
 
 	# count SNPs in selected blocks
 	# counting heterozygous

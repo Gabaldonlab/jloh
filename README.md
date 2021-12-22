@@ -58,6 +58,7 @@ The program has many other options:
 --min-size          Min. LOH block size                                         [100]
 --min-af            Min. allele frequency to consider a variant heterozygous    [0.3]
 --max-af            Max. allele frequency to consider a variant heterozygous    [0.7]
+--debug             Activate generation of several intermediate files           [off]
 --print-info        Show authors and edits with dates                           [off]
 ```
 
@@ -77,11 +78,13 @@ The same procedure is then repeated to extract clusters of **homozygous** SNPs. 
 
 A third list of intervals is then produced, which contains all those intervals complementing the first two. That is, every interval that is neither heterozygous nor homozygous for `ALT`. These are labelled `REF` and indicate intervals where the SNP profile points in the direction of an LOH towards the reference allele (i.e. the one of the reference genome).
 
+All intervals (`REF` and `ALT`) are then checked against the heterozygous blocks and their margins are **edited** until they don't overlap with heterozygous blocks anymore.
+
 ### filter by coverage
 
 Each region that is considered as a candidate LOH region is screened by coverage using the BAM file passed with `--bam`. First, a mean coverage is computed for the whole BAM file. To do that, JLOH checks if the BAM file is indexed, and if not, it indexes it using the **pysam** module. Then, reads mapping inside each region are extracted using the **pysam** module, and compared against the general mean coverage.
 
-Candidate LOH blocks are retained in the output only if they have a coverage profile fitting the hypothesis. This means that `REF` blocks should show some type of coverage increase, while `ALT` blocks should show a decrease. This is due to the fact that there will be less reads mapping against the genomic region if the region carries many SNPs.
+Candidate `REF` LOH blocks are kept only if their mean coverage is *higher than* 50% of the global mean coverage. Candidate `ALT` LOH blocks, instead, must be at *most* 50% of the global mean coverage. 
 
 ### deal with known pre-existing LOH blocks
 
