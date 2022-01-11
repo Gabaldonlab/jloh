@@ -5,7 +5,7 @@ script_info = """
 ###
 Author: Matteo Schiavinato
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2018)
-Last change: 22/12/2021
+Last change: 11/01/2022
 ###
 """
 
@@ -32,7 +32,7 @@ Still the one from the block
 -
 Extact LOH blocks from SNPs, coverage, and a reference genome
 -
-v 0.7.1
+v 0.8.0
 --------------------------------------------------------------------------------
 by Matteo Schiavinato
 largely based on:
@@ -43,26 +43,33 @@ Mixao et al., 2019		https://doi.org/10.3389/fgene.2019.00383
 Usage:
 ./jloh --vcf <VCF> --genome-file <GENOME_FILE> --bam <BAM> [options]
 
-[mandatory]
---vcf               Input VCF file containing all types of variants             [!]
+[I/O]
+--vcf               Input VCF file                                              [!]
 --genome-file       File with chromosome lengths (chromosome <TAB> size)        [!]
 --bam               BAM file used to call the --vcf variants                    [!]
-
-[optional]
---filter-mode       "pass" to keep only PASS variants, "all" to keep everything [all]
 --sample            Sample name / Strain name for output files                  [loh_blocks]
 --output-dir        Output directory                                            [loh_blocks_out]
---t0-vcf            VCF with variants to ignore from --vcf                      [off]
---t0-bam            BAM file used to call the --t0-vcf variants                 [off]
---t0-filter-type    What to do with t0 LOH events? "keep" or "remove"           [remove]
+--debug             Activate generation of several intermediate files           [off]
+--print-info        Show authors and edits with dates                           [off]
+
+[modes]
+--keep-secondary    Ignores secondary alignments from --bam file                [off]
+--no-alleles        Don't use homozygous SNPs to assign LOH blocks to REF/ALT   [off]
+
+[parameters]
+--filter-mode       "pass" to keep only PASS variants, "all" to keep everything [all]
 --min-het-snps      Min. num. heterozygous SNPs in heterozygous region          [2]
 --snp-distance      Max. distance (bp between SNPs for blocks definition        [100]
 --block-dist        Combine LOH blocks into one if closer than this distance    [100]
 --min-size          Min. LOH block size                                         [100]
 --min-af            Min. allele frequency to consider a variant heterozygous    [0.3]
 --max-af            Max. allele frequency to consider a variant heterozygous    [0.7]
---debug             Activate generation of several intermediate files           [off]
---print-info        Show authors and edits with dates                           [off]
+--min-frac-cov      Min. fraction of LOH block that has to be covered by reads  [0.5]
+
+[pre-existing variation]
+--t0-vcf            VCF with variants to ignore from --vcf                      [off]
+--t0-bam            BAM file used to call the --t0-vcf variants                 [off]
+--t0-filter-type    What to do with t0 LOH events? "keep" or "remove"           [remove]
 
 """)
 	sys.exit(0)
@@ -74,6 +81,8 @@ p.add_argument("--bam", type=str)
 p.add_argument("--genome-file")
 p.add_argument("--sample", default="loh_blocks")
 p.add_argument("--filter-mode", choices=["all","pass"], default="all")
+p.add_argument("--keep-secondary", action="store_true", default=False)
+p.add_argument("--no-alleles", action="store_true", default=False)
 p.add_argument("--output-dir", default="loh_blocks_out")
 p.add_argument("--t0-vcf", type=str, default=None)
 p.add_argument("--t0-bam", type=str, default=None)
@@ -84,6 +93,7 @@ p.add_argument("--block-dist", default=100, type=int)
 p.add_argument("--min-size", default=100, type=int)
 p.add_argument("--min-af", default=0.3, type=float)
 p.add_argument("--max-af", default=0.7, type=float)
+p.add_argument("--min-frac-cov", default=0.5, type=float)
 p.add_argument("--debug", action="store_true")
 p.add_argument("--print-info", action="store_true")
 args = p.parse_args()
@@ -432,14 +442,19 @@ def remove_overlapping_regions(bt_A, bt_B, homo_vcf):
 def get_complementary_regions(bt_A, bt_B, genome_file):
 
 	"""
-	Last update: 22/12/2021
+	Last update: 11/01/2022
 	Run bedtools complement to obtain BED intervals
 	These intervals represent the complement of the original regions
 	Which in turn represented the heterozygous blocks
 	Hence, the output of this function are the homozygous blocks
+	The sorting is conducted according to the chromosome names in the genome file
 	"""
 
-	bt_comp = bt_A.cat(bt_B).sort(g=genome_file).merge().complement(g=genome_file)
+	if bt_B != None:
+		bt_comp = bt_A.cat(bt_B).sort(faidx=genome_file).merge().complement(g=genome_file)
+	else:
+		bt_comp = bt_A.sort(faidx=genome_file).merge().complement(g=genome_file)
+
 	return bt_comp
 
 
@@ -478,16 +493,15 @@ def filter_by_length(bt, min_size):
 	"""
 
 	lst = [ str(row).rstrip("\b\r\n").split("\t") for row in bt ]
-	lst = [ (str(x[0]), int(x[1]), int(x[2]), str(x[3])) for x in lst ]
-	lst = [ x for x in lst if x[2]-x[1] >= min_size ]
+	lst = [ x for x in lst if int(x[2]) - int(x[1]) >= min_size ]
 	new_bt = BedTool(lst)
 	return new_bt
 
 
-def index_bam_file(input_bam):
+def index_bam_file(input_bam, sample, handle):
 
 	"""
-	Last update: 20/12/2021
+	Last update: 11/01/2022
 	Note: indexing bam file if index is not found
 	"""
 
@@ -514,16 +528,40 @@ def index_bam_file(input_bam):
 	return bam
 
 
-def get_global_coverage(bamfile, output_dir, sample, handle):
+def read_and_filter_bam(input_bam, output_dir, sample, handle, keep_secondary):
 
 	"""
-	Last update: 20/12/2021
+	v1
+	Last update: 11/01/2022
+	Note: reads a bam file and keeps secondary alignments only when the use specifies
+	the "--keep-secondary" flag
+	Returns a pysam alignmentFile object
+	"""
+
+	if keep_secondary == False:
+		input_bam_filt = f"{output_dir}/{sample}.{handle}.f.bam"
+		pysam.view("-h", "-b", "-F", "0x0100", "-o", input_bam_filt, input_bam, catch_stdout=False)
+		bam = index_bam_file(input_bam_filt, sample, handle)
+		bam = pysam.AlignmentFile(bam, "rb")
+
+	elif keep_secondary == True:
+		bam = index_bam_file(input_bam, sample, handle)
+		bam = pysam.AlignmentFile(bam, "rb")
+
+	return bam
+
+
+def get_global_coverage(bamfile, output_dir, sample, handle, args):
+
+	"""
+	Last update: 11/01/2022
 	Note: Get global mean coverage per position of a reference genome
 	Based on the number of positions that are covered
 	And the number of reads covering them
+	If needed, considers only primary alignments
 	"""
 
-	bam = pysam.AlignmentFile(bamfile, "rb")
+	bam = read_and_filter_bam(bamfile, output_dir, sample, handle, args.keep_secondary)
 
 	Covs = {}
 	for chrom in list(bam.references):
@@ -543,7 +581,7 @@ def get_global_coverage(bamfile, output_dir, sample, handle):
 	return global_cov
 
 
-def assess_coverage(input_bam, bt, meancov, args):
+def assess_coverage(input_bam, bt, meancov, sample, handle, args):
 
 	"""
 	v1
@@ -553,12 +591,15 @@ def assess_coverage(input_bam, bt, meancov, args):
 	###
 	v2
 	Author: Matteo Schiavinato
-	Last change: 21/12/2021
+	Last change: 11/01/2022
 	Notes: Now addressing ALT and REF homoblock alleles in relation to coverage
+	when using the hybrid mode
+	And not doing that when running in normal mode since it would be misleading
+	when -not- working with a hybrid
+	If needed, considers only primary alignments
 	"""
 
-
-	def get_region_coverage(bed, bam, meancov):
+	def get_region_coverage(bed, bam, meancov, min_frac_cov):
 
 		"""
 		v1
@@ -567,10 +608,12 @@ def assess_coverage(input_bam, bt, meancov, args):
 		###
 		v2
 		Author: Matteo Schiavinato
-		Note: Updated to python3
-		Updated to new version of pysam
+		Note: Updated to python3, and updated to new version of pysam
 		Now using coverage per position instead of raw read count
-		Last Update: 21/12/2021
+		calculates coverage using only covered positions
+		counts also what fraction of the total positions they are
+		Must be above a threshold set by the --min-frac-cov parameter
+		Last Update: 11/01/2022
 		"""
 
 		# unload bed coordinate
@@ -578,36 +621,57 @@ def assess_coverage(input_bam, bt, meancov, args):
 		start, end = int(start), int(end)
 		length = end-start
 
-		# get coverage per position
-		# count_coverage() returns a tuple with 4 tuples, each one containing the coverage per position
-		# of a certain base (A,C,T,G) --> (0,1,2,3) in the command below
-		cov_count = bam.count_coverage(chrom, start, end, quality_threshold=0, read_callback="all")
-		cov_count = [ [i for i in cov_count[k] if int(i) > 0] for k in (0,1,2,3) ]
-		tot_pos = sum([ len(x) for x in cov_count ])
-		tot_cov = sum([ sum(x) for x in cov_count ])
-		try:
-			cov = float(tot_cov) / float(tot_pos)
-		except ZeroDivisionError:
-			cov = float(0)
+		# select reads within the region and crop at the end (truncate)
+		pileup = bam.pileup(chrom, start, end, truncate=True)
+		# get total positions of region
+		tot_pos = end-start
+		# get total covered positions using .n which is the number of reads in the "column"
+		tot_cov_pos = len([i for i in pileup if int(i.n) > 0])
+		# get covered fraction by dividing the two values
+		cov_frac = round(float(tot_cov_pos) / float(tot_pos), 3)
 
-		try:
-			cov_ratio = round((cov/meancov)*100, 2)
-		except ZeroDivisionError:
-			cov_ratio = round(float(0), 2)
+		# debug:
+		if cov_frac > 1.0:
+			sys.stderr.write(f"\nERROR: the detected covered fraction ({cov_frac}) in {chrom}, {start}, {end} (0-based) is larger than the region size ({end-start} bp).\n")
+			sys.stderr.write("Report this bug in a GitHub issue: it shouldn't happen!\n\n")
+			sys.exit()
 
-		bed_line = f"{chrom}\t{start}\t{end}\t{cov_ratio}%\t{length}\t{block_type}\n"
-		return bed_line
+		if cov_frac >= min_frac_cov:
+
+			# get average coverage of the region
+			pileup = bam.pileup(chrom, start, end, truncate=True)
+
+			try:
+				avg_cov = round(float(sum([int(i.n) for i in pileup if int(i.n) > 0])) / float(tot_cov_pos), 1)
+			except ZeroDivisionError:
+				avg_cov = round(float(0), 1)
+
+			# get coverage ratio with global mean coverage
+			try:
+				cov_ratio = round((avg_cov/meancov)*100, 2)
+			except ZeroDivisionError:
+				cov_ratio = round(float(0), 2)
+
+			bed_line = f"{chrom}\t{start}\t{end}\t{avg_cov}x\t{cov_frac}\t{cov_ratio}%\t{length}\t{block_type}\n"
+			return bed_line
+
+		else:
+			return False
+
 
 	# -------------------------------------------
 
 	# open bam file
-	bam = pysam.AlignmentFile(input_bam, "rb")
+
+	bam = read_and_filter_bam(input_bam, args.output_dir, sample, handle, args.keep_secondary)
+
 	Out = []
 	total = len(bt)
 	for row in bt:
 		bed = str(row)
-		x = get_region_coverage(bed, bam, meancov)
-		Out.append(x)
+		x = get_region_coverage(bed, bam, meancov, args.min_frac_cov)
+		if x != False:
+			Out.append(x)
 
 	bt = BedTool(Out)
 	return bt
@@ -617,7 +681,7 @@ def process_vcf_file(	args, in_vcf, output_dir, genome_file, bam, sample, handle
 						min_af, max_af, min_het_snps, snp_distance, min_size):
 
 	"""
-	Last update: 22/12/2021
+	Last update: 11/01/2022
 	Note: Series of operations that a VCF file goes through to extract LOH blocks
 	"""
 
@@ -669,110 +733,166 @@ def process_vcf_file(	args, in_vcf, output_dir, genome_file, bam, sample, handle
 
 	# ------------------------------------------------------
 	# get homozygous blocks
-	sys.stderr.write(f"[{at()}] Defining alternative allele (ALT) homozygous blocks...\n")
 
-	Homo_ALT_bed_blocks = get_intervals_of_snps(	homo_snps_vcf,
-								 					snp_distance)
+	if args.no_alleles == False:
 
-	if args.debug:
-		out = f"{output_dir}/debug/3.{handle}.homo_bed_blocks.ALT.bed"
-		tmp = Homo_ALT_bed_blocks
-		tmp.saveas(out)
+		sys.stderr.write(f"[{at()}] Defining alternative allele (ALT) homozygous blocks...\n")
 
-	sys.stderr.write(f"[{at()}] Keeping only blocks with >= {args.min_het_snps} SNPs...\n")
+		Homo_ALT_bed_blocks = get_intervals_of_snps(homo_snps_vcf, snp_distance)
 
-	(Homo_ALT_bed_blocks, skipped) = filter_by_snp_density(	Homo_ALT_bed_blocks,
-															args.min_het_snps)
+		if args.debug:
+			out = f"{output_dir}/debug/3.{handle}.homo_bed_blocks.ALT.bed"
+			tmp = Homo_ALT_bed_blocks
+			tmp.saveas(out)
 
-	sys.stderr.write(f"[{at()}] {skipped} regions were removed due to insufficient SNP count\n")
+		sys.stderr.write(f"[{at()}] Keeping only blocks with >= {args.min_het_snps} SNPs...\n")
 
-	Homo_ALT_bed_blocks = filter_by_length(	Homo_ALT_bed_blocks,
-											args.min_size)
+		(Homo_ALT_bed_blocks, skipped) = filter_by_snp_density(	Homo_ALT_bed_blocks,
+																args.min_het_snps)
 
-	if args.debug:
-		out = f"{output_dir}/debug/4.{handle}.homo_bed_blocks.ALT.filt.bed"
-		tmp = Homo_ALT_bed_blocks
-		tmp.saveas(out)
+		sys.stderr.write(f"[{at()}] {skipped} regions were removed due to insufficient SNP count\n")
 
-	# ------------------------------------------------------
-	# remove homo ALT block if overlapping a hetero block
-	# it could be that there are hetero- and homo-zygous SNPs
-	# interleaved between each other
-	# these must not be considered blocks
-	sys.stderr.write(f"[{at()}] Adjusting ALT homozygous blocks to not overlap heterozygous blocks...\n")
+		Homo_ALT_bed_blocks = filter_by_length(	Homo_ALT_bed_blocks, args.min_size)
 
-	Homo_ALT_bed_blocks = remove_overlapping_regions(Homo_ALT_bed_blocks,
-													Het_bed_blocks,
-													homo_snps_vcf)
+		if args.debug:
+			out = f"{output_dir}/debug/4.{handle}.homo_bed_blocks.ALT.filt.bed"
+			tmp = Homo_ALT_bed_blocks
+			tmp.saveas(out)
 
-	if args.debug:
-		out = f"{output_dir}/debug/5.{handle}.homo_bed_blocks.ALT.filt.no_overlap.bed"
-		tmp = Homo_ALT_bed_blocks
-		tmp.saveas(out)
+		# ------------------------------------------------------
+		# remove homo ALT block if overlapping a hetero block
+		# it could be that there are hetero- and homo-zygous SNPs
+		# interleaved between each other
+		# these must not be considered blocks
+		sys.stderr.write(f"[{at()}] Adjusting ALT homozygous blocks to not overlap heterozygous blocks...\n")
 
-	sys.stderr.write(f"[{at()}] Left with {len(Homo_ALT_bed_blocks)} homo-blocks after intersecting with hetero-blocks\n")
+		Homo_ALT_bed_blocks = remove_overlapping_regions(Homo_ALT_bed_blocks,
+														Het_bed_blocks,
+														homo_snps_vcf)
 
-	# ------------------------------------------------------
-	# Obtaining complementary regions to heterozygous blocks
-	# get complementary bed file
-	sys.stderr.write(f"[{at()}] Getting homozygous regions (i.e. candidate LOH blocks)...\n")
-	homo_REF_bed = f"{output_dir}/process/{sample}.{handle}.d{snp_distance}bp.homo_REF.bed"
+		if args.debug:
+			out = f"{output_dir}/debug/5.{handle}.homo_bed_blocks.ALT.filt.no_overlap.bed"
+			tmp = Homo_ALT_bed_blocks
+			tmp.saveas(out)
 
-	Homo_REF_bed_blocks = get_complementary_regions(Het_bed_blocks,
-													Homo_ALT_bed_blocks,
-													genome_file)
+		sys.stderr.write(f"[{at()}] Left with {len(Homo_ALT_bed_blocks)} homo-blocks after intersecting with hetero-blocks\n")
 
-	if args.debug:
-		out = f"{output_dir}/debug/6.{handle}.homo_bed_blocks.REF.bed"
-		tmp = Homo_REF_bed_blocks
-		tmp.saveas(out)
+		# ------------------------------------------------------
+		# Obtaining complementary regions to heterozygous blocks
+		# get complementary bed file
+		sys.stderr.write(f"[{at()}] Getting homozygous regions (i.e. candidate LOH blocks)...\n")
 
-	# ------------------------------------------------------
-	# remove homo REF block if overlapping a hetero block
-	# it could be that there are hetero- and homo-zygous SNPs
-	# interleaved between each other
-	# these must not be considered blocks
-	sys.stderr.write(f"[{at()}] Adjusting REF homozygous blocks to not overlap heterozygous blocks...\n")
+		Homo_REF_bed_blocks = get_complementary_regions(Het_bed_blocks,
+														Homo_ALT_bed_blocks,
+														genome_file)
 
-	bt_homo = BedTool(homo_snps_vcf)
-	Homo_REF_bed_blocks = count_snps_in_bed_interval(Homo_REF_bed_blocks,
-													bt_homo)
-	Homo_REF_bed_blocks = filter_by_length(	Homo_REF_bed_blocks,
-											args.min_size)
-	Homo_REF_bed_blocks = remove_overlapping_regions(Homo_REF_bed_blocks,
-													Het_bed_blocks,
-													homo_snps_vcf)
+		if args.debug:
+			out = f"{output_dir}/debug/6.{handle}.homo_bed_blocks.REF.bed"
+			tmp = Homo_REF_bed_blocks
+			tmp.saveas(out)
 
-	if args.debug:
-		out = f"{output_dir}/debug/7.{handle}.homo_bed_blocks.REF.no_overlap.bed"
-		tmp = Homo_REF_bed_blocks
-		tmp.saveas(out)
+		# ------------------------------------------------------
+		# remove homo REF block if overlapping a hetero block
+		# it could be that there are hetero- and homo-zygous SNPs
+		# interleaved between each other
+		# these must not be considered blocks
+		sys.stderr.write(f"[{at()}] Adjusting REF homozygous blocks to not overlap heterozygous blocks...\n")
 
-	sys.stderr.write(f"[{at()}] Left with {len(Homo_REF_bed_blocks)} homo-blocks after intersecting with hetero-blocks\n")
+		bt_homo = BedTool(homo_snps_vcf)
+		Homo_REF_bed_blocks = count_snps_in_bed_interval(Homo_REF_bed_blocks,
+														bt_homo)
+		Homo_REF_bed_blocks = filter_by_length(	Homo_REF_bed_blocks,
+												args.min_size)
+		Homo_REF_bed_blocks = remove_overlapping_regions(Homo_REF_bed_blocks,
+														Het_bed_blocks,
+														homo_snps_vcf)
 
-	# --------------------------------------------------
-	# add REF or ALT annotation
-	# and then combine REF and ALT homozygous blocks
-	# and then filter by length
-	sys.stderr.write(f"[{at()}] Combining {len(Homo_REF_bed_blocks)} REF and {len(Homo_ALT_bed_blocks)} ALT blocks into a single BED file...\n")
-	Homo_REF = add_column(Homo_REF_bed_blocks, "REF")
-	Homo_ALT = add_column(Homo_ALT_bed_blocks, "ALT")
-	Homo_blocks = combine_beds(	Homo_REF, Homo_ALT)
-	total = len(Homo_blocks)
+		if args.debug:
+			out = f"{output_dir}/debug/7.{handle}.homo_bed_blocks.REF.no_overlap.bed"
+			tmp = Homo_REF_bed_blocks
+			tmp.saveas(out)
 
-	if args.debug:
-		out = f"{output_dir}/debug/8.{handle}.homo_bed_blocks.REF_and_ALT.bed"
-		tmp = Homo_blocks
-		tmp.saveas(out)
+		sys.stderr.write(f"[{at()}] Left with {len(Homo_REF_bed_blocks)} homo-blocks after intersecting with hetero-blocks\n")
 
-	sys.stderr.write(f"[{at()}] Now working with {total} REF & ALT blocks\n")
+		# --------------------------------------------------
+		# add REF or ALT annotation
+		# and then combine REF and ALT homozygous blocks
+		sys.stderr.write(f"[{at()}] Combining {len(Homo_REF_bed_blocks)} REF and {len(Homo_ALT_bed_blocks)} ALT blocks into a single BED file...\n")
+		Homo_REF = add_column(Homo_REF_bed_blocks, "REF")
+		Homo_ALT = add_column(Homo_ALT_bed_blocks, "ALT")
+		Homo_blocks = combine_beds(	Homo_REF, Homo_ALT)
+		total = len(Homo_blocks)
 
+		if args.debug:
+			out = f"{output_dir}/debug/8.{handle}.homo_bed_blocks.final.bed"
+			tmp = Homo_blocks
+			tmp.saveas(out)
+
+		sys.stderr.write(f"[{at()}] Now working with {total} LOH blocks (either REF or ALT)\n")
+
+
+	elif args.no_alleles == True:
+
+		### Extract Homo_blocks without homo SNPs ###
+		### just based on complementarity with hetero blocks ###
+		### Return those ###
+
+		# ------------------------------------------------------
+		# Obtaining complementary regions to heterozygous blocks
+
+		sys.stderr.write(f"[{at()}] Getting homozygous regions (i.e. candidate LOH blocks)...\n")
+
+		Homo_bed_blocks = get_complementary_regions(Het_bed_blocks, None, genome_file)
+
+		if args.debug:
+			out = f"{output_dir}/debug/6.{handle}.homo_bed_blocks.bed"
+			tmp = Homo_bed_blocks
+			tmp.saveas(out)
+
+		# ------------------------------------------------------
+		# remove homo block if overlapping a hetero block
+		# it could be that there are hetero- and homo-zygous SNPs
+		# interleaved between each other
+		# these must not be considered blocks
+		sys.stderr.write(f"[{at()}] Adjusting homozygous blocks to not overlap heterozygous blocks...\n")
+
+		bt_homo = BedTool(homo_snps_vcf)
+		Homo_bed_blocks = count_snps_in_bed_interval(Homo_bed_blocks, bt_homo)
+		Homo_bed_blocks = filter_by_length(Homo_bed_blocks, args.min_size)
+		Homo_bed_blocks = remove_overlapping_regions(Homo_bed_blocks, Het_bed_blocks, homo_snps_vcf)
+
+		if args.debug:
+			out = f"{output_dir}/debug/7.{handle}.homo_bed_blocks.no_overlap.bed"
+			tmp = Homo_bed_blocks
+			tmp.saveas(out)
+
+		sys.stderr.write(f"[{at()}] Left with {len(Homo_bed_blocks)} homo-blocks after intersecting with hetero-blocks\n")
+
+		# --------------------------------------------------
+		# add "NA" annotation (instead of REF/ALT, explained in the GitHub README)
+		Homo_blocks = add_column(Homo_bed_blocks, "NA")
+		total = len(Homo_blocks)
+
+		if args.debug:
+			out = f"{output_dir}/debug/8.{handle}.homo_bed_blocks.final.bed"
+			tmp = Homo_blocks
+			tmp.saveas(out)
+
+		sys.stderr.write(f"[{at()}] Now working with {total} LOH blocks\n")
+
+	else:
+		sys.stderr.write(f"\nERROR: --no-alleles should be either True or False, instead it was set to {args.no_alleles}.\n")
+		sys.stderr.write("Report this bug in a GitHub issue: it shouldn't happen!\n\n")
+		sys.exit()
+
+	# ----------------
+	# filter by length
 	Homo_blocks = filter_by_length(Homo_blocks, args.min_size)
 	filtered = len(Homo_blocks)
 	discarded = total - filtered
 
 	if args.debug:
-		out = f"{output_dir}/debug/9.{handle}.homo_bed_blocks.REF_and_ALT.filt.bed"
+		out = f"{output_dir}/debug/9.{handle}.homo_bed_blocks.final.filt.bed"
 		tmp = Homo_blocks
 		tmp.saveas(out)
 
@@ -781,16 +901,11 @@ def process_vcf_file(	args, in_vcf, output_dir, genome_file, bam, sample, handle
 	# -----------------------------------------
 	# filter by real coverage from the BAM file
 
-	# get mean global coverage
-	indexed_bam = index_bam_file(bam)
-	meancov = get_global_coverage(indexed_bam, output_dir, sample, handle)
+	meancov = get_global_coverage(bam, output_dir, sample, handle, args)
 
 	sys.stderr.write(f"[{at()}] Mean coverage: {round(meancov, 2)}x\n")
 
-	LOH = assess_coverage(	indexed_bam,
-							Homo_blocks,
-							meancov,
-							args)
+	LOH = assess_coverage(bam, Homo_blocks, meancov, sample, handle, args)
 
 	sys.stderr.write(f"[{at()}] Computed coverage for selected LOH blocks\n")
 
@@ -895,7 +1010,7 @@ def main():
 	# including a header
 	out = f"{output_dir}/{args.sample}.LOH_blocks.tsv"
 	OUTPUT = open(out, "w")
-	OUTPUT.write("\t".join(["#Chrom", "Start", "End", "Cov", "Length", "Allele", "Homo_snps", "Hetero_snps"]) + "\n")
+	OUTPUT.write("\t".join(["#Chrom", "Start", "End", "Cov", "Cov_frac", "Cov_ratio", "Length", "Allele", "Homo_snps", "Hetero_snps"]) + "\n")
 	for row in LOH_w_snps:
 		OUTPUT.write(str(row))
 	OUTPUT.close()
