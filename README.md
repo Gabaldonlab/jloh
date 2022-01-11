@@ -40,26 +40,33 @@ chr3  90804782
 The program has many other options:
 
 ```
-[mandatory]
---vcf               Input VCF file containing all types of variants             [!]
+[I/O]
+--vcf               Input VCF file                                              [!]
 --genome-file       File with chromosome lengths (chromosome <TAB> size)        [!]
 --bam               BAM file used to call the --vcf variants                    [!]
-
-[optional]
---filter-mode       "pass" to keep only PASS variants, "all" to keep everything [all]
 --sample            Sample name / Strain name for output files                  [loh_blocks]
 --output-dir        Output directory                                            [loh_blocks_out]
---t0-vcf            VCF with variants to ignore from --vcf                      [off]
---t0-bam            BAM file used to call the --t0-vcf variants                 [off]
---t0-filter-type    What to do with t0 LOH events? "keep" or "remove"           [remove]
+--debug             Activate generation of several intermediate files           [off]
+--print-info        Show authors and edits with dates                           [off]
+
+[modes]
+--keep-secondary    Ignores secondary alignments from --bam file                [off]
+--no-alleles        Don't use homozygous SNPs to assign LOH blocks to REF/ALT   [off]
+
+[parameters]
+--filter-mode       "pass" to keep only PASS variants, "all" to keep everything [all]
 --min-het-snps      Min. num. heterozygous SNPs in heterozygous region          [2]
 --snp-distance      Max. distance (bp between SNPs for blocks definition        [100]
 --block-dist        Combine LOH blocks into one if closer than this distance    [100]
 --min-size          Min. LOH block size                                         [100]
 --min-af            Min. allele frequency to consider a variant heterozygous    [0.3]
 --max-af            Max. allele frequency to consider a variant heterozygous    [0.7]
---debug             Activate generation of several intermediate files           [off]
---print-info        Show authors and edits with dates                           [off]
+--min-frac-cov      Min. fraction of LOH block that has to be covered by reads  [0.5]
+
+[pre-existing variation]
+--t0-vcf            VCF with variants to ignore from --vcf                      [off]
+--t0-bam            BAM file used to call the --t0-vcf variants                 [off]
+--t0-filter-type    What to do with t0 LOH events? "keep" or "remove"           [remove]
 ```
 
 ## The workflow, described
