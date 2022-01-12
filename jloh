@@ -32,7 +32,7 @@ Still the one from the block
 -
 Extact LOH blocks from SNPs, coverage, and a reference genome
 -
-v 0.8.0
+v 0.9.0
 --------------------------------------------------------------------------------
 by Matteo Schiavinato
 largely based on:
@@ -65,6 +65,7 @@ Usage:
 --min-af            Min. allele frequency to consider a variant heterozygous    [0.3]
 --max-af            Max. allele frequency to consider a variant heterozygous    [0.7]
 --min-frac-cov      Min. fraction of LOH block that has to be covered by reads  [0.5]
+--hemi              Frac. of the mean coverage under which LOH is hemizygous    [0.75]
 
 [pre-existing variation]
 --t0-vcf            VCF with variants to ignore from --vcf                      [off]
@@ -94,6 +95,7 @@ p.add_argument("--min-size", default=100, type=int)
 p.add_argument("--min-af", default=0.3, type=float)
 p.add_argument("--max-af", default=0.7, type=float)
 p.add_argument("--min-frac-cov", default=0.5, type=float)
+p.add_argument("--hemi", default=0.75, type=float)
 p.add_argument("--debug", action="store_true")
 p.add_argument("--print-info", action="store_true")
 args = p.parse_args()
@@ -591,7 +593,7 @@ def assess_coverage(input_bam, bt, meancov, sample, handle, args):
 	###
 	v2
 	Author: Matteo Schiavinato
-	Last change: 11/01/2022
+	Last change: 12/01/2022
 	Notes: Now addressing ALT and REF homoblock alleles in relation to coverage
 	when using the hybrid mode
 	And not doing that when running in normal mode since it would be misleading
@@ -599,7 +601,7 @@ def assess_coverage(input_bam, bt, meancov, sample, handle, args):
 	If needed, considers only primary alignments
 	"""
 
-	def get_region_coverage(bed, bam, meancov, min_frac_cov):
+	def get_region_coverage(bed, bam, meancov, min_frac_cov, hemi_threshold):
 
 		"""
 		v1
@@ -613,7 +615,8 @@ def assess_coverage(input_bam, bt, meancov, sample, handle, args):
 		calculates coverage using only covered positions
 		counts also what fraction of the total positions they are
 		Must be above a threshold set by the --min-frac-cov parameter
-		Last Update: 11/01/2022
+		If cov_ratio is below 75%, interval is marked as "hemi"; otherwise "homo"
+		Last Update: 12/01/2022
 		"""
 
 		# unload bed coordinate
@@ -648,11 +651,18 @@ def assess_coverage(input_bam, bt, meancov, sample, handle, args):
 
 			# get coverage ratio with global mean coverage
 			try:
-				cov_ratio = round((avg_cov/meancov)*100, 2)
+				cov_ratio = avg_cov/meancov
 			except ZeroDivisionError:
-				cov_ratio = round(float(0), 2)
+				cov_ratio = 0
 
-			bed_line = f"{chrom}\t{start}\t{end}\t{avg_cov}x\t{cov_frac}\t{cov_ratio}%\t{length}\t{block_type}\n"
+			if cov_ratio >= hemi_threshold:
+				zygosity = "homo"
+			else:
+				zygosity = "hemi"
+
+			cov_ratio = round((cov_ratio)*100, 2)
+
+			bed_line = f"{chrom}\t{start}\t{end}\t{avg_cov}x\t{cov_frac}\t{cov_ratio}%\t{zygosity}\t{length}\t{block_type}\n"
 			return bed_line
 
 		else:
@@ -669,7 +679,7 @@ def assess_coverage(input_bam, bt, meancov, sample, handle, args):
 	total = len(bt)
 	for row in bt:
 		bed = str(row)
-		x = get_region_coverage(bed, bam, meancov, args.min_frac_cov)
+		x = get_region_coverage(bed, bam, meancov, args.min_frac_cov, args.hemi)
 		if x != False:
 			Out.append(x)
 
@@ -681,7 +691,7 @@ def process_vcf_file(	args, in_vcf, output_dir, genome_file, bam, sample, handle
 						min_af, max_af, min_het_snps, snp_distance, min_size):
 
 	"""
-	Last update: 11/01/2022
+	Last update: 12/01/2022
 	Note: Series of operations that a VCF file goes through to extract LOH blocks
 	"""
 
@@ -943,7 +953,7 @@ def use_intersection_intervals(Out, filter_type):
 def main():
 
 	"""
-	Last update: 22/12/2021
+	Last update: 12/01/2022
 	Note: Function carrying on the main operations
 	"""
 
@@ -1010,7 +1020,7 @@ def main():
 	# including a header
 	out = f"{output_dir}/{args.sample}.LOH_blocks.tsv"
 	OUTPUT = open(out, "w")
-	OUTPUT.write("\t".join(["#Chrom", "Start", "End", "Cov", "Cov_frac", "Cov_ratio", "Length", "Allele", "Homo_snps", "Hetero_snps"]) + "\n")
+	OUTPUT.write("\t".join(["#Chrom", "Start", "End", "Cov", "Cov_frac", "Cov_ratio", "Zygosity", "Length", "Allele", "Homo_snps", "Hetero_snps"]) + "\n")
 	for row in LOH_w_snps:
 		OUTPUT.write(str(row))
 	OUTPUT.close()
