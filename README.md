@@ -67,6 +67,7 @@ JLOH has many command-line arguments that can be set to fine-tune the analysis:
 --min-af            Min. allele frequency to consider a variant heterozygous    [0.3]
 --max-af            Max. allele frequency to consider a variant heterozygous    [0.7]
 --min-frac-cov      Min. fraction of LOH block that has to be covered by reads  [0.5]
+--hemi              Frac. of the mean coverage under which LOH is hemizygous    [0.75]
 
 [pre-existing variation]
 --t0-vcf            VCF with variants to ignore from --vcf                      [off]
@@ -140,7 +141,7 @@ JLOH's main output is a table containing all candidate LOH blocks. These blocks 
 
 Ideally, LOH blocks assigned as `REF` should match regions that are depleted of *homozygous* SNPs, while those assigned as `ALT` should match regions dense in *homozygous* SNPs. Detected LOH blocks (regardless of the annotation) should not overlap regions that are dense in *heterozygous SNPs*.
 
-In terms of zygosity, regions annotated as *homo* should have a read coverage that is higher or equal to the value set with the `--hemi` parameter (default: 0.75, i.e. 75%). Regions annotated as *hemi* should have a read coverage that is below this value. 
+In terms of zygosity, regions annotated as *homo* should have a read coverage that is higher or equal to the value set with the `--hemi` parameter (default: 0.75, i.e. 75%). Regions annotated as *hemi* should have a read coverage that is below this value.
 
 An example as seen in IGV is provided below.  
 
