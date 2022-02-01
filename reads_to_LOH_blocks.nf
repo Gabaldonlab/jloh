@@ -70,22 +70,49 @@ exit 0
 // -----------------------------------------------------------------------------
 // PAIRED END READS
 
+Channel
+  .fromPath("${params.ref_genome}")
+  .into{ Ref_genomes; Ref_genomes_pileup; Ref_genomes_JLOH }
+
 process index_ref_genome {
 
   executor = "local"
   cpus = params.threads
   maxForks = params.threads
 
+  input:
+    file ref_genome from Ref_genomes
+
   output:
-    file "${params.sample_id}.genome_index" into genome_index
+    file "genome_index.*" into Genome_index
 
   script:
     """
-    ${HISAT2_BUILD} -p ${params.threads} ${params.ref_genome} ${params.sample_id}.genome_index
+    ${HISAT2_BUILD} -p ${params.threads} ${ref_genome} genome_index
     """
 }
 
+
 if (params.read_type == "PE") {
+
+  // read input read files
+
+  Channel
+    .fromPath("${params.reads_for}")
+    .map{ it -> [ it.simpleName, it ] }
+    .set{ Reads_1 }
+
+  Channel
+    .fromPath("${params.reads_rev}")
+    .map{ it -> [ it.simpleName, it ] }
+    .set{ Reads_2 }
+
+  Reads_1
+    .join(Reads_2)
+    .into{ Reads_PE_QC; Reads_PE_TRIM; Reads_PE_RAW }
+
+  // trim reads if needed
+  // then map them
 
   if (!params.skip_trimming) {
 
@@ -97,6 +124,9 @@ if (params.read_type == "PE") {
 
       publishDir "${params.output_dir}/trimmed_reads/quality_check", mode: "copy"
 
+      input:
+        tuple val(x), file(reads_for), file(reads_rev) from Reads_PE_QC
+
       output:
         path "before_trimming"
 
@@ -106,7 +136,7 @@ if (params.read_type == "PE") {
         ${FASTQC} \
         --threads ${params.threads} \
         --outdir before_trimming \
-        ${params.reads_for} ${params.reads_rev}
+        ${reads_for} ${reads_rev}
         """
     }
 
@@ -119,9 +149,12 @@ if (params.read_type == "PE") {
       publishDir  "${params.output_dir}/trimmed_reads",
                   mode: "copy", pattern: "*.{P1,P2,U1,U2}.fastq"
 
+      input:
+        tuple val(x), file(reads_for), file(reads_rev) from Reads_PE_TRIM
+
       output:
         tuple file("${params.sample_id}.P1.fastq"), file("${params.sample_id}.P2.fastq"), \
-        file("${params.sample_id}.U.fastq") into Trimmed_reads
+        file("${params.sample_id}.U.fastq") into Reads_PE_trimmed
 
       script:
         """
@@ -129,7 +162,7 @@ if (params.read_type == "PE") {
         PE \
         -threads ${params.threads} \
         -summary trim.summary.tsv \
-        ${params.reads_for} ${params.reads_rev} \
+        ${reads_for} ${reads_rev} \
         ${params.sample_id}.P1.fastq ${params.sample_id}.U1.fastq \
         ${params.sample_id}.P2.fastq ${params.sample_id}.U2.fastq \
         ILLUMINACLIP:${params.adapters}:2:30:10 \
@@ -143,7 +176,7 @@ if (params.read_type == "PE") {
         """
     }
 
-    Trimmed_reads.into{ Trimmed_reads_MAP; Trimmed_reads_QC }
+    Reads_PE_trimmed.into{ Reads_PE_trimmed_MAP; Reads_PE_trimmed_QC }
 
     process PE_quality_check_after_trim {
 
@@ -154,7 +187,7 @@ if (params.read_type == "PE") {
       publishDir "${params.output_dir}/trimmed_reads/quality_check", mode: "copy"
 
       input:
-        tuple file(reads_for), file(reads_rev), file(reads_unpaired) from Trimmed_reads_QC
+        tuple file(reads_for), file(reads_rev), file(reads_unpaired) from Reads_PE_trimmed_QC
 
       output:
         path "after_trimming"
@@ -178,8 +211,8 @@ if (params.read_type == "PE") {
       publishDir  "${params.output_dir}/mapping", mode: "copy", pattern: "*.sam"
 
       input:
-        tuple file(reads_for), file(reads_rev), file(reads_unpaired) from Trimmed_reads_MAP
-        file genome_index
+        tuple file(reads_for), file(reads_rev), file(reads_unpaired) from Reads_PE_trimmed_MAP
+        file index from Genome_index.collect()
 
       output:
         file "${params.sample_id}.sam" into sam
@@ -188,10 +221,10 @@ if (params.read_type == "PE") {
         """
         ${HISAT2} -p ${params.threads} \
         --no-spliced-alignment \
-        --score-min ${params.relaxed_score} --mp ${params.mm_penalties} \
+        --score-min ${params.scoring_fun} --mp ${params.mm_penalties} \
         --rdg ${params.gap_penalties} --rfg ${params.gap_penalties} \
         -I ${params.min_isize} -X ${params.max_isize} \
-        -x ${genome_index} \
+        -x genome_index \
         -1 ${reads_for} -2 ${reads_rev} -U ${reads_unpaired} \
         -S ${params.sample_id}.sam
         """
@@ -207,7 +240,8 @@ if (params.read_type == "PE") {
       publishDir  "${params.output_dir}/mapping", mode: "copy", pattern: "*.sam"
 
       input:
-        file genome_index
+        tuple val(x), file(reads_for), file(reads_rev) from Reads_PE_RAW
+        file index from Genome_index.collect()
 
       output:
         file "${params.sample_id}.sam" into sam
@@ -216,11 +250,11 @@ if (params.read_type == "PE") {
         """
         ${HISAT2} -p ${params.threads} \
         --no-spliced-alignment \
-        --score-min ${params.relaxed_score} --mp ${params.mm_penalties} \
+        --score-min ${params.scoring_fun} --mp ${params.mm_penalties} \
         --rdg ${params.gap_penalties} --rfg ${params.gap_penalties} \
         -I ${params.min_isize} -X ${params.max_isize} \
-        -x ${genome_index} \
-        -1 ${params.reads_for} -2 ${params.reads_rev} \
+        -x genome_index \
+        -1 ${reads_for} -2 ${reads_rev} \
         -S ${params.sample_id}.sam
         """
     }
@@ -232,6 +266,10 @@ if (params.read_type == "PE") {
 
 } else if (params.read_type == "SE") {
 
+  Channel
+    .fromPath("${params.reads}")
+    .into{ Reads_SE_QC; Reads_SE_TRIM; Reads_SE_RAW }
+
   if (!params.skip_trimming) {
 
     process SE_quality_check_before_trim {
@@ -242,6 +280,9 @@ if (params.read_type == "PE") {
 
       publishDir "${params.output_dir}/trimmed_reads/quality_check", mode: "copy"
 
+      input:
+        file reads from Reads_SE_QC
+
       output:
         path "before_trimming"
 
@@ -251,7 +292,7 @@ if (params.read_type == "PE") {
         ${FASTQC} \
         --threads ${params.threads} \
         --outdir before_trimming \
-        ${params.reads}
+        ${reads}
         """
     }
 
@@ -264,9 +305,11 @@ if (params.read_type == "PE") {
       publishDir  "${params.output_dir}/trimmed_reads",
                   mode: "copy", pattern: "*.{P1,P2,U1,U2}.fastq"
 
+      input:
+        file reads from Reads_SE_TRIM
+
       output:
-        file "${params.sample_id}.trimmed.fastq" into reads
-        file "${params.sample_id}.trimmed.fastq" into reads_QC
+        file "${params.sample_id}.trimmed.fastq" into Reads_SE_trimmed
 
       script:
         """
@@ -274,7 +317,7 @@ if (params.read_type == "PE") {
         PE \
         -threads ${params.threads} \
         -summary trim.summary.tsv \
-        ${params.reads} ${params.sample_id}.trimmed.fastq \
+        ${reads} ${params.sample_id}.trimmed.fastq \
         ILLUMINACLIP:${params.adapters}:2:30:10 \
         LEADING:${params.leading} \
         TRAILING:${params.trailing} \
@@ -283,6 +326,8 @@ if (params.read_type == "PE") {
         MINLEN:${params.minlen}
         """
     }
+
+    Reads_SE_trimmed.into{ Reads_SE_trimmed_MAP; Reads_SE_trimmed_QC }
 
     process SE_quality_check_after_trim {
 
@@ -293,7 +338,7 @@ if (params.read_type == "PE") {
       publishDir "${params.output_dir}/trimmed_reads/quality_check", mode: "copy"
 
       input:
-        file reads_QC
+        file reads from Reads_SE_trimmed_QC
 
       output:
         path "after_trimming"
@@ -304,42 +349,69 @@ if (params.read_type == "PE") {
         ${FASTQC} \
         --threads ${params.threads} \
         --outdir after_trimming \
-        ${reads_QC}
+        ${reads}
         """
     }
+
+    process SE_map_trimmed_reads {
+
+      executor = "local"
+      cpus = params.threads
+      maxForks = params.threads
+
+      publishDir  "${params.output_dir}/mapping", mode: "copy", pattern: "*.sam"
+
+      input:
+        file reads into Reads_SE_trimmed_MAP
+        file index from Genome_index.collect()
+
+      output:
+        file "${params.sample_id}.sam" into sam
+
+      script:
+        """
+        ${HISAT2} -p ${params.threads} \
+        --no-spliced-alignment \
+        --score-min ${params.scoring_fun} --mp ${params.mm_penalties} \
+        --rdg ${params.gap_penalties} --rfg ${params.gap_penalties} \
+        -I ${params.min_isize} -X ${params.max_isize} \
+        -x genome_index \
+        -U ${reads} \
+        -S ${params.sample_id}.sam
+        """
+      }
+
   } else {
 
-    reads = params.reads
-  }
+    process SE_map_untrimmed_reads {
 
-  process map_reads {
+      executor = "local"
+      cpus = params.threads
+      maxForks = params.threads
 
-    executor = "local"
-    cpus = params.threads
-    maxForks = params.threads
+      publishDir  "${params.output_dir}/mapping", mode: "copy", pattern: "*.sam"
 
-    publishDir  "${params.output_dir}/mapping", mode: "copy", pattern: "*.sam"
+      input:
+        file reads into Reads_SE_RAW
+        file index from Genome_index.collect()
 
-    input:
-      file reads
-      file genome_index
+      output:
+        file "${params.sample_id}.sam" into sam
 
-    output:
-      file "${params.sample_id}.sam" into sam
-
-    script:
-      """
-      ${HISAT2} -p ${params.threads} \
-      --no-spliced-alignment \
-      --score-min ${params.relaxed_score} --mp ${params.mm_penalties} \
-      --rdg ${params.gap_penalties} --rfg ${params.gap_penalties} \
-      -I ${params.min_isize} -X ${params.max_isize} \
-      -x ${genome_index} \
-      -U ${reads} \
-      -S ${params.sample_id}.sam
-      """
+      script:
+        """
+        ${HISAT2} -p ${params.threads} \
+        --no-spliced-alignment \
+        --score-min ${params.scoring_fun} --mp ${params.mm_penalties} \
+        --rdg ${params.gap_penalties} --rfg ${params.gap_penalties} \
+        -I ${params.min_isize} -X ${params.max_isize} \
+        -x genome_index \
+        -U ${reads} \
+        -S ${params.sample_id}.sam
+        """
     }
   }
+}
 
 process filter_and_sort_bam {
 
@@ -386,14 +458,15 @@ process pileup_reads {
   input:
     file bam_fs
     file bam_fs_index
+    file ref_genome from Ref_genomes_pileup
 
   output:
     file "${params.sample_id}.mpileup.vcf" into pileup
 
   script:
     """
-    ${SAMTOOLS} faidx ${params.ref_genome} &&
-    ${BCFTOOLS} mpileup --fasta-ref ${params.ref_genome} \
+    ${SAMTOOLS} faidx ${ref_genome} &&
+    ${BCFTOOLS} mpileup --fasta-ref ${ref_genome} \
     --annotate FORMAT/AD,FORMAT/ADF,FORMAT/ADR,FORMAT/DP,FORMAT/SP,INFO/AD,INFO/ADF,INFO/ADR \
     --output ${params.sample_id}.mpileup.vcf --output-type v --skip-indels \
     ${bam_fs}
@@ -434,8 +507,8 @@ process filter_short_variants {
     file raw_vcf
 
   output:
-    file "${sample_id}.report.txt" into filtering_report
-    file "${sample_id}.ff.vcf" into filt_vcf
+    file "${params.sample_id}.report.txt" into filtering_report
+    file "${params.sample_id}.ff.vcf" into filt_vcf
 
   script:
     """
@@ -443,7 +516,7 @@ process filter_short_variants {
     --input-file ${raw_vcf} \
     --output-file ${params.sample_id}.f.vcf \
     --quality ${params.min_qual} \
-    --alt-frac ${params.min_allelefreq} \
+    --alt-frac ${params.min_alt_frac} \
     --min-depth ${params.min_depth} \
     --map-qual-zero-frac ${params.mq0f} \
     --threads 1 \
@@ -467,20 +540,21 @@ process call_LOH_blocks {
     file filt_vcf
     file bam_fs_for_jloh
     file bam_fs_index_for_jloh
+    file ref_genome from Ref_genomes_JLOH
 
   output:
-    file "${params.sample_id}_jloh/*"
+    file "*" into Jloh_out
 
   script:
     """
-    ${BIOAWK} -c fastx '{print \$name\"\\t\"length(\$seq)}' ${params.ref_genome} \
+    ${BIOAWK} -c fastx '{print \$name\"\\t\"length(\$seq)}' ${ref_genome} \
     > ${params.sample_id}.genome_file.tsv &&
     ${JLOH} \
     --vcf ${filt_vcf} \
     --bam ${bam_fs_for_jloh} \
     --genome-file ${params.sample_id}.genome_file.tsv \
     --sample ${params.sample_id} \
-    --output-dir ${params.sample_id}_jloh \
+    --output-dir . \
     --filter-mode all \
     --min-af ${params.min_het_af} \
     --max-af ${params.max_het_af} \
