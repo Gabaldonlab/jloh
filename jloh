@@ -5,7 +5,7 @@ script_info = """
 ###
 Author: Matteo Schiavinato
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2018)
-Last change: 11/01/2022
+Last change: 19/01/2022
 ###
 """
 
@@ -32,7 +32,7 @@ Still the one from the block
 -
 Extact LOH blocks from SNPs, coverage, and a reference genome
 -
-v 0.9.0
+v 0.10.0
 --------------------------------------------------------------------------------
 by Matteo Schiavinato
 largely based on:
@@ -66,11 +66,15 @@ Usage:
 --max-af            Max. allele frequency to consider a variant heterozygous    [0.7]
 --min-frac-cov      Min. fraction of LOH block that has to be covered by reads  [0.5]
 --hemi              Frac. of the mean coverage under which LOH is hemizygous    [0.75]
+--overhang          Kb up/downstream of the LOH block for coverage comparison   [5000]
 
 [pre-existing variation]
 --t0-vcf            VCF with variants to ignore from --vcf                      [off]
 --t0-bam            BAM file used to call the --t0-vcf variants                 [off]
 --t0-filter-type    What to do with t0 LOH events? "keep" or "remove"           [remove]
+
+[debug]
+--alpha             two-sided max. diff. from chromosomal cluster mean cov      [0.05]
 
 """)
 	sys.exit(0)
@@ -96,8 +100,11 @@ p.add_argument("--min-af", default=0.3, type=float)
 p.add_argument("--max-af", default=0.7, type=float)
 p.add_argument("--min-frac-cov", default=0.5, type=float)
 p.add_argument("--hemi", default=0.75, type=float)
+p.add_argument("--overhang", default=5000, type=int)
 p.add_argument("--debug", action="store_true")
 p.add_argument("--print-info", action="store_true")
+# debug parameters, remove later
+p.add_argument("--alpha", default=0.05, type=float)
 args = p.parse_args()
 
 
@@ -530,60 +537,7 @@ def index_bam_file(input_bam, sample, handle):
 	return bam
 
 
-def read_and_filter_bam(input_bam, output_dir, sample, handle, keep_secondary):
-
-	"""
-	v1
-	Last update: 11/01/2022
-	Note: reads a bam file and keeps secondary alignments only when the use specifies
-	the "--keep-secondary" flag
-	Returns a pysam alignmentFile object
-	"""
-
-	if keep_secondary == False:
-		input_bam_filt = f"{output_dir}/{sample}.{handle}.f.bam"
-		pysam.view("-h", "-b", "-F", "0x0100", "-o", input_bam_filt, input_bam, catch_stdout=False)
-		bam = index_bam_file(input_bam_filt, sample, handle)
-		bam = pysam.AlignmentFile(bam, "rb")
-
-	elif keep_secondary == True:
-		bam = index_bam_file(input_bam, sample, handle)
-		bam = pysam.AlignmentFile(bam, "rb")
-
-	return bam
-
-
-def get_global_coverage(bamfile, output_dir, sample, handle, args):
-
-	"""
-	Last update: 11/01/2022
-	Note: Get global mean coverage per position of a reference genome
-	Based on the number of positions that are covered
-	And the number of reads covering them
-	If needed, considers only primary alignments
-	"""
-
-	bam = read_and_filter_bam(bamfile, output_dir, sample, handle, args.keep_secondary)
-
-	Covs = {}
-	for chrom in list(bam.references):
-		cov_count = bam.count_coverage(chrom, quality_threshold=0, read_callback="all")
-		cov_count = [ [i for i in cov_count[k] if int(i) > 0] for k in (0,1,2,3) ]
-		tot_pos = sum([ len(x) for x in cov_count ])
-		tot_cov = sum([ sum(x) for x in cov_count ])
-		try:
-			cov = float(tot_cov) / float(tot_pos)
-		except ZeroDivisionError:
-			cov = float(0)
-		Covs[chrom] = cov
-
-	Covs  = { chrom : Covs[chrom] for chrom in Covs.keys() if Covs[chrom] > 0 }
-	global_cov = sum(Covs.values()) / len(Covs.values())
-
-	return global_cov
-
-
-def assess_coverage(input_bam, bt, meancov, sample, handle, args):
+def assess_coverage(input_bam, bt, sample, handle, args):
 
 	"""
 	v1
@@ -593,15 +547,115 @@ def assess_coverage(input_bam, bt, meancov, sample, handle, args):
 	###
 	v2
 	Author: Matteo Schiavinato
-	Last change: 12/01/2022
-	Notes: Now addressing ALT and REF homoblock alleles in relation to coverage
-	when using the hybrid mode
-	And not doing that when running in normal mode since it would be misleading
-	when -not- working with a hybrid
-	If needed, considers only primary alignments
+	Last change: 31/01/2022
+	Check coverage in each LOH block and compare it against the chromosome's mean cov
+	Create a list of chromosomes that could be entirely hemizygous
+	Use this list to adjust conclusions on hemi/homo
 	"""
 
-	def get_region_coverage(bed, bam, meancov, min_frac_cov, hemi_threshold):
+	def read_and_filter_bam(input_bam, output_dir, sample, handle, keep_secondary):
+
+		"""
+		v1
+		Last update: 19/01/2022
+		Note: reads a bam file and keeps secondary alignments only when the use specifies
+		the "--keep-secondary" flag
+		Returns a pysam alignmentFile object
+		"""
+
+		if keep_secondary == False:
+			input_bam_filt = f"{output_dir}/{sample}.{handle}.f.bam"
+			pysam.view("-h", "-b", "-F", "0x0100", "-o", input_bam_filt, input_bam, catch_stdout=False)
+			bam = index_bam_file(input_bam_filt, sample, handle)
+			bam = pysam.AlignmentFile(bam, "rb")
+
+		elif keep_secondary == True:
+			bam = index_bam_file(input_bam, sample, handle)
+			bam = pysam.AlignmentFile(bam, "rb")
+
+		return bam
+
+
+	def get_chrom_coverages(bam, output_dir, sample, handle, args):
+
+		"""
+		v1
+		Author: Matteo Schiavinato
+		Last change: 19/01/2022
+		Note: calculating mean coverage of each chromosome independently
+		"""
+
+		Covs = {}
+		for chrom in list(bam.references):
+			cov_count = bam.count_coverage(chrom, quality_threshold=0, read_callback="all")
+			cov_count = [ [i for i in cov_count[k] if int(i) > 0] for k in (0,1,2,3) ]
+			tot_pos = sum([ len(x) for x in cov_count ])
+			tot_cov = sum([ sum(x) for x in cov_count ])
+			try:
+				cov = float(tot_cov) / float(tot_pos)
+			except ZeroDivisionError:
+				cov = float(0)
+			Covs[chrom] = cov
+
+		return Covs
+
+
+	def get_coverage(bam, chrom, start, end):
+
+		"""
+		v1
+		Last update: 31/01/2022
+		"""
+
+		if start < 0:
+			start = 0
+
+		# select reads within the region and crop at the end (truncate)
+		pileup = bam.pileup(chrom, start, end, truncate=True)
+		# get total positions of region
+		tot_pos = end-start
+		# get total covered positions using .n which is the number of reads in the "column"
+		tot_cov_pos = len([i for i in pileup if int(i.n) > 0])
+
+		return tot_cov_pos
+
+
+	def get_zygosity(block_cov, bam, chrom, start, end, overhang, hemi_threshold):
+
+		"""
+		v1
+		Last update: 31/01/2022
+		"""
+
+		# get cov ratio with 5 kb upstream
+		up_cov = get_coverage(bam, chrom, start-overhang, start)
+		# get cov ratio with 5 kb downstream
+		down_cov = get_coverage(bam, chrom, end, end+overhang)
+
+		# compare with block coverage
+		try:
+			up_ratio = min(block_cov / up_cov, 100)
+		except ZeroDivisionError:
+			up_ratio = 100
+
+		try:
+			down_ratio = min(block_cov / down_cov, 100)
+		except ZeroDivisionError:
+			down_ratio = 100
+
+		# if ratios are < --hemi, block is hemizygous
+		# if ratios are >= --hemi, block is homozygous
+		if (up_ratio < hemi_threshold) and (down_ratio < hemi_threshold):
+			zygosity = "hemi"
+		elif (up_ratio >= hemi_threshold) and (down_ratio >= hemi_threshold):
+			zygosity = "homo"
+		else:
+			zygosity = "NA"
+
+		return zygosity, up_ratio, down_ratio
+
+
+	def process_region_coverage(bed, bam, min_frac_cov, hemi_threshold, Covs, overhang):
 
 		"""
 		v1
@@ -610,27 +664,19 @@ def assess_coverage(input_bam, bt, meancov, sample, handle, args):
 		###
 		v2
 		Author: Matteo Schiavinato
-		Note: Updated to python3, and updated to new version of pysam
-		Now using coverage per position instead of raw read count
-		calculates coverage using only covered positions
-		counts also what fraction of the total positions they are
-		Must be above a threshold set by the --min-frac-cov parameter
-		If cov_ratio is below 75%, interval is marked as "hemi"; otherwise "homo"
-		Last Update: 12/01/2022
+		Last Update: 31/01/2022
 		"""
 
 		# unload bed coordinate
 		chrom, start, end, block_type = bed.rstrip("\n\b\r").split('\t')
 		start, end = int(start), int(end)
 		length = end-start
+		chrom_meancov = float(Covs[chrom])
 
-		# select reads within the region and crop at the end (truncate)
-		pileup = bam.pileup(chrom, start, end, truncate=True)
-		# get total positions of region
-		tot_pos = end-start
-		# get total covered positions using .n which is the number of reads in the "column"
-		tot_cov_pos = len([i for i in pileup if int(i.n) > 0])
+		# get total covererd positions
+		tot_cov_pos = get_coverage(bam, chrom, start, end)
 		# get covered fraction by dividing the two values
+		tot_pos = end-start
 		cov_frac = round(float(tot_cov_pos) / float(tot_pos), 3)
 
 		# debug:
@@ -649,37 +695,37 @@ def assess_coverage(input_bam, bt, meancov, sample, handle, args):
 			except ZeroDivisionError:
 				avg_cov = round(float(0), 1)
 
-			# get coverage ratio with global mean coverage
-			try:
-				cov_ratio = avg_cov/meancov
-			except ZeroDivisionError:
-				cov_ratio = 0
+			# get zygosity
+			zygosity, up_ratio, down_ratio = get_zygosity(avg_cov, bam, chrom, start, end, overhang, hemi_threshold)
+			up_ratio = round(up_ratio, 2)
+			down_ratio = round(down_ratio, 2)
 
-			if cov_ratio >= hemi_threshold:
-				zygosity = "homo"
-			else:
-				zygosity = "hemi"
-
-			cov_ratio = round((cov_ratio)*100, 2)
-
-			bed_line = f"{chrom}\t{start}\t{end}\t{avg_cov}x\t{cov_frac}\t{cov_ratio}%\t{zygosity}\t{length}\t{block_type}\n"
+			bed_line = f"{chrom}\t{start}\t{end}\t{avg_cov}x\t{cov_frac}\t{up_ratio}%\t{down_ratio}%\t{zygosity}\t{length}\t{block_type}\n"
 			return bed_line
 
 		else:
 			return False
 
-
 	# -------------------------------------------
 
 	# open bam file
-
+	sys.stderr.write(f"[{at()}] Reading bam file... \n")
 	bam = read_and_filter_bam(input_bam, args.output_dir, sample, handle, args.keep_secondary)
+	sys.stderr.write(f"[{at()}] Getting mean coverage by chromosome... \n")
+	Covs = get_chrom_coverages(bam, args.output_dir, sample, handle, args)
 
+	# write chromosome coverages to a file
+	OUT = open(f"{args.output_dir}/{sample}.{handle}.chrom_coverage.tsv", "w")
+	for chr in Covs:
+		OUT.write(f"{chr}\t{Covs[chr]}\n")
+	OUT.close()
+
+	# calculate region coverage
 	Out = []
 	total = len(bt)
 	for row in bt:
 		bed = str(row)
-		x = get_region_coverage(bed, bam, meancov, args.min_frac_cov, args.hemi)
+		x = process_region_coverage(bed, bam, args.min_frac_cov, args.hemi, Covs, args.overhang)
 		if x != False:
 			Out.append(x)
 
@@ -911,11 +957,7 @@ def process_vcf_file(	args, in_vcf, output_dir, genome_file, bam, sample, handle
 	# -----------------------------------------
 	# filter by real coverage from the BAM file
 
-	meancov = get_global_coverage(bam, output_dir, sample, handle, args)
-
-	sys.stderr.write(f"[{at()}] Mean coverage: {round(meancov, 2)}x\n")
-
-	LOH = assess_coverage(bam, Homo_blocks, meancov, sample, handle, args)
+	LOH = assess_coverage(bam, Homo_blocks, sample, handle, args)
 
 	sys.stderr.write(f"[{at()}] Computed coverage for selected LOH blocks\n")
 
@@ -1020,8 +1062,16 @@ def main():
 	# including a header
 	out = f"{output_dir}/{args.sample}.LOH_blocks.tsv"
 	OUTPUT = open(out, "w")
-	OUTPUT.write("\t".join(["#Chrom", "Start", "End", "Cov", "Cov_frac", "Cov_ratio", "Zygosity", "Length", "Allele", "Homo_snps", "Hetero_snps"]) + "\n")
+	OUTPUT.write("\t".join(["#Chrom", "Start", "End", "Cov", "Cov_frac", "Cov_ratio_up", "Cov_ratio_down", "Zygosity", "Length", "Allele", "Homo_snps", "Hetero_snps"]) + "\n")
 	for row in LOH_w_snps:
+		OUTPUT.write(str(row))
+	OUTPUT.close()
+
+	# create output bed file
+	out = f"{output_dir}/{args.sample}.LOH_blocks.bed"
+	OUTPUT = open(out, "w")
+	for row in LOH_w_snps:
+		row = list(row)[0:3]
 		OUTPUT.write(str(row))
 	OUTPUT.close()
 
