@@ -20,7 +20,7 @@ reads_to_LOH_blocks.nf \
 --read_type PE \
 --reads_for <path_to_reads_forward> \
 --reads_rev <path_to_reads_reverse> \
+--ref_genome <path_to_ref_genome> \
 --threads 48 \
 --run_id ${SAMPLE_ID} \
---output_dir ${SAMPLE_ID} \
---ref_genome
+--output_dir ${SAMPLE_ID}
