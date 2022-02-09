@@ -8,7 +8,7 @@ A tool to extract blocks of loss of heterozygosity (LOH) based on single-nucleot
 
 ## Install
 
-As simple as: `git clone https://github.com/Gabaldonlab/jloh.git` or `https://github.com/MatteoSchiavinato/jloh.git`
+As simple as: `git clone https://github.com/Gabaldonlab/jloh.git`
 And it's ready to go! But there are a few dependencies:
 
 | Program     | Type        | Version | Links      |
@@ -105,7 +105,7 @@ The third block of operations involves the determination of whether each candida
 
 #### How coverage is used
 
-Each region that is considered as a candidate LOH region is screened by coverage using the BAM file passed with `--bam`. First, the global mean coverage per position is computed for each chromosome represented in the whole BAM file. To do that, JLOH checks if the BAM file is indexed, and if not, it indexes it using the **pysam** module. Then, the reads mapping inside each region are extracted using the **pysam** module, and used to calculate a candidate block's mean coverage. This mean coverage is then compared against the global mean coverage of the chromosome it belongs to. 
+Each region that is considered as a candidate LOH region is screened by coverage using the BAM file passed with `--bam`. First, the global mean coverage per position is computed for each chromosome represented in the whole BAM file. To do that, JLOH checks if the BAM file is indexed, and if not, it indexes it using the **pysam** module. Then, the reads mapping inside each region are extracted using the **pysam** module, and used to calculate a candidate block's mean coverage. This mean coverage is then compared against the global mean coverage of the chromosome it belongs to.
 
 Each block must also pass a *covered fraction* filter (the fraction of positions actually covered by reads). If the fraction is lower than `--min-frac-cov`, the block is discarded.
 

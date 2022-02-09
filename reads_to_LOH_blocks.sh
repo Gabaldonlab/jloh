@@ -21,6 +21,6 @@ reads_to_LOH_blocks.nf \
 --reads_for <path_to_reads_forward> \
 --reads_rev <path_to_reads_reverse> \
 --threads 48 \
---sample_id ${SAMPLE_ID} \
+--run_id ${SAMPLE_ID} \
 --output_dir ${SAMPLE_ID} \
 --ref_genome
