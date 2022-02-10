@@ -1072,7 +1072,7 @@ def main():
 	OUTPUT = open(out, "w")
 	for row in LOH_w_snps:
 		row = list(row)[0:3]
-		OUTPUT.write(str(row))
+		OUTPUT.write("\t".join(row))
 	OUTPUT.close()
 
 	sys.stderr.write(f"[{at()}] Done!\n")
