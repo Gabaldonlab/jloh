@@ -36,9 +36,9 @@ chr3  90804782
 ...
 ```
 
-## The workflow, described
+## Implementation
 
-This section describes in detail what you can achieve with **JLOH**.
+This section describes in detail what you can achieve with **JLOH**. Later in this guide, a nextflow workflow to go from reads to LOH blocks is also described.
 
 ### Command-line arguments
 
@@ -146,3 +146,13 @@ In terms of zygosity, regions annotated as *homo* should have a read coverage th
 An example as seen in IGV is provided below.  
 
 ![Example](images/example.png)
+
+## Nextflow workflow
+
+Together with the **JLOH** tool, we provide also a [Nextflow](http://nextflow.io/) workflow that you can use to run your samples directly from raw reads to LOH blocks. All you have to do is to edit the configuration file of the workflow (\*config) and the running script (\*sh). Edit them according to your own computer / server, and then run:
+
+`bash reads_to_LOH_blocks.sh`
+
+In case you're working on a cluster with a slurm queuing system, you can edit the `#SBATCH` lines at the beginning and then run:
+
+`sbatch reads_to_LOH_blocks.sh`
