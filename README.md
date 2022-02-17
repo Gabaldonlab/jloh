@@ -1,4 +1,4 @@
-# J LOH
+  # J LOH
 
 *[Still the one from the block](https://www.youtube.com/watch?v=dly6p4Fu5TE)*
 
@@ -24,7 +24,7 @@ Note that **pybedtools** will look for [bedtools](https://bedtools.readthedocs.i
 The basic usage of the program is as simple as:
 
 ```
-./jloh --vcf <VCF> --genome-file <GENOME_FILE> --bam <BAM> [options]
+./jloh --threads <num_threads> --vcf <VCF> --genome-file <GENOME_FILE> --bam <BAM> [options]
 ```
 
 To produce a genome file, simply calculate the length of each sequence in your reference FASTA file and produce a file containing their name + length, structured in a tab-separated format that looks like this:
@@ -40,54 +40,15 @@ chr3  90804782
 
 This section describes in detail what you can achieve with **JLOH**. Later in this guide, a nextflow workflow to go from reads to LOH blocks is also described.
 
-### Command-line arguments
+### sorting of SNPs by zygosity
 
-JLOH has many command-line arguments that can be set to fine-tune the analysis:
-
-```
-[I/O]
---vcf               Input VCF file                                              [!]
---genome-file       File with chromosome lengths (chromosome <TAB> size)        [!]
---bam               BAM file used to call the --vcf variants                    [!]
---sample            Sample name / Strain name for output files                  [loh_blocks]
---output-dir        Output directory                                            [loh_blocks_out]
---debug             Activate generation of several intermediate files           [off]
---print-info        Show authors and edits with dates                           [off]
-
-[modes]
---keep-secondary    Ignores secondary alignments from --bam file                [off]
---no-alleles        Don't use homozygous SNPs to assign LOH blocks to REF/ALT   [off]
-
-[parameters]
---filter-mode       "pass" to keep only PASS variants, "all" to keep everything [all]
---min-het-snps      Min. num. heterozygous SNPs in heterozygous region          [2]
---snp-distance      Max. distance (bp between SNPs for blocks definition        [100]
---block-dist        Combine LOH blocks into one if closer than this distance    [100]
---min-size          Min. LOH block size                                         [100]
---min-af            Min. allele frequency to consider a variant heterozygous    [0.3]
---max-af            Max. allele frequency to consider a variant heterozygous    [0.7]
---min-frac-cov      Min. fraction of LOH block that has to be covered by reads  [0.5]
---hemi              Frac. of the mean coverage under which LOH is hemizygous    [0.75]
-
-[pre-existing variation]
---t0-vcf            VCF with variants to ignore from --vcf                      [off]
---t0-bam            BAM file used to call the --t0-vcf variants                 [off]
---t0-filter-type    What to do with t0 LOH events? "keep" or "remove"           [remove]
-```
-
-### selection of SNPs
-
-The variants passed with `--vcf` are filtered, retaining only heterozygous SNPs which are placed in an output file called `<sample>.het_snps.vcf`. Homozygous SNPs are placed in another output file called `<sample>.homo_snps.vcf`. Indels and other types of variation are discarded.
-
-The heterozygous SNPs are used to extract regions containing heterozygosity, while the homozygous SNPs are used to assign homozygous regions to either the alternative (ALT) or the reference (REF) allele; this is done by default, unless the user passes the `--no-alleles` option (see later).
-
-The selection of heterozygous SNPs is conducted based on their `FORMAT` (field number 9 and 10 of a VCF file). The first column of this field carries a series of annotations separated by colons (e.g. GT:AF) the values of which are annotated the same way on the second column (e.g.` 0/1:0.60`). If a SNP is annotated as heterozygous, it will carry a genotype (`GT`) such as `0/1` or `1/2`. It should also have an allele frequency (`AF`) annotation. SNPs are considered heterozygous if their `AF` annotation falls between the values specified with `--min-af` and `--max-af`.
+The variants passed with `--vcf` are scanned, subdividing heterozygous and homozygous SNPs into two separate files: `<sample>.het_snps.vcf` and `<sample>.homo_snps.vcf`. Indels and other types of variation are discarded. The heterozygous SNPs are used to extract regions containing heterozygosity, while the homozygous SNPs are used to assign homozygous regions to either the alternative (ALT) or the reference (REF) allele; this is done by default, unless the user passes the `--no-alleles` option (see later). The selection of heterozygous SNPs is conducted based on their `FORMAT` (e.g. `GT 0/1` or `1/2` for heterozygous SNPs). Selected SNPs should also have an allele frequency (`AF`) annotation, and are retained if their `AF` is larger than `--min-af` and lower than `--max-af`.
 
 Missing allele frequency? Try using [all2vcf](https://github.com/MatteoSchiavinato/all2vcf).
 
-### extraction of heterozygosity regions
+### extraction of heterozygous regions
 
-The first block of operations is aimed at the extraction of genomic regions rich in *heterozygous SNPs*. These regions cannot be LOH blocks and are identified in order to be masked. The heterozygous regions are extracted based on clusters of heterozygous SNPs. The minimum number of SNPs eliminates regions with too little SNPs to be considered true positives, while the maximum SNP distance defines how the SNPs are clustered. These parameters are controlled with the `--min-het-snps` and the `--snp-distance` parameters. This produces a list of genomic intervals defining the heterozygous clusters, including the number of SNPs contained in them. These intervals will be masked for later LOH detection.
+Heterozygous regions are extracted based on clusters of heterozygous SNPs. The minimum number of SNPs defined with `--min-het-snps` eliminates regions with too little SNPs. The maximum SNP distance (`--snp-distance`) defines how far can the SNPs be within one cluster. This produces a list of heterozygous regions that will then be ignored in LOH block detection.
 
 ### Extraction of candidate blocks
 
@@ -99,19 +60,14 @@ Everything that did not include sufficient heterozygous SNPs is then screened as
 
 Regardless of the choice, at the end of this block of operations JLOH has a list of potential LOH blocks i terms of chromosome, start, end, number of SNPs, and length. Blocks shorter than `--min-size` are at this point filtered out. The remaining ones are screened against the initial heterozygous regions: overlapping regions are cropped from the candidate LOH block coordinates.
 
+### Coverage trimming
+
+Candidate blocks are screened against the coverage profiles of each chromosome using the BAM file passed with `--bam`. Regions of candidate blocks that don't have any coverage are trimmed, reducing the candidate block coordinates only to the covered portion of it. In case this makes it too short, i.e. shorter than `--min-size`, the block is consequently discarded. Each block must also pass a *covered fraction* filter (the fraction of positions actually covered by reads). If the fraction is lower than `--min-frac-cov`, the block is discarded.
+
 ### Determination of block zygosity
 
-The third block of operations involves the determination of whether each candidate LOH block is homozygous or hemizygous. This is done through read coverage: homozygous blocks will have a read coverage that is comparable with that of the global mean coverage per position; hemizygous blocks will have lost one of the two copies (if diploid) and will have only half of the global mean coverage. This is annotated in the output file and can be controlled with the `--hemi` parameter.
+The coverage information is then used to infer the zygosity of a block. In case the `--no-alleles` option is set, this step is skipped. If not skipped, the upstream and downstream regions of each block are extracted. The extent of the up/downstream region is regulated by the `--overhang` parameter. If both up- and downstream regions show the same trend (e.g. both have 2x the coverage of the block), then the block's zygosity is inferred. There are two zygosity types: `homo` and `hemi`. This combines together with the presence or absence of homozygous SNPs in four possible scenarios (see image in the **Interpreting Output** chapter below).
 
-#### How coverage is used
-
-Each region that is considered as a candidate LOH region is screened by coverage using the BAM file passed with `--bam`. First, the global mean coverage per position is computed for each chromosome represented in the whole BAM file. To do that, JLOH checks if the BAM file is indexed, and if not, it indexes it using the **pysam** module. Then, the reads mapping inside each region are extracted using the **pysam** module, and used to calculate a candidate block's mean coverage. This mean coverage is then compared against the global mean coverage of the chromosome it belongs to.
-
-Each block must also pass a *covered fraction* filter (the fraction of positions actually covered by reads). If the fraction is lower than `--min-frac-cov`, the block is discarded.
-
-#### The `--keep-secondary` option
-
-In the default scenario, the user should use only primary alignments for their analysis. This is strongly recommended and is commonly done, to avoid coverage overestimations determined by multi-mapping reads with many secondary alignments. If the user sets the `--keep-secondary` option, all provided reads are used. This may be useful to assess impact of secondary alignments on your analysis, but is not recommended unless you know what you're doing.
 
 ### deal with known pre-existing LOH blocks
 
@@ -139,7 +95,7 @@ Note: if a `--t0-vcf` and a `-t0-bam` file are passed, there will be extra files
 
 JLOH's main output is a table containing all candidate LOH blocks. These blocks are annotated with various information on them, but the interpretation is strongly case-specific, hence is left to the user. We strongly advice the user to load the input VCF, BAM, and the output TSV to a genome browser such as [IGV](https://software.broadinstitute.org/software/igv/). The output TSV's first three columns are already a BED file (0-based, half-open intervals) and can be used as they are.
 
-Ideally, LOH blocks assigned as `REF` should match regions that are depleted of *homozygous* SNPs, while those assigned as `ALT` should match regions dense in *homozygous* SNPs. Detected LOH blocks (regardless of the annotation) should not overlap regions that are dense in *heterozygous SNPs*.
+Ideally, LOH blocks assigned as `REF` should match regions that are covered by reads but depleted of *homozygous* SNPs, while those assigned as `ALT` should match regions dense in *homozygous* SNPs. Detected LOH blocks (regardless of the annotation) should not overlap regions that are dense in *heterozygous SNPs*.
 
 In terms of zygosity, regions annotated as *homo* should have a read coverage that is higher or equal to the value set with the `--hemi` parameter (default: 0.75, i.e. 75%). Regions annotated as *hemi* should have a read coverage that is below this value.
 

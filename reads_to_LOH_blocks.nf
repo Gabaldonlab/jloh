@@ -238,7 +238,7 @@ if (params.read_type == "PE") {
       cpus = params.threads
       maxForks = params.threads
 
-      publishDir  "${params.output_dir}/mapping", mode: "copy", pattern: "*.sam"
+      // publishDir  "${params.output_dir}/mapping", mode: "copy", pattern: "*.sam"
 
       input:
         tuple val(sample_id), file(reads_for), file(reads_rev), file(reads_unpaired), \
@@ -278,7 +278,7 @@ if (params.read_type == "PE") {
       cpus = params.threads
       maxForks = params.threads
 
-      publishDir  "${params.output_dir}/mapping", mode: "copy", pattern: "*.sam"
+      // publishDir  "${params.output_dir}/mapping", mode: "copy", pattern: "*.sam"
 
       input:
         tuple val(sample_id), file(reads_for), file(reads_rev), \
@@ -427,7 +427,7 @@ if (params.read_type == "PE") {
       cpus = params.threads
       maxForks = params.threads
 
-      publishDir  "${params.output_dir}/mapping", mode: "copy", pattern: "*.sam"
+      // publishDir  "${params.output_dir}/mapping", mode: "copy", pattern: "*.sam"
 
       input:
         tuple val(sample_id), file(reads), val(genome_id), file(ref_genome) from Hisat2_in
@@ -466,7 +466,7 @@ if (params.read_type == "PE") {
       cpus = params.threads
       maxForks = params.threads
 
-      publishDir  "${params.output_dir}/mapping", mode: "copy", pattern: "*.sam"
+      // publishDir  "${params.output_dir}/mapping", mode: "copy", pattern: "*.sam"
 
       input:
         tuple val(sample_id), file(reads), val(genome_id), file(ref_genome) from Hisat2_in
@@ -532,7 +532,7 @@ process pileup_reads {
   cpus = 1
   maxForks = params.threads
 
-  publishDir  "${params.output_dir}/LOH/process", mode: "copy", pattern: "*.mpileup.vcf"
+  // publishDir  "${params.output_dir}/LOH/process", mode: "copy", pattern: "*.mpileup.vcf"
 
   input:
     tuple val(sample_id), val(genome_id), file(ref_genome), \
@@ -558,7 +558,7 @@ process call_short_variants {
   cpus = params.threads
   maxForks = params.threads
 
-  publishDir  "${params.output_dir}/LOH/process", mode: "copy", pattern: "*.raw.vcf"
+  // publishDir  "${params.output_dir}/LOH/process", mode: "copy", pattern: "*.raw.vcf"
 
   input:
     tuple val(sample_id), val(genome_id), file(ref_genome), file(bam_fs), \
@@ -570,7 +570,9 @@ process call_short_variants {
 
   script:
     """
-    ${BCFTOOLS} call --threads ${params.threads} --multiallelic-caller --variants-only \
+    ${BCFTOOLS} call \
+    --threads ${params.threads} \
+    --multiallelic-caller --variants-only \
     --output ${params.run_id}.${sample_id}.${genome_id}.raw.vcf --output-type v \
     ${pileup}
     """
@@ -633,6 +635,7 @@ process call_LOH_blocks {
     ${BIOAWK} -c fastx '{print \$name\"\\t\"length(\$seq)}' ${ref_genome} \
     > ${params.run_id}.genome_file.tsv &&
     ${JLOH} \
+    --threads ${params.threads} \
     --vcf ${filt_vcf} \
     --bam ${bam_fs} \
     --genome-file ${params.run_id}.genome_file.tsv \
