@@ -645,7 +645,7 @@ process call_LOH_blocks {
     --min-af ${params.min_het_af} \
     --max-af ${params.max_het_af} \
     --min-frac-cov ${params.min_frac_cov} \
-    --min-het-snps ${params.min_het_snps} \
+    --min-snps ${params.min_het_snps} \
     --snp-distance ${params.snp_distance} \
     --block-dist ${params.block_distance} \
     --min-size ${params.min_loh_size} \
