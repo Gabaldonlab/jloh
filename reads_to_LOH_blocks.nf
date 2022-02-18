@@ -56,7 +56,7 @@ println """
 
   [JLOH]
 
---min_het_snps      Min. number of het SNPs to consider a het bloock            [2]
+--min_snps_kbp      Min. number of het SNPs to consider a het bloock            [2]
 --snp_distance      Size (bp) of the window to use for LOH detection            [100]
 --min_loh_size      Min. size (bp) of the candidate LOH blocks                  [100]
 --block_distance    Combine LOH blocks into one if closer than this distance    [100]
@@ -645,12 +645,10 @@ process call_LOH_blocks {
     --min-af ${params.min_het_af} \
     --max-af ${params.max_het_af} \
     --min-frac-cov ${params.min_frac_cov} \
-    --min-snps ${params.min_het_snps} \
+    --min-snps-kbp ${params.min_snps_kbp} \
     --snp-distance ${params.snp_distance} \
     --block-dist ${params.block_distance} \
     --min-size ${params.min_loh_size} \
-    --hemi ${params.hemizygous_cov} \
-    --alpha ${params.alpha}
-
+    --hemi ${params.hemizygous_cov}
     """
 }

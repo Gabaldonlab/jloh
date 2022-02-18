@@ -48,7 +48,7 @@ Missing allele frequency? Try using [all2vcf](https://github.com/MatteoSchiavina
 
 ### extraction of heterozygous regions
 
-Heterozygous regions are extracted based on clusters of heterozygous SNPs. The minimum number of SNPs defined with `--min-het-snps` eliminates regions with too little SNPs. The maximum SNP distance (`--snp-distance`) defines how far can the SNPs be within one cluster. This produces a list of heterozygous regions that will then be ignored in LOH block detection.
+Heterozygous regions are extracted based on clusters of heterozygous SNPs. The minimum number of SNPs per kbp is defined with `--min-snps-kbp` parameter, which eliminates regions with too little SNPs. The maximum SNP distance (`--snp-distance`) defines how far can the SNPs be within one cluster. This produces a list of heterozygous regions that will then be ignored in LOH block detection.
 
 ### Extraction of candidate blocks
 
