@@ -5,7 +5,7 @@ script_info = """
 ###
 Author: Matteo Schiavinato
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2018)
-Last change: 18/02/2022
+Last change: 21/02/2022
 ###
 """
 
@@ -22,6 +22,7 @@ import pybedtools
 from pybedtools import BedTool
 from math import log10
 import multiprocessing
+from operator import itemgetter
 
 # help section
 if len(sys.argv) == 1:
@@ -35,7 +36,7 @@ Still the one from the block
 -
 Extact LOH blocks from SNPs, coverage, and a reference genome
 -
-v 0.11.0
+v 0.11.1
 --------------------------------------------------------------------------------
 by Matteo Schiavinato
 largely based on:
@@ -912,13 +913,18 @@ def use_intersection_intervals(Out, filter_type):
 def count_snps_in_bed_interval(bed, vcf):
 
 	"""
-	Last update: 21/12/2021
+	Last update: 21/02/2022
 	Note: Count how many SNPs are found inside a BED interval
 	by intersecting a BED file with a VCF file
 	"""
 
 	bt_inter = bed.intersect(vcf, c=True)
-	return bt_inter
+	bt_inter = [ list(x) for x in bt_inter ]
+	bt_inter = [ [x[0]] + [int(x[1])] + [int(x[2])] + x[3:] for x in bt_inter ]
+	bt_inter_sorted = sorted(bt_inter, key=itemgetter(0,1,2))
+	bt_inter_sorted = BedTool(bt_inter_sorted)
+
+	return bt_inter_sorted
 
 
 def main(args):
