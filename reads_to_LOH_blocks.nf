@@ -56,15 +56,13 @@ println """
 
   [JLOH]
 
---min_snps_kbp      Min. number of het SNPs to consider a het bloock            [2]
---snp_distance      Size (bp) of the window to use for LOH detection            [100]
---min_loh_size      Min. size (bp) of the candidate LOH blocks                  [100]
---block_distance    Combine LOH blocks into one if closer than this distance    [100]
---min_het_af        Min. allele frequency to consider heterozygous              [0.30]
---max_het_af        Max. allele frequency to consider heterozygous              [0.70]
+--min_snps_kbp      Min. number of het SNPs to consider a het block             [0.1]
+--snp_distance      Size (bp) of the window to use for LOH detection            [1000]
+--min_loh_size      Min. size (bp) of the candidate LOH blocks                  [1000]
+--min_het_af        Min. allele frequency to consider heterozygous              [0.25]
+--max_het_af        Max. allele frequency to consider heterozygous              [0.75]
 --min_frac_cov      Min. fraction of LOH block that has to be covered by reads  [0.5]
 --hemizygous_cov    Frac. of the mean coverage under which LOH is hemizygous    [0.75]
---alpha             Two-sided max. diff. from chromosomal cluster mean cov      [0.05]
 
 """
 exit 0
@@ -617,8 +615,8 @@ process filter_short_variants {
 process call_LOH_blocks {
 
   executor = "local"
-  cpus = 1
-  maxForks = params.threads
+  cpus = params.threads
+  maxForks = 1
 
   publishDir "${params.output_dir}/LOH", mode: "copy"
 
@@ -650,5 +648,6 @@ process call_LOH_blocks {
     --block-dist ${params.block_distance} \
     --min-size ${params.min_loh_size} \
     --hemi ${params.hemizygous_cov}
+
     """
 }
