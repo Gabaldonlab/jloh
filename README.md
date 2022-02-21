@@ -8,12 +8,12 @@ A tool to extract blocks of loss of heterozygosity (LOH) based on single-nucleot
 
 ## Table of Contents
 
-[Install](#Install)
-[Run](#Run)
-[Implementation](#Implementation)
-[Output](#Output)
-[Interpreting output](#Interpreting output)
-[Nextflow workflow](#Nextflow workflow)
+- [Install](#Install)
+- [Run](#Run)
+- [Implementation](#Implementation)
+- [Output](#Output)
+- [Interpreting output](#Interpreting output)
+- [Nextflow workflow](#Nextflow workflow)
 
 ## Install
 
