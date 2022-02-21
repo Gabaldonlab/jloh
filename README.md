@@ -12,8 +12,6 @@ A tool to extract blocks of loss of heterozygosity (LOH) based on single-nucleot
 - [Run](#Run)
 - [Implementation](#Implementation)
 - [Output](#Output)
-- [Interpreting output](#InterpretingOutput)
-- [Nextflow workflow](#NextflowWorkflow)
 
 ## Install
 
@@ -44,6 +42,17 @@ chr2  1231455
 chr3  90804782
 ...
 ```
+
+### Nextflow workflow
+
+Together with the **JLOH** tool, we provide also a [Nextflow](http://nextflow.io/) workflow that you can use to run your samples directly from raw reads to LOH blocks. All you have to do is to edit the configuration file of the workflow (\*config) and the running script (\*sh). Edit them according to your own computer / server, and then run:
+
+`bash reads_to_LOH_blocks.sh`
+
+In case you're working on a cluster with a slurm queuing system, you can edit the `#SBATCH` lines at the beginning and then run:
+
+`sbatch reads_to_LOH_blocks.sh`
+
 
 ## Implementation
 
@@ -100,7 +109,7 @@ By default, JLOH won't expect a "t0" dataset and will go through this step witho
 
 Note: if a `--t0-vcf` and a `-t0-bam` file are passed, there will be extra files with the same naming system corresponding to these input files. These will carry the label "t0" instead of "exp".
 
-## Interpreting output
+### Interpreting output
 
 JLOH's main output is a table containing all candidate LOH blocks. These blocks are annotated with various information on them, but the interpretation is strongly case-specific, hence is left to the user. We strongly advice the user to load the input VCF, BAM, and the output TSV to a genome browser such as [IGV](https://software.broadinstitute.org/software/igv/). The output TSV's first three columns are already a BED file (0-based, half-open intervals) and can be used as they are.
 
@@ -111,13 +120,3 @@ In terms of zygosity, regions annotated as *homo* should have a read coverage th
 An example as seen in IGV is provided below.  
 
 ![Example](images/example.png)
-
-## Nextflow workflow
-
-Together with the **JLOH** tool, we provide also a [Nextflow](http://nextflow.io/) workflow that you can use to run your samples directly from raw reads to LOH blocks. All you have to do is to edit the configuration file of the workflow (\*config) and the running script (\*sh). Edit them according to your own computer / server, and then run:
-
-`bash reads_to_LOH_blocks.sh`
-
-In case you're working on a cluster with a slurm queuing system, you can edit the `#SBATCH` lines at the beginning and then run:
-
-`sbatch reads_to_LOH_blocks.sh`
