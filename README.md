@@ -58,13 +58,13 @@ In case you're working on a cluster with a slurm queuing system, you can edit th
 
 This section describes in detail what you can achieve with **JLOH**. Later in this guide, a nextflow workflow to go from reads to LOH blocks is also described.
 
-### sorting of SNPs by zygosity
+### Sorting of SNPs by zygosity
 
 The variants passed with `--vcf` are scanned, subdividing heterozygous and homozygous SNPs into two separate files: `<sample>.het_snps.vcf` and `<sample>.homo_snps.vcf`. Indels and other types of variation are discarded. The heterozygous SNPs are used to extract regions containing heterozygosity, while the homozygous SNPs are used to assign homozygous regions to either the alternative (ALT) or the reference (REF) allele; this is done by default, unless the user passes the `--no-alleles` option (see later). The selection of heterozygous SNPs is conducted based on their `FORMAT` (e.g. `GT 0/1` or `1/2` for heterozygous SNPs). Selected SNPs should also have an allele frequency (`AF`) annotation, and are retained if their `AF` is larger than `--min-af` and lower than `--max-af`.
 
 Missing allele frequency? Try using [all2vcf](https://github.com/MatteoSchiavinato/all2vcf).
 
-### extraction of heterozygous regions
+### Extraction of heterozygous regions
 
 Heterozygous regions are extracted based on clusters of heterozygous SNPs. The minimum number of SNPs per kbp is defined with `--min-snps-kbp` parameter, which eliminates regions with too little SNPs. The maximum SNP distance (`--snp-distance`) defines how far can the SNPs be within one cluster. This produces a list of heterozygous regions that will then be ignored in LOH block detection.
 
@@ -87,7 +87,7 @@ Candidate blocks are screened against the coverage profiles of each chromosome u
 The coverage information is then used to infer the zygosity of a block. In case the `--no-alleles` option is set, this step is skipped. If not skipped, the upstream and downstream regions of each block are extracted. The extent of the up/downstream region is regulated by the `--overhang` parameter. If both up- and downstream regions show the same trend (e.g. both have 2x the coverage of the block), then the block's zygosity is inferred. There are two zygosity types: `homo` and `hemi`. This combines together with the presence or absence of homozygous SNPs in four possible scenarios (see image in the **Interpreting Output** chapter below).
 
 
-### deal with known pre-existing LOH blocks
+### Pre-existing LOH blocks
 
 The last block of operations is aimed at comparing the detected LOH blocks with any pre-existing ones. This is an *optional* step and is not performed unless the user passes another VCF file with the `-t0-vcf` option. This file will be considered as variation that pre-dates the one listed in `--vcf`.
 
