@@ -5,7 +5,7 @@ script_info = """
 ###
 Author: Matteo Schiavinato
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2018)
-Last change: 24/02/2022
+Last change: 25/02/2022
 ###
 """
 
@@ -36,7 +36,7 @@ Still the one from the block
 -
 Extact LOH blocks from SNPs, coverage, and a reference genome
 -
-v 0.11.2
+v 0.11.3
 --------------------------------------------------------------------------------
 by Matteo Schiavinato
 largely based on:
@@ -279,7 +279,7 @@ def get_intervals_of_snps(snps_vcf, snp_distance):
 	return bt_merged
 
 
-def filter_by_snp_density(bt, min_num_snps, discard):
+def filter_by_snp_density(bt, min_snps_kbp, discard):
 
 	"""
 	v1
@@ -288,7 +288,7 @@ def filter_by_snp_density(bt, min_num_snps, discard):
 	###
 	v2
 	Author: Matteo Schiavinato
-	Last update: 18/02/2022
+	Last update: 25/02/2022
 	"""
 
 	if discard == False:
@@ -299,8 +299,8 @@ def filter_by_snp_density(bt, min_num_snps, discard):
 			ref,start,end,count = str(ref),int(start),int(end),float(count)
 			length_kb = (end-start) / 1000
 			density = float(count) / float(length_kb)
-			min_density = float(min_num_snps) / float(length_kb)
-			if (float(density) >= float(min_density)) and \
+
+			if (float(density) >= float(min_snps_kbp)) and \
 			(int(end) > int(start)):
 				out.append(row)
 			else:
@@ -316,8 +316,8 @@ def filter_by_snp_density(bt, min_num_snps, discard):
 			ref,start,end,count = str(ref),int(start),int(end),float(count)
 			length_kb = (end-start) / 1000
 			density = float(count) / float(length_kb)
-			max_density = float(min_num_snps) / float(length_kb)
-			if (float(density) < float(max_density)) and \
+
+			if (float(density) < float(min_snps_kbp)) and \
 			(int(end) > int(start)):
 				out.append(row)
 			else:
@@ -450,7 +450,7 @@ def get_chromosomal_covered_regions(queue, lock, in_bam, chrom, chrom_len):
 	queue.put(bt)
 
 
-def get_covered_regions(queue, lock, args, Chrom_lengths, in_bam):
+def get_uncovered_regions(queue, lock, args, Chrom_lengths, in_bam):
 
 	"""
 	Last update: 24/02/2022
@@ -475,6 +475,7 @@ def get_covered_regions(queue, lock, args, Chrom_lengths, in_bam):
 
 	# convert to bed tool
 	bt = BedTool(cov_regions_bed).sort(faidx=args.genome_file).merge(d=args.min_uncov)
+	bt = bt.sort(faidx=args.genome_file)
 
 	# invert interval
 	bt_complement = bt.complement(g=args.genome_file)
@@ -882,10 +883,10 @@ def process_vcf_file(args, queue, lock, in_vcf, in_bam, handle):
 	Chrom_lengths = parse_chromosomes(args.genome_file)
 
 	sys.stderr.write(f"[{at()}] Extracting uncovered regions of the genome...\n")
-	bt_cov_regions = get_covered_regions(queue, lock, args, Chrom_lengths, in_bam)
+	bt_uncov_regions = get_uncovered_regions(queue, lock, args, Chrom_lengths, in_bam)
 
 	sys.stderr.write(f"[{at()}] Adjusting block boundaries by coverage...\n")
-	Homo_blocks_adj = fix_coordinates_by_cov(Homo_blocks, bt_cov_regions, args.min_size)
+	Homo_blocks_adj = fix_coordinates_by_cov(Homo_blocks, bt_uncov_regions, args.min_size)
 
 	# --------------------------------------------------------------------------
 	# EXTRACT BLOCK COVERAGE
