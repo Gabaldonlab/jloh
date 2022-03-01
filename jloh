@@ -36,7 +36,7 @@ Still the one from the block
 -
 Extact LOH blocks from SNPs, coverage, and a reference genome
 -
-v 0.11.3
+v 0.11.4
 --------------------------------------------------------------------------------
 by Matteo Schiavinato
 largely based on:
@@ -60,7 +60,6 @@ Usage:
 --filter-mode       "pass" to keep only PASS variants, "all" to keep everything [all]
 --min-snps-kbp      Min. num. SNPs in hetero-/homo-zygous region                [1]
 --snp-distance      Max. distance (bp) between SNPs for blocks definition       [100]
---block-dist        Combine LOH blocks into one if closer than this distance    [100]
 --min-size          Min. LOH block size                                         [100]
 --min-af            Min. allele frequency to consider a variant heterozygous    [0.3]
 --max-af            Max. allele frequency to consider a variant heterozygous    [0.7]
@@ -93,7 +92,6 @@ p.add_argument("--t0-bam", type=str, default=None)
 p.add_argument("--t0-filter-type", choices=["keep", "remove"], default="remove")
 p.add_argument("--min-snps-kbp", type=float, default=1)
 p.add_argument("--snp-distance", default=100, type=int)
-p.add_argument("--block-dist", default=100, type=int)
 p.add_argument("--min-size", default=100, type=int)
 p.add_argument("--min-af", default=0.3, type=float)
 p.add_argument("--max-af", default=0.7, type=float)
@@ -373,7 +371,7 @@ def get_snp_intervals(args, in_vcf, handle, invert):
 def remove_overlapping_regions(bt_A, bt_B, min_length):
 
 	"""
-	Last update: 23/02/2022
+	Last update: 01/03/2022
 	"""
 
 	# remove intersection between the two beds
@@ -450,6 +448,29 @@ def get_chromosomal_covered_regions(queue, lock, in_bam, chrom, chrom_len):
 	queue.put(bt)
 
 
+
+def remove_negative_intervals(args, bt):
+
+	"""
+	01/03/2022
+	This function only bypasses an issue of bedtools that they haven't fixed yet
+	This bug creates an interval going from 1 to -1 which then is impossible to parse
+	from pybedtools
+	Open github issue:
+	https://github.com/arq5x/bedtools2/issues/979
+	"""
+
+	tmp_out = f"{args.output_dir}/TMP.internal_service_file.bed"
+	bt.saveas(tmp_out)
+	Bed_lines = [ line.rstrip("\r\b\n").split("\t") for line in open(tmp_out, "r") ]
+	Bed_lines = [ (str(x[0]), int(x[1]), int(x[2])) for x in Bed_lines ]
+	Bed_lines = [ x for x in Bed_lines if ((x[1] < x[2]) and (x[2] > 0)) ]
+	bt = BedTool(Bed_lines)
+	os.remove(tmp_out)
+
+	return bt
+
+
 def get_uncovered_regions(queue, lock, args, Chrom_lengths, in_bam):
 
 	"""
@@ -480,13 +501,18 @@ def get_uncovered_regions(queue, lock, args, Chrom_lengths, in_bam):
 	# invert interval
 	bt_complement = bt.complement(g=args.genome_file)
 
+	# write to file and read again
+	# to bypass the bedtools bug which they won't fix any time soon
+	# which creates an interval from 1 to -1 and then makes the whole thing crash
+	bt_complement = remove_negative_intervals(args, bt)
+
 	return bt_complement
 
 
 def fix_coordinates_by_cov(Homo_blocks, bt_uncov_regions, min_length):
 
 	"""
-	Last update: 24/02/2022
+	Last update: 01/03/2022
 	"""
 
 	# intersect the two bed files (blocks and uncovered regions)
