@@ -366,7 +366,7 @@ def filter_by_length(bt, min_length):
 def get_snp_intervals(args, in_vcf, invert):
 
 	"""
-	Last update: 04/03/2022
+	Last update: 07/03/2022
 	"""
 
 	# -------------------------------------------
@@ -378,13 +378,11 @@ def get_snp_intervals(args, in_vcf, invert):
 	if invert == False:
 		snp_blocks = BedTool(in_vcf).merge(d=args.snp_distance, c=1, o="count")
 		(snp_blocks, skipped) = filter_by_snp_distance_and_count(args, snp_blocks, False)
-		snp_blocks = filter_by_length(snp_blocks, args.min_length)
 
 	# when true, retain only intervals with AT MOST this number of SNPs
 	elif invert == True:
 		snp_blocks = BedTool(in_vcf).merge(d=args.snp_distance, c=1, o="count")
 		(snp_blocks, skipped) = filter_by_snp_distance_and_count(args, snp_blocks, True)
-		snp_blocks = filter_by_length(snp_blocks, args.min_length)
 
 	return snp_blocks
 
@@ -434,7 +432,7 @@ def snps_to_bed_blocks(args, het_snps_vcf, homo_snps_vcf, genome_file):
 	return Het_bed_blocks, Homo_bed_blocks_REF, Homo_bed_blocks_ALT
 
 
-def remove_overlapping_regions(bt_A, bt_B, min_length):
+def remove_overlapping_regions(bt_A, bt_B):
 
 	"""
 	Last update: 01/03/2022
@@ -445,7 +443,6 @@ def remove_overlapping_regions(bt_A, bt_B, min_length):
 	# remove short ones
 	lst = [str(x).rstrip("\b\r\n").split("\t") for x in bt]
 	lst = [x for x in lst if int(x[2]) > int(x[1])]
-	lst = [x for x in lst if int(x[2])-int(x[1]) >= min_length]
 	# sort
 	bt = bt.sort()
 	# write to output
@@ -462,12 +459,10 @@ def adjust_homo_coordinates_by_hetero_overlap(args, Het_blocks, Homo_blocks_REF,
 	pool = multiprocessing.Pool(processes=args.threads)
 
 	Homo_blocks_REF = pool.apply_async(remove_overlapping_regions, args=(Homo_blocks_REF,
-																		Het_blocks,
-																		args.min_length))
+																		Het_blocks))
 
 	Homo_blocks_ALT = pool.apply_async(remove_overlapping_regions, args=(Homo_blocks_ALT,
-																		Het_blocks,
-																		args.min_length))
+																		Het_blocks))
 
 
 	pool.close()
@@ -561,10 +556,10 @@ def remove_negative_intervals(args, bt):
 	return bt
 
 
-def fix_coordinates_by_cov(Homo_blocks, bt_uncov_regions, min_length):
+def fix_coordinates_by_cov(Homo_blocks, bt_uncov_regions):
 
 	"""
-	Last update: 01/03/2022
+	Last update: 07/03/2022
 	"""
 
 	# intersect the two bed files (blocks and uncovered regions)
@@ -576,7 +571,6 @@ def fix_coordinates_by_cov(Homo_blocks, bt_uncov_regions, min_length):
 	# remove short ones
 	adj_blocks = [ str(x).rstrip("\n\r\b").split("\t") for x in bt_blocks_adj ]
 	adj_blocks = [ x for x in adj_blocks if (int(x[1]) >= 0 and int(x[2]) > int(x[1])) ]
-	adj_blocks = [ x for x in adj_blocks if int(x[2])-int(x[1]) >= min_length ]
 	bt_blocks_adj = BedTool(adj_blocks)
 
 	# sort
@@ -623,7 +617,7 @@ def remove_uncovered_regions(args, bam, ref, Homo_blocks, genome_file):
 	bt_uncov_regions = remove_negative_intervals(args, bt)
 
 	# fix coordinates
-	Homo_blocks_adj = fix_coordinates_by_cov(Homo_blocks, bt_uncov_regions, args.min_length)
+	Homo_blocks_adj = fix_coordinates_by_cov(Homo_blocks, bt_uncov_regions)
 
 	return Homo_blocks_adj
 
