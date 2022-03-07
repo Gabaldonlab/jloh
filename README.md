@@ -20,12 +20,14 @@ And it's ready to go! But there are a few dependencies:
 
 | Program     | Type        | Version | Links      |
 |-------------|-------------|---------|------------|
+| bedtools    | Program     | 2.29.2  | [source](https://bedtools.readthedocs.io/en/latest/), [cite]() |
 | Biopython   | Module      | 1.79    | [source](https://biopython.org/), [cite](https://doi.org/10.1093/bioinformatics/btp163) |
 | pybedtools  | Module      | 0.8.2   | [source](https://daler.github.io/pybedtools/main.html), [cite](https://doi.org/10.1093/bioinformatics/btr539) |
 | pysam       | Module      | 0.1.7   | [source](https://pypi.org/project/pysam/), [cite](https://github.com/pysam-developers/pysam) |
 | Python      | Interpreter | 3.6.1   | [source](https://www.python.org/downloads/release/python-397/), [cite](http://citebay.com/how-to-cite/python/) |
+| samtools |  | Program     | 1.13    | [source](http://www.htslib.org/), [cite]() |
 
-Note that **pybedtools** will look for [bedtools](https://bedtools.readthedocs.io/en/latest/) in the `$PATH`, while **pysam** will look for [samtools](http://www.htslib.org/). Hence, you may have to install these two programs as well.  
+Note that **pybedtools** will look for [bedtools](https://bedtools.readthedocs.io/en/latest/) in the `$PATH`, while **pysam** will look for [samtools](http://www.htslib.org/). 
 
 ## Run
 
