@@ -4,34 +4,20 @@
 if (params.help) {
 println """
 
-  // ----------------------------------------------------------------------//
-  // Workflow to extract LOH blocks leveraging JLOH and other common tools //
-  // ----------------------------------------------------------------------//
-
-  // refer to:
-  // https://github.com/Gabaldonlab/jloh
-  // Author: Matteo Schiavinato
-  // DOI: (yet to be published)
+  // ------------------------------------------------------------------//
+  // Workflow to extract LOH blocks from public paired-end hybrid data //
+  // ------------------------------------------------------------------//
 
   [input]
 
 --help              Print this help section                                     [off]
---run_id            ID of the processed sample (or the run, when >1 sample)     [smpl]
 --output_dir        Name of output directory                                    [JLOH_run]
 --threads           Number of parallel threads                                  [4]
---read_type         Select paired-end (PE) or single-end (SE)                   [PE]
---reads_for         If paired-end reads, forward reads                          [!]
---reads_rev         If paired-end reads, reverse reads                          [!]
---reads             If single-end reads, the only reads file                    [!]
---reads_dir         Directory containing *_1.fastq and *_2.fastq read files
-                    (if paired) or all read files (if single)                   [off]
---ref_genome        Path to the reference genome in FASTA format                [!]
---ref_genome_dir    Directory containing all ref genomes to map the reads on
-                    (must end in *.fa or in *.fasta)                            [off]
+--input_data        Table containing input data paths and info (see github)     [!]
+--reads_dir         Directory containing the reads (for double-checking)        [!]
 
   [trimming]
 
---skip_trimming     Specify this option if you want to skip the trimming        [off]
 --adapters          Path to the adapters file to pass to trimmomatic            [off]
 --leading           Trimmomatic "LEADING" setting                               [20]
 --trailing          Trimmomatic "TRAILING" setting                              [20]
@@ -56,11 +42,11 @@ println """
 
   [JLOH]
 
---min_snps_kbp      Min. number of het SNPs to consider a het block             [0.1]
---snp_distance      Size (bp) of the window to use for LOH detection            [1000]
+--min_snps          Min. number of proximal het SNPs to consider a het block    [2]
+--snp_distance      Max. distance between SNPs to assign to same block          [100]
 --min_loh_size      Min. size (bp) of the candidate LOH blocks                  [1000]
---min_het_af        Min. allele frequency to consider heterozygous              [0.25]
---max_het_af        Max. allele frequency to consider heterozygous              [0.75]
+--min_af            Min. allele frequency to consider heterozygous              [0.2]
+--max_af            Max. allele frequency to consider heterozygous              [0.8]
 --min_frac_cov      Min. fraction of LOH block that has to be covered by reads  [0.5]
 --hemizygous_cov    Frac. of the mean coverage under which LOH is hemizygous    [0.75]
 
@@ -72,454 +58,206 @@ exit 0
 // -----------------------------------------------------------------------------
 // PAIRED END READS
 
-// reading genomes
+// read input data
 
-if ((!params.ref_genome_dir) && (params.ref_genome)) {
+def lines = new File("${params.input_data}").collect {it}
 
-  Channel
-    .fromPath("${params.ref_genome}")
-    .map{ it ->  [it.baseName, it ]}
-    .set{ Ref_genomes }
+Channel
+  .fromList(lines)
+  .map{ it -> it.tokenize("\t") }
+  .map{ it -> [ it[0], file(it[1]), file(it[2]), it[3], file(it[4]), it[5], file(it[6]) ] }
+  .set{ Input_data }
 
-} else if ((params.ref_genome_dir) && (!params.ref_genome)) {
+Channel
+  .fromFilePairs("${params.reads_dir}/*_{1,2}.{fq,fastq}", flat: true)
+  .set{ Reads }
 
-  Channel
-    .fromPath("${params.ref_genome_dir}/*.{fa,fasta}")
-    .map{ it ->  [it.baseName, it ]}
-    .set{ Ref_genomes }
-
-} else {
-
-  println "ERROR: use either --ref_genome or --ref_genome_dir, but not both"
-  exit 0
-
-}
-
-if (params.read_type == "PE") {
-
-  // read input read files
-
-  if ((!params.reads_dir) && (params.reads_for && params.reads_rev)) {
-
-    Channel
-      .fromPath("${params.reads_for}")
-      .map{ it -> [ it.baseName, it ] }
-      .set{ Reads_1 }
-
-    Channel
-      .fromPath("${params.reads_rev}")
-      .map{ it -> [ it.baseName, it ] }
-      .set{ Reads_2 }
-
-    Reads_1
-      .join(Reads_2)
-      .into{ Reads_PE_QC; Reads_PE_TRIM; Reads_PE_RAW }
-
-  } else if ((params.reads_dir) && !(params.reads_for && params.reads_rev)) {
-
-    Channel
-      .fromFilePairs("${params.reads_dir}/*_{1,2}.{fq,fastq}", flat: true)
-      .into{ Reads_PE_QC; Reads_PE_TRIM; Reads_PE_RAW }
-
-  } else {
-
-    println "ERROR: use either --reads_for/--reads_rev or --reads_dir, but not both"
-    exit 0
-
-  }
-
-  // trim reads if needed
-  // then map them
-
-  if (!params.skip_trimming) {
-
-    process PE_quality_check_before_trim {
-
-      executor = "local"
-      cpus = params.threads
-      maxForks = params.threads
-
-      publishDir "${params.output_dir}/trimmed_reads/quality_check/before", mode: "copy"
-
-      input:
-        tuple val(sample_id), file(reads_for), file(reads_rev) from Reads_PE_QC
-
-      output:
-        path "${params.run_id}.${sample_id}"
-
-      script:
-        """
-        if [ ! -d ${params.run_id}.${sample_id} ]; then mkdir ${params.run_id}.${sample_id}; fi &&
-        ${FASTQC} \
-        --threads ${params.threads} \
-        --outdir ${params.run_id}.${sample_id} \
-        ${reads_for} ${reads_rev}
-        """
-    }
-
-    process PE_trim_reads {
-
-      executor = "local"
-      cpus = params.threads
-      maxForks = params.threads
-
-      publishDir  "${params.output_dir}/trimmed_reads",
-                  mode: "copy", pattern: "*.{P1,P2,U1,U2}.fastq"
-
-      input:
-        tuple val(sample_id), file(reads_for), file(reads_rev) from Reads_PE_TRIM
-
-      output:
-        tuple val(sample_id), \
-        file("${params.run_id}.${sample_id}.P1.fastq"), \
-        file("${params.run_id}.${sample_id}.P2.fastq"), \
-        file("${params.run_id}.${sample_id}.U.fastq") into Reads_PE_trimmed
-
-      script:
-        """
-        ${TRIMMOMATIC} \
-        PE \
-        -threads ${params.threads} \
-        -summary ${sample_id}.summary.tsv \
-        ${reads_for} ${reads_rev} \
-        ${params.run_id}.${sample_id}.P1.fastq ${params.run_id}.${sample_id}.U1.fastq \
-        ${params.run_id}.${sample_id}.P2.fastq ${params.run_id}.${sample_id}.U2.fastq \
-        ILLUMINACLIP:${params.adapters}:2:30:10 \
-        LEADING:${params.leading} \
-        TRAILING:${params.trailing} \
-        SLIDINGWINDOW:${params.sliding_window} \
-        AVGQUAL:${params.avgqual} \
-        MINLEN:${params.minlen} &&
-        cat ${params.run_id}.${sample_id}.U1.fastq ${params.run_id}.${sample_id}.U2.fastq \
-        > ${params.run_id}.${sample_id}.U.fastq
-        """
-    }
-
-    Reads_PE_trimmed.into{ Reads_PE_trimmed_MAP; Reads_PE_trimmed_QC }
-
-    process PE_quality_check_after_trim {
-
-      executor = "local"
-      cpus = params.threads
-      maxForks = params.threads
-
-      publishDir "${params.output_dir}/trimmed_reads/quality_check/after", mode: "copy"
-
-      input:
-        tuple val(sample_id), file(reads_for), file(reads_rev), file(reads_unpaired) from Reads_PE_trimmed_QC
-
-      output:
-        path "${params.run_id}.${sample_id}"
-
-      script:
-        """
-        if [ ! -d ${params.run_id}.${sample_id} ]; then mkdir ${params.run_id}.${sample_id}; fi &&
-        ${FASTQC} \
-        --threads ${params.threads} \
-        --outdir ${params.run_id}.${sample_id} \
-        ${reads_for} ${reads_rev} ${reads_unpaired}
-        """
-    }
-
-    // cartesian product of the reads x genomes channels
-    Reads_PE_trimmed_MAP
-      .combine(Ref_genomes)
-      .set{ Hisat2_in }
-
-    // output:
-    // tuple val(sample_id), file(reads_for), file(reads_rev), file(reads_unpaired), \
-    //       val(genome_id), file(ref_genome)
-
-    process PE_map_trimmed_reads {
-
-      executor = "local"
-      cpus = params.threads
-      maxForks = params.threads
-
-      // publishDir  "${params.output_dir}/mapping", mode: "copy", pattern: "*.sam"
-
-      input:
-        tuple val(sample_id), file(reads_for), file(reads_rev), file(reads_unpaired), \
-              val(genome_id), file(ref_genome) from Hisat2_in
-
-      output:
-        tuple val(sample_id), val(genome_id), file(ref_genome), \
-              file("${params.run_id}.${sample_id}.${genome_id}.sam") into Hisat2_out
-
-      script:
-        """
-        ${HISAT2_BUILD} -p ${params.threads} ${ref_genome} ${genome_id}.idx &&
-        ${HISAT2} -p ${params.threads} \
-        --no-spliced-alignment \
-        --score-min ${params.scoring_fun} --mp ${params.mm_penalties} \
-        --rdg ${params.gap_penalties} --rfg ${params.gap_penalties} \
-        -I ${params.min_isize} -X ${params.max_isize} \
-        -x ${genome_id}.idx \
-        -1 ${reads_for} -2 ${reads_rev} -U ${reads_unpaired} \
-        -S ${params.run_id}.${sample_id}.${genome_id}.sam
-        """
-    }
-  } else {
-
-    // cartesian product of the reads x genomes channels
-    Reads_PE_RAW
-      .combine(Ref_genomes)
-      .set{ Hisat2_in }
-
-    // output:
-    // tuple val(sample_id), file(reads_for), file(reads_rev), \
-    //       val(genome_id), file(ref_genome)
-
-    process PE_map_untrimmed_reads {
-
-      executor = "local"
-      cpus = params.threads
-      maxForks = params.threads
-
-      // publishDir  "${params.output_dir}/mapping", mode: "copy", pattern: "*.sam"
-
-      input:
-        tuple val(sample_id), file(reads_for), file(reads_rev), \
-              val(genome_id), file(ref_genome) from Hisat2_in
-
-      output:
-        tuple val(sample_id), val(genome_id), file(ref_genome), \
-              file("${params.run_id}.${sample_id}.${genome_id}.sam") into Hisat2_out
-
-      script:
-        """
-        ${HISAT2} -p ${params.threads} \
-        --no-spliced-alignment \
-        --score-min ${params.scoring_fun} --mp ${params.mm_penalties} \
-        --rdg ${params.gap_penalties} --rfg ${params.gap_penalties} \
-        -I ${params.min_isize} -X ${params.max_isize} \
-        -x ${genome_id}.idx \
-        -1 ${reads_for} -2 ${reads_rev} \
-        -S ${params.run_id}.${sample_id}.${genome_id}.sam
-        """
-    }
-  }
+Input_data
+  .join(Reads)
+  .map{ it -> [ it[0], it[1], it[2], it[3], it[4], it[5], it[6] ] }
+  .into{ Input_pretrim; Input_trim }
 
 
 // -----------------------------------------------------------------------------
-// SINGLE END READS
+// reads trimming
 
-} else if (params.read_type == "SE") {
+process PE_quality_check_before_trim {
 
-  if ((!params.reads_dir) && (params.reads)) {
+  executor = "local"
+  cpus = 4
+  maxForks = params.threads
 
-    Channel
-      .fromPath("${params.reads}")
-      .map{ it -> [it.baseName, it]}
-      .into{ Reads_SE_QC; Reads_SE_TRIM; Reads_SE_RAW }
+  publishDir "${params.output_dir}/trimmed_reads/quality_check/before", mode: "copy"
 
-  } else if ((params.reads_dir) && (!params.reads)) {
+  input:
+    tuple val(sample_id), file(reads_for), file(reads_rev), \
+          val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B) \
+          from Input_pretrim
 
-    Channel
-      .fromPath("${params.reads}*.{fq,fastq}")
-      .map{ it -> [it.baseName, it]}
-      .into{ Reads_SE_QC; Reads_SE_TRIM; Reads_SE_RAW }
+  output:
+    path "${sample_id}"
 
-  } else {
-
-    println "ERROR: use either --reads or --reads_dir, but not both"
-    exit 0
-
-  }
-
-
-  if (!params.skip_trimming) {
-
-    process SE_quality_check_before_trim {
-
-      executor = "local"
-      cpus = params.threads
-      maxForks = params.threads
-
-      publishDir "${params.output_dir}/trimmed_reads/quality_check/before", mode: "copy"
-
-      input:
-        tuple val(sample_id), file(reads) from Reads_SE_QC
-
-      output:
-        path "${params.run_id}.${sample_id}"
-
-      script:
-        """
-        if [ ! -d ${params.run_id}.${sample_id} ]; then mkdir ${params.run_id}.${sample_id}; fi &&
-        ${FASTQC} \
-        --threads ${params.threads} \
-        --outdir ${params.run_id}.${sample_id} \
-        ${reads}
-        """
-    }
-
-    process SE_trim_reads {
-
-      executor = "local"
-      cpus = params.threads
-      maxForks = params.threads
-
-      publishDir  "${params.output_dir}/trimmed_reads",
-                  mode: "copy", pattern: "*.trimmed.fastq"
-
-      input:
-        tuple val(sample_id), file(reads) from Reads_SE_TRIM
-
-      output:
-        tuple val(sample_id), file("${params.run_id}.${sample_id}.trimmed.fastq") into Reads_SE_trimmed
-
-      script:
-        """
-        ${TRIMMOMATIC} \
-        SE \
-        -threads ${params.threads} \
-        -summary ${sample_id}.summary.tsv \
-        ${reads} ${params.run_id}.${sample_id}.trimmed.fastq \
-        ILLUMINACLIP:${params.adapters}:2:30:10 \
-        LEADING:${params.leading} \
-        TRAILING:${params.trailing} \
-        SLIDINGWINDOW:${params.sliding_window} \
-        AVGQUAL:${params.avgqual} \
-        MINLEN:${params.minlen}
-        """
-    }
-
-    Reads_SE_trimmed.into{ Reads_SE_trimmed_MAP; Reads_SE_trimmed_QC }
-
-    process SE_quality_check_after_trim {
-
-      executor = "local"
-      cpus = params.threads
-      maxForks = params.threads
-
-      publishDir "${params.output_dir}/trimmed_reads/quality_check/after", mode: "copy"
-
-      input:
-        tuple val(sample_id), file(reads) from Reads_SE_trimmed_QC
-
-      output:
-        path "${params.run_id}.${sample_id}"
-
-      script:
-        """
-        if [ ! -d ${params.run_id}.${sample_id} ]; then mkdir ${params.run_id}.${sample_id}; fi &&
-        ${FASTQC} \
-        --threads ${params.threads} \
-        --outdir ${params.run_id}.${sample_id} \
-        ${reads}
-        """
-    }
-
-    // cartesian product of the reads x genomes channels
-    Reads_SE_trimmed_MAP
-      .combine(Ref_genomes)
-      .set{ Hisat2_in }
-
-    // output:
-    // tuple val(sample_id), file(reads), val(genome_id), file(ref_genome)
-
-    process SE_map_trimmed_reads {
-
-      executor = "local"
-      cpus = params.threads
-      maxForks = params.threads
-
-      // publishDir  "${params.output_dir}/mapping", mode: "copy", pattern: "*.sam"
-
-      input:
-        tuple val(sample_id), file(reads), val(genome_id), file(ref_genome) from Hisat2_in
-
-      output:
-        tuple val(sample_id), val(genome_id), file(ref_genome), \
-              file("${params.run_id}.${sample_id}.${genome_id}.sam") into Hisat2_out
-
-      script:
-        """
-        ${HISAT2_BUILD} -p ${params.threads} ${ref_genome} ${genome_id}.idx &&
-        ${HISAT2} -p ${params.threads} \
-        --no-spliced-alignment \
-        --score-min ${params.scoring_fun} --mp ${params.mm_penalties} \
-        --rdg ${params.gap_penalties} --rfg ${params.gap_penalties} \
-        -I ${params.min_isize} -X ${params.max_isize} \
-        -x ${genome_id}.idx \
-        -U ${reads} \
-        -S ${params.run_id}.${sample_id}.${genome_id}.sam
-        """
-      }
-
-  } else {
-
-    // cartesian product of the reads x genomes channels
-    Reads_SE_RAW
-      .combine(Ref_genomes)
-      .set{ Hisat2_in }
-
-    // output:
-    // tuple val(sample_id), file(reads), val(genome_id), file(ref_genome)
-
-    process SE_map_untrimmed_reads {
-
-      executor = "local"
-      cpus = params.threads
-      maxForks = params.threads
-
-      // publishDir  "${params.output_dir}/mapping", mode: "copy", pattern: "*.sam"
-
-      input:
-        tuple val(sample_id), file(reads), val(genome_id), file(ref_genome) from Hisat2_in
-
-      output:
-        tuple val(sample_id), val(genome_id), file(ref_genome), \
-              file("${params.run_id}.${sample_id}.${genome_id}.sam") into Hisat2_out
-
-      script:
-        """
-        ${HISAT2_BUILD} -p ${params.threads} ${ref_genome} ${genome_id}.idx &&
-        ${HISAT2} -p ${params.threads} \
-        --no-spliced-alignment \
-        --score-min ${params.scoring_fun} --mp ${params.mm_penalties} \
-        --rdg ${params.gap_penalties} --rfg ${params.gap_penalties} \
-        -I ${params.min_isize} -X ${params.max_isize} \
-        -x ${genome_id}.idx \
-        -U ${reads} \
-        -S ${params.run_id}.${sample_id}.${genome_id}.sam
-        """
-    }
-  }
+  script:
+    """
+    if [ ! -d ${sample_id} ]; then mkdir ${sample_id}; fi &&
+    ${FASTQC} \
+    --threads ${params.threads} \
+    --outdir ${sample_id} \
+    ${reads_for} ${reads_rev}
+    """
 }
 
-// ---------------------------------------------------------------------------
-// COMMON STEPS
+process PE_trim_reads {
+
+  executor = "local"
+  cpus = 8
+  maxForks = params.threads
+
+  publishDir  "${params.output_dir}/trimmed_reads",
+              mode: "copy", pattern: "*.{P1,P2,U1,U2}.fastq"
+
+  input:
+    tuple val(sample_id), file(reads_for), file(reads_rev), \
+          val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B) \
+          from Input_trim
+
+  output:
+    tuple val(sample_id), \
+    file("${sample_id}.P1.fastq"), \
+    file("${sample_id}.P2.fastq"), \
+    file("${sample_id}.U.fastq"), \
+    val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B) \
+    into Reads_PE_trimmed
+
+  script:
+    """
+    ${TRIMMOMATIC} \
+    PE \
+    -threads ${params.threads} \
+    -summary ${sample_id}.summary.tsv \
+    ${reads_for} ${reads_rev} \
+    ${sample_id}.P1.fastq ${sample_id}.U1.fastq \
+    ${sample_id}.P2.fastq ${sample_id}.U2.fastq \
+    ILLUMINACLIP:${params.adapters}:2:30:10 \
+    LEADING:${params.leading} \
+    TRAILING:${params.trailing} \
+    SLIDINGWINDOW:${params.sliding_window} \
+    AVGQUAL:${params.avgqual} \
+    MINLEN:${params.minlen} &&
+    cat ${sample_id}.U1.fastq ${sample_id}.U2.fastq \
+    > ${sample_id}.U.fastq
+    """
+}
+
+Reads_PE_trimmed.into{ Reads_PE_trimmed_MAP; Reads_PE_trimmed_QC }
+
+process PE_quality_check_after_trim {
+
+  executor = "local"
+  cpus = 4
+  maxForks = params.threads
+
+  publishDir "${params.output_dir}/trimmed_reads/quality_check/after", mode: "copy"
+
+  input:
+    tuple val(sample_id), file(reads_for), file(reads_rev), file(reads_unpaired), \
+          val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B) \
+          from Reads_PE_trimmed_QC
+
+  output:
+    path "${sample_id}"
+
+  script:
+    """
+    if [ ! -d ${sample_id} ]; then mkdir ${sample_id}; fi &&
+    ${FASTQC} \
+    --threads ${params.threads} \
+    --outdir ${sample_id} \
+    ${reads_for} ${reads_rev} ${reads_unpaired}
+    """
+}
+
+
+process PE_map_trimmed_reads {
+
+  executor = "local"
+  cpus = params.threads
+  maxForks = 1
+
+  input:
+    tuple val(sample_id), file(reads_for), file(reads_rev), file(reads_unpaired), \
+          val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B) \
+          from Reads_PE_trimmed_MAP
+
+  output:
+    tuple val(sample_id), \
+          file("${sample_id}.${genome_A_name}.sam"), file("${sample_id}.${genome_B_name}.sam"), \
+          val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B) \
+          into Hisat2_out
+
+  script:
+    """
+    ${HISAT2_BUILD} -p ${params.threads} ${genome_A} ${genome_A_name}.idx &&
+    ${HISAT2_BUILD} -p ${params.threads} ${genome_B} ${genome_B_name}.idx &&
+    ${HISAT2} -p ${params.threads} \
+    --no-spliced-alignment \
+    --score-min ${params.scoring_fun} --mp ${params.mm_penalties} \
+    --rdg ${params.gap_penalties} --rfg ${params.gap_penalties} \
+    -I ${params.min_isize} -X ${params.max_isize} \
+    -x ${genome_A_name}.idx \
+    -1 ${reads_for} -2 ${reads_rev} -U ${reads_unpaired} \
+    -S ${sample_id}.${genome_A_name}.sam &&
+    ${HISAT2} -p ${params.threads} \
+    --no-spliced-alignment \
+    --score-min ${params.scoring_fun} --mp ${params.mm_penalties} \
+    --rdg ${params.gap_penalties} --rfg ${params.gap_penalties} \
+    -I ${params.min_isize} -X ${params.max_isize} \
+    -x ${genome_B_name}.idx \
+    -1 ${reads_for} -2 ${reads_rev} -U ${reads_unpaired} \
+    -S ${sample_id}.${genome_B_name}.sam
+    """
+}
 
 process filter_and_sort_bam {
 
   executor = "local"
-  cpus = params.threads
+  cpus = 4
   maxForks = params.threads
 
   publishDir  "${params.output_dir}/mapping",
               mode: "copy", pattern: "*.{fs.bam,fs.bam.bai}"
 
   input:
-    tuple val(sample_id), val(genome_id), file(ref_genome), file(sam) from Hisat2_out
+    tuple val(sample_id), \
+          file(par_A_sam), file(par_B_sam), \
+          val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B) \
+          from Hisat2_out
 
   output:
-    tuple val(sample_id), val(genome_id), file(ref_genome), \
-          file("${params.run_id}.${sample_id}.${genome_id}.fs.bam"), \
-          file("${params.run_id}.${sample_id}.${genome_id}.fs.bam.bai") \
+    tuple val(sample_id), \
+          file("${sample_id}.${genome_A_name}.fs.bam"), file("${sample_id}.${genome_A_name}.fs.bam.bai"), \
+          file("${sample_id}.${genome_B_name}.fs.bam"), file("${sample_id}.${genome_B_name}.fs.bam.bai"), \
+          val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B) \
           into Filt_Sort_Bam
 
   script:
     """
     ${SAMTOOLS} view --threads ${params.threads} -F 0x0100 -F 0x4 -h -b \
-    -o ${params.run_id}.${sample_id}.${genome_id}.f.bam ${sam} &&
+    -o ${sample_id}.${genome_A_name}.f.bam ${par_A_sam} &&
+    ${SAMTOOLS} view --threads ${params.threads} -F 0x0100 -F 0x4 -h -b \
+    -o ${sample_id}.${genome_B_name}.f.bam ${par_B_sam} &&
     ${SAMTOOLS} sort --threads ${params.threads} --output-fmt bam \
-    -T ${params.run_id}.${sample_id}.${genome_id} \
-    -o ${params.run_id}.${sample_id}.${genome_id}.fs.bam \
-    ${params.run_id}.${sample_id}.${genome_id}.f.bam &&
+    -T ${sample_id}.${genome_A_name} \
+    -o ${sample_id}.${genome_A_name}.fs.bam \
+    ${sample_id}.${genome_A_name}.f.bam &&
+    ${SAMTOOLS} sort --threads ${params.threads} --output-fmt bam \
+    -T ${sample_id}.${genome_B_name} \
+    -o ${sample_id}.${genome_B_name}.fs.bam \
+    ${sample_id}.${genome_B_name}.f.bam &&
     ${SAMTOOLS} index -@ ${params.threads} -b \
-    ${params.run_id}.${sample_id}.${genome_id}.fs.bam
+    ${sample_id}.${genome_A_name}.fs.bam &&
+    ${SAMTOOLS} index -@ ${params.threads} -b \
+    ${sample_id}.${genome_B_name}.fs.bam
     """
 }
 
@@ -530,49 +268,67 @@ process pileup_reads {
   cpus = 1
   maxForks = params.threads
 
-  // publishDir  "${params.output_dir}/LOH/process", mode: "copy", pattern: "*.mpileup.vcf"
-
   input:
-    tuple val(sample_id), val(genome_id), file(ref_genome), \
-          file(bam_fs), file(bam_fs_bai) from Filt_Sort_Bam
+    tuple val(sample_id), \
+          file(par_A_fs_bam), file(par_A_fs_bam_index), \
+          file(par_B_fs_bam), file(par_B_fs_bam_index), \
+          val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B) \
+          from Filt_Sort_Bam
 
   output:
-    tuple val(sample_id), val(genome_id), file(ref_genome), file(bam_fs), file(bam_fs_bai), \
-          file("${params.run_id}.${sample_id}.${genome_id}.mpileup.vcf") into Pileups
+    tuple val(sample_id), \
+          file(par_A_fs_bam), file(par_A_fs_bam_index), file("${sample_id}.${genome_A_name}.mpileup.vcf"), \
+          file(par_B_fs_bam), file(par_B_fs_bam_index), file("${sample_id}.${genome_B_name}.mpileup.vcf"), \
+          val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B) \
+          into Pileups
 
   script:
     """
-    ${SAMTOOLS} faidx ${ref_genome} &&
-    ${BCFTOOLS} mpileup --fasta-ref ${ref_genome} \
+    ${SAMTOOLS} faidx ${genome_A} &&
+    ${SAMTOOLS} faidx ${genome_B} &&
+    ${BCFTOOLS} mpileup --fasta-ref ${genome_A} \
     --annotate FORMAT/AD,FORMAT/ADF,FORMAT/ADR,FORMAT/DP,FORMAT/SP,INFO/AD,INFO/ADF,INFO/ADR \
-    --output ${params.run_id}.${sample_id}.${genome_id}.mpileup.vcf --output-type v --skip-indels \
-    ${bam_fs}
+    --output ${sample_id}.${genome_A_name}.mpileup.vcf --output-type v --skip-indels \
+    ${par_A_fs_bam} &&
+    ${BCFTOOLS} mpileup --fasta-ref ${genome_B} \
+    --annotate FORMAT/AD,FORMAT/ADF,FORMAT/ADR,FORMAT/DP,FORMAT/SP,INFO/AD,INFO/ADF,INFO/ADR \
+    --output ${sample_id}.${genome_B_name}.mpileup.vcf --output-type v --skip-indels \
+    ${par_B_fs_bam}
     """
 }
 
 process call_short_variants {
 
   executor = "local"
-  cpus = params.threads
+  cpus = 8
   maxForks = params.threads
 
-  // publishDir  "${params.output_dir}/LOH/process", mode: "copy", pattern: "*.raw.vcf"
-
   input:
-    tuple val(sample_id), val(genome_id), file(ref_genome), file(bam_fs), \
-          file(bam_fs_bai), file(pileup) from Pileups
+    tuple val(sample_id), \
+          file(par_A_fs_bam), file(par_A_fs_bam_index), file(par_A_pileup), \
+          file(par_B_fs_bam), file(par_B_fs_bam_index), file(par_B_pileup), \
+          val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B) \
+          from Pileups
 
   output:
-    tuple val(sample_id), val(genome_id), file(ref_genome), file(bam_fs), file(bam_fs_bai), \
-          file("${params.run_id}.${sample_id}.${genome_id}.raw.vcf") into Raw_vcfs
+    tuple val(sample_id), \
+          file(par_A_fs_bam), file(par_A_fs_bam_index), file("${sample_id}.${genome_A_name}.raw.vcf"), \
+          file(par_B_fs_bam), file(par_B_fs_bam_index), file("${sample_id}.${genome_B_name}.raw.vcf"), \
+          val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B) \
+          into Raw_vcfs
 
   script:
     """
     ${BCFTOOLS} call \
     --threads ${params.threads} \
     --multiallelic-caller --variants-only \
-    --output ${params.run_id}.${sample_id}.${genome_id}.raw.vcf --output-type v \
-    ${pileup}
+    --output ${sample_id}.${genome_A_name}.raw.vcf --output-type v \
+    ${par_A_pileup} &&
+    ${BCFTOOLS} call \
+    --threads ${params.threads} \
+    --multiallelic-caller --variants-only \
+    --output ${sample_id}.${genome_B_name}.raw.vcf --output-type v \
+    ${par_B_pileup}
     """
 }
 
@@ -585,69 +341,92 @@ process filter_short_variants {
   publishDir  "${params.output_dir}/LOH/process", mode: "copy", pattern: "*.{ff.vcf,report.txt}"
 
   input:
-    tuple val(sample_id), val(genome_id), file(ref_genome), file(bam_fs), file(bam_fs_bai), \
-          file(raw_vcf) from Raw_vcfs
+    tuple val(sample_id), \
+          file(par_A_fs_bam), file(par_A_fs_bam_index), file(par_A_raw_vcf), \
+          file(par_B_fs_bam), file(par_B_fs_bam_index), file(par_B_raw_vcf), \
+          val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B) \
+          from Raw_vcfs
 
   output:
-    file "${params.run_id}.${sample_id}.${genome_id}.report.txt" into Reports
+    tuple file("${sample_id}.${genome_A_name}.report.txt"), \
+          file("${sample_id}.${genome_B_name}.report.txt") \
+          into Reports
 
-    tuple val(sample_id), val(genome_id), file(ref_genome), file(bam_fs), file(bam_fs_bai), \
-          file("${params.run_id}.${sample_id}.${genome_id}.ff.vcf") into Filt_vcfs
+    tuple val(sample_id), \
+          file(par_A_fs_bam), file(par_A_fs_bam_index), file("${sample_id}.${genome_A_name}.ff.vcf"), \
+          file(par_B_fs_bam), file(par_B_fs_bam_index), file("${sample_id}.${genome_B_name}.ff.vcf"), \
+          val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B) \
+          into Filt_vcfs
 
   script:
     """
     ${ALL2VCF} filter_vcf \
-    --input-file ${raw_vcf} \
-    --output-file ${params.run_id}.${sample_id}.${genome_id}.f.vcf \
+    --input-file ${par_A_raw_vcf} \
+    --output-file ${sample_id}.${genome_A_name}.f.vcf \
     --quality ${params.min_qual} \
     --alt-frac ${params.min_alt_frac} \
     --min-depth ${params.min_depth} \
     --map-qual-zero-frac ${params.mq0f} \
-    --threads 1 \
-    --report ${params.run_id}.${sample_id}.${genome_id}.report.txt &&
+    &> ${sample_id}.${genome_A_name}.report.txt &&
     ${ALL2VCF} frequency \
-    --in ${params.run_id}.${sample_id}.${genome_id}.f.vcf \
-    --out ${params.run_id}.${sample_id}.${genome_id}.ff.vcf
-
+    --in ${sample_id}.${genome_A_name}.f.vcf \
+    --out ${sample_id}.${genome_A_name}.ff.vcf &&
+    ${ALL2VCF} filter_vcf \
+    --input-file ${par_B_raw_vcf} \
+    --output-file ${sample_id}.${genome_B_name}.f.vcf \
+    --quality ${params.min_qual} \
+    --alt-frac ${params.min_alt_frac} \
+    --min-depth ${params.min_depth} \
+    --map-qual-zero-frac ${params.mq0f} \
+    &> ${sample_id}.${genome_B_name}.report.txt &&
+    ${ALL2VCF} frequency \
+    --in ${sample_id}.${genome_B_name}.f.vcf \
+    --out ${sample_id}.${genome_B_name}.ff.vcf
     """
 }
 
 process call_LOH_blocks {
 
   executor = "local"
-  cpus = params.threads
-  maxForks = 1
+  cpus = 16
+  maxForks = 3
 
-  publishDir "${params.output_dir}/LOH", mode: "copy"
+  publishDir "${params.output_dir}/LOH", mode: "copy", pattern: "*.{tsv,vcf}"
 
   input:
-    tuple val(sample_id), val(genome_id), file(ref_genome), file(bam_fs), file(bam_fs_bai), \
-          file(filt_vcf) from Filt_vcfs
+    tuple val(sample_id), \
+          file(par_A_fs_bam), file(par_A_fs_bam_index), file(par_A_vcf), \
+          file(par_B_fs_bam), file(par_B_fs_bam_index), file(par_B_vcf), \
+          val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B) \
+          from Filt_vcfs
 
   output:
-    tuple val(sample_id), val(genome_id), file(ref_genome), file(bam_fs), file(bam_fs_bai), \
-          path("${params.run_id}.${sample_id}.${genome_id}") into Jloh_out
+    tuple val(sample_id), val(genome_A_name), val(genome_B_name), \
+          file("${sample_id}/${sample_id}.exp_A.LOH_blocks.tsv"), \
+          file("${sample_id}/${sample_id}.exp_B.LOH_blocks.tsv"), \
+          file("${sample_id}/${sample_id}.exp_A.LOH_blocks.bed"), \
+          file("${sample_id}/${sample_id}.exp_B.LOH_blocks.bed"), \
+          file("${sample_id}/${sample_id}.exp_A.chrom_coverage.tsv"), \
+          file("${sample_id}/${sample_id}.exp_B.chrom_coverage.tsv") \
+          into Jloh_out
 
   script:
     """
-    ${BIOAWK} -c fastx '{print \$name\"\\t\"length(\$seq)}' ${ref_genome} \
-    > ${params.run_id}.genome_file.tsv &&
-    ${JLOH} \
+    ${JLOH} extract \
     --threads ${params.threads} \
-    --vcf ${filt_vcf} \
-    --bam ${bam_fs} \
-    --genome-file ${params.run_id}.genome_file.tsv \
-    --sample ${params.run_id}.${sample_id}.${genome_id} \
-    --output-dir ${params.run_id}.${sample_id}.${genome_id} \
+    --vcfs ${par_A_vcf} ${par_B_vcf} \
+    --bams ${par_A_fs_bam} ${par_B_fs_bam} \
+    --refs ${genome_A} ${genome_B} \
+    --sample ${sample_id} \
+    --output-dir ${sample_id} \
     --filter-mode all \
-    --min-af ${params.min_het_af} \
-    --max-af ${params.max_het_af} \
+    --min-af ${params.min_af} \
+    --max-af ${params.max_af} \
     --min-frac-cov ${params.min_frac_cov} \
-    --min-snps-kbp ${params.min_snps_kbp} \
+    --min-snps ${params.min_snps_kbp} \
     --snp-distance ${params.snp_distance} \
-    --block-dist ${params.block_distance} \
-    --min-size ${params.min_loh_size} \
-    --hemi ${params.hemizygous_cov}
-
+    --min-length ${params.min_loh_size} \
+    --hemi ${params.hemizygous_cov} \
+    --min-uncov ${params.min_uncovered}
     """
 }
