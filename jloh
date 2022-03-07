@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
 
+script_info = """
+###
+Author: Matteo Schiavinato
+Last change: 07/03/2022
+Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
+###
+"""
+
+
 import sys
 import os
 import os.path
@@ -29,14 +38,9 @@ Commands:
  -- Extraction
     extract             Extract LOH blocks from VCF, BAM and FASTA files
     filter              Filter extracted LOH blocks
-    intersect           Intersect LOH blocks between two runs
 
  -- Calculations
     density             Estimate heterozygous and homozygous SNP densities
-
- -- Graphical tools
-    plot                Meaningful plots from the the results from "extract"
-
 
 """)
 else:

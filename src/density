@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
 
+script_info = """
+###
+Author: Matteo Schiavinato
+Last change: 07/03/2022
+###
+"""
+
+
 import argparse as ap
 import sys
 from Bio import SeqIO

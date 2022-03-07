@@ -391,7 +391,7 @@ process call_LOH_blocks {
   cpus = 16
   maxForks = 3
 
-  publishDir "${params.output_dir}/LOH", mode: "copy", pattern: "*.{tsv,vcf}"
+  publishDir "${params.output_dir}/LOH", mode: "copy", pattern: "*/*.{tsv,vcf}"
 
   input:
     tuple val(sample_id), \

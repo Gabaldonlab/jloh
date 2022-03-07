@@ -8,10 +8,23 @@ A tool to extract, filter, and manage blocks of loss of heterozygosity (LOH) bas
 
 ## Table of Contents
 
-- [Install](#Install)
-- [Run](#Run)
-- [Implementation](#Implementation)
-- [Output](#Output)
+- [J LOH](#j-loh)
+  * [Table of Contents](#table-of-contents)
+  * [Install](#install)
+  * [Run](#run)
+    + [Nextflow workflow](#nextflow-workflow)
+- [Implementation](#implementation)
+  * [JLOH extract](#jloh-extract)
+    + [Sorting of SNPs by zygosity](#sorting-of-snps-by-zygosity)
+    + [Extraction of heterozygous regions](#extraction-of-heterozygous-regions)
+    + [Extraction of candidate blocks](#extraction-of-candidate-blocks)
+    + [Coverage trimming](#coverage-trimming)
+    + [Determination of block zygosity](#determination-of-block-zygosity)
+    + [Output](#output)
+      - [Interpreting output](#interpreting-output)
+  * [JLOH filter](#jloh-filter)
+  * [JLOH density](#jloh-density)
+
 
 ## Install
 
@@ -20,24 +33,19 @@ And it's ready to go! But there are a few dependencies:
 
 | Program     | Type        | Version | Links      |
 |-------------|-------------|---------|------------|
-| bedtools    | Program     | 2.29.2  | [source](https://bedtools.readthedocs.io/en/latest/), [cite]() |
+| bedtools    | Program     | 2.29.2  | [source](https://bedtools.readthedocs.io/en/latest/), [cite](https://doi.org/10.1002/0471250953.bi1112s47) |
 | Biopython   | Module      | 1.79    | [source](https://biopython.org/), [cite](https://doi.org/10.1093/bioinformatics/btp163) |
+| pandas      | Module      | 1.3.5   | [source](https://pandas.pydata.org/), [cite](https://doi.org/10.5281/zenodo.3509134) |
 | pybedtools  | Module      | 0.8.2   | [source](https://daler.github.io/pybedtools/main.html), [cite](https://doi.org/10.1093/bioinformatics/btr539) |
 | pysam       | Module      | 0.1.7   | [source](https://pypi.org/project/pysam/), [cite](https://github.com/pysam-developers/pysam) |
 | Python      | Interpreter | 3.6.1   | [source](https://www.python.org/downloads/release/python-397/), [cite](http://citebay.com/how-to-cite/python/) |
-| samtools |  | Program     | 1.13    | [source](http://www.htslib.org/), [cite]() |
+| samtools |  | Program     | 1.13    | [source](http://www.htslib.org/), [cite](https://doi.org/10.1093/gigascience/giab008) |
 
-Note that **pybedtools** will look for [bedtools](https://bedtools.readthedocs.io/en/latest/) in the `$PATH`, while **pysam** will look for [samtools](http://www.htslib.org/). 
+Note that **pybedtools** will look for [bedtools](https://bedtools.readthedocs.io/en/latest/) in the `$PATH`, while **pysam** will look for [samtools](http://www.htslib.org/).
 
 ## Run
 
-JLOH has different tools which are used to extract and perform different operations on LOH blocks. The main tool is `JLOH extract`: its basic usage is as simple as:
-
-```
-./jloh extract --threads <num_threads> --vcf <VCF> --ref <FASTA> --bam <BAM> [options]
-```
-
-To see all available tools simply run:
+JLOH has different tools which are used to extract and perform different operations on LOH blocks. To see all available tools simply run:
 
 ```
 ./jloh -h
@@ -54,9 +62,13 @@ In case you're working on a cluster with a slurm queuing system, you can edit th
 `sbatch reads_to_LOH_blocks.sh`
 
 
-## Implementation
+# Implementation
 
 This section describes in detail what you can achieve with **JLOH**. Later in this guide, a nextflow workflow to go from reads to LOH blocks is also described.
+
+## JLOH extract
+
+This tool extracts LOH blocks from a VCF file, a BAM file, and their reference genome in FASTA format.
 
 ### Sorting of SNPs by zygosity
 
@@ -86,7 +98,7 @@ The coverage information is then used to infer the zygosity of a block. The upst
 
 There are two types of zygosity predicted by JLOH: `homo` and `hemi`. These are defined by the `--hemi` parameter, which is a threshold from 0 to 1 applied to the coverage ratios calculated between the block and its flanking regions. The comparison with the upstream and the downstream regions returns two ratios (range: 0-1). If both are below `--hemi`, the block is considered hemizygous. Otherwise, it is considered homozygous. If they show contrasting results, the block is labelled as "NA". This combines together with the presence or absence of homozygous SNPs in four possible scenarios (see image in the **Interpreting Output** chapter below). The default parameters (`--overhang 5000 --min-overhang 0.9 --hemi 0.75`) are probably ok for most users.
 
-## Output
+### Output
 
 These are the important output files of JLOH:  
 
@@ -96,7 +108,7 @@ These are the important output files of JLOH:
 
 - `<sample>.exp.homo_snps.vcf`: VCF file containing the homozygous SNPs isolated from the input VCF.
 
-### Interpreting output
+#### Interpreting output
 
 JLOH's main output is a table containing all candidate LOH blocks. These blocks are annotated with various information on them, but the interpretation is strongly case-specific, hence is left to the user. We strongly advice the user to load the input VCF, BAM, and the output TSV to a genome browser such as [IGV](https://software.broadinstitute.org/software/igv/). The output TSV's first three columns are already a BED file (0-based, half-open intervals) and can be used as they are.
 
@@ -107,3 +119,11 @@ In terms of zygosity, regions annotated as *homo* should have a read coverage th
 An example as seen in IGV is provided below.  
 
 ![Example](images/example.png)
+
+## JLOH filter
+
+This tool filters the output produced by `JLOH extract` according to several criteria. The user can select to filter the LOH blocks based on their coverage, on their SNP count, SNP density, length, or extract individual regions just like in samtools.
+
+## JLOH density
+
+This tool computes the densities of all SNPs, heterozygous SNPs, and homozygous SNPs over the genome sequence. It is meant to be an informative tool for the user. 
