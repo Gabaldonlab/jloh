@@ -13,38 +13,22 @@ if len(sys.argv) == 1:
 if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
 	sys.stderr.write("""
 
-Calculate heterozygous and homozygous SNP density from a VCF file and a reference
-FASTA genome sequence 
+Calculate heterozygous and homozygous SNP density from a VCF file and its reference
+FASTA genome sequence
 
 Usage:
-jloh density --vcf <VCF> --genome-file <GENOME_FILE> [options]
+jloh density --vcf <VCF> --ref <FASTA>
 
-[default mode]
 --vcf               Input VCF file to use for density calculations              [!]
 --ref               Reference FASTA genome on which SNPs were called            [!]
-
-[hybrid mode]
---hybrid            Activate hybrid mode                                        [off]
---vcf-A             Input VCF file from parent A                                [!]
---ref-A             Reference FASTA genome from parent A                        [!]
---vcf-B             Input VCF file from parent B                                [!]
---ref-B             Reference FASTA genome from parent B                        [!]
 
 """)
 	sys.exit(0)
 
 
 p = ap.ArgumentParser()
-# default options
 p.add_argument("--vcf")
 p.add_argument("--ref")
-# hybrid options
-p.add_argument("--hybrid", action="store_true")
-p.add_argument("--vcf-A")
-p.add_argument("--ref-A")
-p.add_argument("--vcf-B")
-p.add_argument("--ref-B")
-
 args = p.parse_args()
 
 
@@ -53,21 +37,16 @@ args = p.parse_args()
 def check_conditions(args):
 
 	"""
-	Last update: 03/03/2022
+	Last update: 07/03/2022
 	"""
 
 	if args.print_info:
 		print(script_info)
 		sys.exit(0)
 
-	if ((not args.vcf and not args.ref) and not args.hybrid):
+	if (not args.vcf and not args.ref):
 		sys.stderr.write("ERROR: when using the default mode you must provide a VCF and a REF\n")
 		sys.stderr.write("See --vcf, --ref options\n")
-		sys.exit()
-
-	if (args.hybrid and (not args.vcf_A and not args.vcf_B and not args.ref_A and not args.ref_B)):
-		sys.stderr.write("ERROR: when using the --hybrid mode you must provide a VCF and a REF for both A and B subgenomes\n")
-		sys.stderr.write("See --vcf-A, --vcf-B, --ref-A, --ref-B options\n")
 		sys.exit()
 
 	return True
@@ -189,54 +168,29 @@ def calculate_chrom_snp_densities(Variants, ref):
 def run_in_default_mode(args):
 
 	"""
-	Last update: 03/03/2022
+	Last update: 07/03/2022
 	"""
 
 	# split
 	Hetero_lines, Homo_lines = hetero_and_homo_snps(args.vcf)
+	All = Hetero_lines + Homo_lines
 
 	# hetero
 	Het_snp_densities = calculate_chrom_snp_densities(Hetero_lines, args.ref)
-	hetero_div = median([float(i) for i in Het_snp_densities.values()])
-	hetero_div = round(hetero_div, 2)
+	hetero_dens = median([float(i) for i in Het_snp_densities.values()])
+	hetero_dens = round(hetero_dens, 2)
 
 	# homo
 	Homo_snp_densities = calculate_chrom_snp_densities(Homo_lines, args.ref)
-	homo_div = median([float(i) for i in Homo_snp_densities.values()])
-	homo_div = round(homo_div, 2)
+	homo_dens = median([float(i) for i in Homo_snp_densities.values()])
+	homo_dens = round(homo_dens, 2)
 
-	return hetero_div, homo_div
+	# all
+	All_snp_densities = calculate_chrom_snp_densities(All, args.ref)
+	all_dens = median([float(i) for i in All_snp_densities.values()])
+	all_dens = round(all_dens, 2)
 
-
-def run_in_hybrid_mode(args):
-
-	"""
-	Last update: 04/03/2022
-	"""
-
-	# split
-	sys.stderr.write(f"[{at()}] Extracting heterozygous and homozygous SNPs...\n")
-	Hetero_lines_A, Homo_lines_A = hetero_and_homo_snps(args.vcf_A)
-	Hetero_lines_B, Homo_lines_B = hetero_and_homo_snps(args.vcf_B)
-
-	# hetero
-	sys.stderr.write(f"[{at()}] Calculating heterozygous and homozygous SNP density in both parental genomes...\n")
-	Het_snp_densities_A = calculate_chrom_snp_densities(Hetero_lines_A, args.ref_A)
-	Het_snp_densities_B = calculate_chrom_snp_densities(Hetero_lines_B, args.ref_B)
-	het_avg_divergence_A = median([float(i) for i in Het_snp_densities_A.values()])
-	het_avg_divergence_B = median([float(i) for i in Het_snp_densities_B.values()])
-
-	hetero_div = round((het_avg_divergence_A + het_avg_divergence_B) / 2, 2)
-
-	# homo
-	Homo_snp_densities_A = calculate_chrom_snp_densities(Homo_lines_A, args.ref_A)
-	Homo_snp_densities_B = calculate_chrom_snp_densities(Homo_lines_B, args.ref_B)
-	homo_avg_divergence_A = median([float(i) for i in Homo_snp_densities_A.values()])
-	homo_avg_divergence_B = median([float(i) for i in Homo_snp_densities_B.values()])
-
-	homo_div = round((homo_avg_divergence_A + homo_avg_divergence_B) / 2, 2)
-
-	return hetero_div, homo_div
+	return hetero_dens, homo_dens, all_dens
 
 
 def main(args):
@@ -249,15 +203,12 @@ def main(args):
 	tmp = check_conditions(args)
 
 	# run in the selected mode
-	if args.hybrid:
-		homo_div, hetero_div = run_in_hybrid_mode(args)
-
-	else:
-		homo_div, hetero_div = run_in_default_mode(args)
+	homo_dens, hetero_dens, all_dens = run_in_default_mode(args)
 
 	# write divergence to output
-	sys.stdout.write(f"{hetero_div} heterozygous SNPs/kbp\n")
-	sys.stdout.write(f"{homo_div} homozygous SNPs/kbp\n")
+	sys.stdout.write(f"{all_dens} SNPs/kbp\n")
+	sys.stdout.write(f"{hetero_dens} heterozygous SNPs/kbp\n")
+	sys.stdout.write(f"{homo_dens} homozygous SNPs/kbp\n")
 
 
 if __name__ == "__main__":
