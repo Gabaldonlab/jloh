@@ -292,7 +292,7 @@ def calculate_chrom_snp_densities(Variants, ref):
 def hetero_and_homo_snp_densities(het_snps_vcf, homo_snps_vcf, ref):
 
 	"""
-	Last update: 07/03/2022
+	Last update: 09/03/2022
 	"""
 
 	Hetero_lines = [ line for line in open(het_snps_vcf, "r") if line[0] != "#" ]
@@ -300,13 +300,19 @@ def hetero_and_homo_snp_densities(het_snps_vcf, homo_snps_vcf, ref):
 
 	# hetero
 	Het_snp_densities = calculate_chrom_snp_densities(Hetero_lines, ref)
-	hetero_div = median([float(i) for i in [x for x in Het_snp_densities.values() if x > 0]])
-	hetero_div = round(hetero_div, 2)
+	Het_snp_densities = [float(x) for x in Het_snp_densities.values() if x > 0]
+	if len(Het_snp_densities) > 0:
+		hetero_div = round(median(Het_snp_densities), 2)
+	else:
+		hetero_div = round(0,2)
 
 	# homo
 	Homo_snp_densities = calculate_chrom_snp_densities(Homo_lines, ref)
-	homo_div = median([float(i) for i in [x for x in Homo_snp_densities.values() if x > 0]])
-	homo_div = round(homo_div, 2)
+	Homo_snp_densities = [float(x) for x in Homo_snp_densities.values() if x > 0]
+	if len(Homo_snp_densities) > 0:
+		homo_div = round(median(Homo_snp_densities), 2)
+	else:
+		homo_div = round(0,2)
 
 	return hetero_div, homo_div
 
@@ -373,7 +379,7 @@ def filter_by_length(bt, min_length):
 def get_snp_intervals(args, in_vcf, invert):
 
 	"""
-	Last update: 07/03/2022
+	Last update: 09/03/2022
 	"""
 
 	# -------------------------------------------
@@ -383,13 +389,21 @@ def get_snp_intervals(args, in_vcf, invert):
 
 	# when false, retain only intervals with AT LEAST this number of SNPs
 	if invert == False:
-		snp_blocks = BedTool(in_vcf).merge(d=args.snp_distance, c=1, o="count")
-		(snp_blocks, skipped) = filter_by_snp_distance_and_count(args, snp_blocks, False)
+		snp_blocks = BedTool(in_vcf)
+		if len(snp_blocks) > 0:
+			snp_blocks = snp_blocks.merge(d=args.snp_distance, c=1, o="count")
+			(snp_blocks, skipped) = filter_by_snp_distance_and_count(args, snp_blocks, False)
+		else:
+			(snp_blocks, skipped) = [], 0
 
 	# when true, retain only intervals with AT MOST this number of SNPs
 	elif invert == True:
-		snp_blocks = BedTool(in_vcf).merge(d=args.snp_distance, c=1, o="count")
-		(snp_blocks, skipped) = filter_by_snp_distance_and_count(args, snp_blocks, True)
+		snp_blocks = BedTool(in_vcf)
+		if len(snp_blocks) > 0:
+			snp_blocks = snp_blocks.merge(d=args.snp_distance, c=1, o="count")
+			(snp_blocks, skipped) = filter_by_snp_distance_and_count(args, snp_blocks, True)
+		else:
+			(snp_blocks, skipped) = [], 0
 
 	return snp_blocks
 
@@ -420,7 +434,7 @@ def get_homo_ref_blocks(Het, Homo_ALT, genome_file):
 def snps_to_bed_blocks(args, het_snps_vcf, homo_snps_vcf, genome_file):
 
 	"""
-	Last update: 07/03/2022
+	Last update: 09/03/2022
 	"""
 
 	pool = multiprocessing.Pool(args.threads)
@@ -442,25 +456,29 @@ def snps_to_bed_blocks(args, het_snps_vcf, homo_snps_vcf, genome_file):
 def remove_overlapping_regions(bt_A, bt_B):
 
 	"""
-	Last update: 01/03/2022
+	Last update: 09/03/2022
 	"""
 
-	# remove intersection between the two beds
-	bt = bt_A.subtract(b=bt_B)
-	# remove short ones
-	lst = [str(x).rstrip("\b\r\n").split("\t") for x in bt]
-	lst = [x for x in lst if int(x[2]) > int(x[1])]
-	# sort
-	bt = bt.sort()
-	# write to output
-	return bt
+	if ((len(bt_A) > 0) and (len(bt_B) > 0)):
+		# remove intersection between the two beds
+		bt = bt_A.subtract(b=bt_B)
+		# remove short ones
+		lst = [str(x).rstrip("\b\r\n").split("\t") for x in bt]
+		lst = [x for x in lst if int(x[2]) > int(x[1])]
+		# sort
+		bt = bt.sort()
+		# write to output
+		return bt
+
+	else:
+		return []
 
 
 
 def adjust_homo_coordinates_by_hetero_overlap(args, Het_blocks, Homo_blocks_REF, Homo_blocks_ALT):
 
 	"""
-	Last update: 03/03/2022
+	Last update: 09/03/2022
 	"""
 
 	pool = multiprocessing.Pool(processes=args.threads)
