@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 08/03/2022
+Last change: 10/03/2022
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 ###
 """
@@ -104,7 +104,8 @@ args = p.parse_args()
 
 
 # tmp dir
-tmp_dir = f"{args.output_dir}/tmp"
+timestamp = time.time()
+tmp_dir = f"{args.output_dir}/tmp_{timestamp}"
 if os.path.exists(tmp_dir) == False:
 	os.makedirs(tmp_dir, exist_ok=True)
 
@@ -1210,10 +1211,10 @@ def run_in_hybrid_mode(args):
 	return True
 
 
-def main(args):
+def main(args, tmp_dir):
 
 	"""
-	Last update: 07/03/2022
+	Last update: 10/03/2022
 	"""
 
 	# check conditions before starting
@@ -1230,5 +1231,8 @@ def main(args):
 		sys.stderr.write(f"[{at()}] Running in default mode...\n")
 		tmp = run_in_default_mode(args)
 
+	# remove tmp folder
+	os.remove(tmp_dir)
+
 if __name__ == "__main__":
-	main(args)
+	main(args, tmp_dir)
