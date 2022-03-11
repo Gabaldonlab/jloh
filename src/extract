@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 10/03/2022
+Last change: 11/03/2022
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 ###
 """
@@ -24,6 +24,7 @@ from math import log10
 import multiprocessing
 from operator import itemgetter
 from statistics import median
+import shutil
 
 
 
@@ -55,6 +56,7 @@ jloh extract --vcf <VCF> --ref <FASTA> --bam <BAM> [options]
 --sample            Sample name / Strain name for output files                  [jloh]
 --output-dir        Output directory                                            [jloh_out]
 --threads           Number of parallel computing threads                        [4]
+--mask              BED file containing regions to skip in the analysis         [off]
 
 [parameters]
 --filter-mode       "pass" to keep only PASS variants, "all" to keep everything [all]
@@ -84,10 +86,13 @@ p.add_argument("--hybrid", action="store_true")
 p.add_argument("--vcfs", nargs="*")
 p.add_argument("--bams", nargs="*")
 p.add_argument("--refs", nargs="*")
-# other options
+# I/O/E
 p.add_argument("--sample", default="jloh")
-p.add_argument("--filter-mode", choices=["all","pass"], default="all")
 p.add_argument("--output-dir", default="jloh_out")
+p.add_argument("--threads", default=4, type=int)
+p.add_argument("--mask")
+# parameters
+p.add_argument("--filter-mode", choices=["all","pass"], default="all")
 p.add_argument("--snp-distance", default=100, type=int)
 p.add_argument("--min-snps", default=2, type=int)
 p.add_argument("--min-length", default=1000, type=int)
@@ -98,7 +103,6 @@ p.add_argument("--hemi", default=0.75, type=float)
 p.add_argument("--overhang", default=5000, type=int)
 p.add_argument("--min-overhang", default=0.9, type=float)
 p.add_argument("--min-uncov", default=10, type=int)
-p.add_argument("--threads", default=4, type=int)
 
 args = p.parse_args()
 
@@ -945,6 +949,20 @@ def count_snps_in_bed_interval(bed, vcf):
 	return bt_inter_sorted
 
 
+def remove_masked_intervals(args, LOH):
+
+	"""
+	Last update: 11/03/2022
+	"""
+
+	bt_mask = BedTool(args.mask)
+	bt = BedTool(LOH)
+
+	bt_inter = bt.intersect(bt_mask, v=True)
+
+	return bt_inter
+
+
 def write_vcfs_to_output(args, Handles, mode, Hetero_lines_lst, Homo_lines_lst, Headers):
 
 	"""
@@ -1026,7 +1044,7 @@ def write_vcfs_to_output(args, Handles, mode, Hetero_lines_lst, Homo_lines_lst, 
 def run_in_default_mode(args):
 
 	"""
-	Last update: 04/03/2022
+	Last update: 11/03/2022
 	"""
 
 	handle = "exp"
@@ -1081,6 +1099,13 @@ def run_in_default_mode(args):
 	LOH_w_snps = count_snps_in_bed_interval(LOH_w_snps, Vcfs["hetero"])
 	sys.stderr.write(f"[{at()}] {len(LOH_w_snps)} blocks were processed\n")
 
+	# remove masked intervals (if any)
+	if args.mask:
+		sys.stderr.write(f"[{at()}] Removing masked intervals...\n")
+		LOH_w_snps = remove_masked_intervals(args, LOH_W_snps)
+		sys.stderr.write(f"[{at()}] The final set consists of {len(LOH_w_snps)} blocks\n")
+	else:
+		sys.stderr.write(f"[{at()}] The final set consists of {len(LOH_w_snps)} blocks\n")
 
 	# write to output
 	# including a header
@@ -1108,7 +1133,7 @@ def run_in_default_mode(args):
 def run_in_hybrid_mode(args):
 
 	"""
-	Last update: 07/03/2022
+	Last update: 11/03/2022
 	"""
 
 	handle_A = "exp_A"
@@ -1187,7 +1212,14 @@ def run_in_hybrid_mode(args):
 	LOH_w_snps_A = [str(row) for row in LOH_w_snps_A]
 	LOH_w_snps_B = [str(row) for row in LOH_w_snps_B]
 	LOH_w_snps = BedTool(LOH_w_snps_A + LOH_w_snps_B)
-	sys.stderr.write(f"[{at()}] The final set consists of {len(LOH_w_snps)} blocks\n")
+
+	# remove masked intervals (if any)
+	if args.mask:
+		sys.stderr.write(f"[{at()}] Removing masked intervals...\n")
+		LOH_w_snps = remove_masked_intervals(args, LOH_w_snps)
+		sys.stderr.write(f"[{at()}] The final set consists of {len(LOH_w_snps)} blocks\n")
+	else:
+		sys.stderr.write(f"[{at()}] The final set consists of {len(LOH_w_snps)} blocks\n")
 
 	# write to output
 	# including a header
@@ -1214,7 +1246,7 @@ def run_in_hybrid_mode(args):
 def main(args, tmp_dir):
 
 	"""
-	Last update: 10/03/2022
+	Last update: 11/03/2022
 	"""
 
 	# check conditions before starting
@@ -1232,7 +1264,7 @@ def main(args, tmp_dir):
 		tmp = run_in_default_mode(args)
 
 	# remove tmp folder
-	os.remove(tmp_dir)
+	shutil.rmtree(tmp_dir)
 
 if __name__ == "__main__":
 	main(args, tmp_dir)

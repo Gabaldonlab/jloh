@@ -40,6 +40,11 @@ println """
 --min_depth         Minimum variant coverage depth (DP)                         [10]
 --mq0f              Maximum "mapping-quality-0" fraction of reads               [0.05]
 
+  [genome divergence]
+
+--min_mum_length    Minimum length to retain a genome alignment                 [1000]
+--min_mum_id        Minimum sequence identity to retain a genome mapping        [95]
+
   [JLOH]
 
 --min_snps          Min. number of proximal het SNPs to consider a het block    [2]
@@ -385,6 +390,37 @@ process filter_short_variants {
     """
 }
 
+
+process create_mask_file {
+
+  executor = "local"
+  cpus = 1
+  maxForks = 1
+
+  input:
+    tuple val(sample_id), \
+          file(par_A_fs_bam), file(par_A_fs_bam_index), file(par_A_vcf), \
+          file(par_B_fs_bam), file(par_B_fs_bam_index), file(par_B_vcf), \
+          val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B) \
+          from Filt_vcfs
+
+  output:
+    tuple val(sample_id), \
+          file(par_A_fs_bam), file(par_A_fs_bam_index), file(par_A_vcf), \
+          file(par_B_fs_bam), file(par_B_fs_bam_index), file(par_B_vcf), \
+          val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B), \
+          file("${sample_id}.mask.bed") \
+          into Filt_vcfs_with_mask
+
+  script:
+    """
+    ${JLOH} g2g \
+    --ref-A ${genome_A} --ref-B ${genome_B} \
+    --min-identity ${params.min_mum_id} --min-length ${params.min_mum_length} \
+    > ${sample_id}.mask.bed
+    """
+}
+
 process call_LOH_blocks {
 
   executor = "local"
@@ -397,11 +433,12 @@ process call_LOH_blocks {
     tuple val(sample_id), \
           file(par_A_fs_bam), file(par_A_fs_bam_index), file(par_A_vcf), \
           file(par_B_fs_bam), file(par_B_fs_bam_index), file(par_B_vcf), \
-          val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B) \
-          from Filt_vcfs
+          val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B), \
+          file(bed_mask) \
+          from Filt_vcfs_with_mask
 
   output:
-    tuple val(sample_id), val(genome_A_name), val(genome_B_name), \
+    tuple val(sample_id), val(genome_A_name), val(genome_B_name), file(bed_mask), \
           file("${sample_id}/${sample_id}.exp_A.LOH_blocks.tsv"), \
           file("${sample_id}/${sample_id}.exp_B.LOH_blocks.tsv"), \
           file("${sample_id}/${sample_id}.exp_A.LOH_blocks.bed"), \
@@ -417,6 +454,7 @@ process call_LOH_blocks {
     --vcfs ${par_A_vcf} ${par_B_vcf} \
     --bams ${par_A_fs_bam} ${par_B_fs_bam} \
     --refs ${genome_A} ${genome_B} \
+    --mask ${bed_mask} \
     --sample ${sample_id} \
     --output-dir ${sample_id} \
     --filter-mode all \

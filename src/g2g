@@ -1,0 +1,242 @@
+#!/usr/bin/env python3
+
+script_info = """
+###
+Author: Matteo Schiavinato
+Last change: 11/03/2022
+Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
+###
+"""
+
+import argparse as ap
+import os
+import sys
+from time import asctime as at
+import time
+import pymummer
+from Bio import SeqIO
+import pybedtools
+from pybedtools import BedTool
+import shutil
+
+# help section
+if len(sys.argv) == 1:
+    sys.argv.append("--help")
+
+if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
+    sys.stderr.write("""
+
+Align one genome sequence against another with nucmer, extract SNPs, then make
+a complement BED file with regions that show no SNP between the two references
+
+This BED file represents identical regions between the two genomes
+
+When using jloh extract in --hybrid mode, you can use this file as a --mask to
+reduce the number of false positive results
+
+Usage:
+jloh g2g --target <FASTA> --query <FASTA> [options]
+
+[I/O/E]
+--ref-A                 First FASTA sequence                                    [!]
+--ref-B                 Second FASTA sequence                                   [!]
+
+[parameters]
+--min-identity          Min. identity (0-100%) to keep an alignment             [95]
+--min-length            Min. length to keep an alignment                        [1000]
+
+""")
+    sys.exit(0)
+
+# parser
+p = ap.ArgumentParser()
+p.add_argument("--ref-A")
+p.add_argument("--ref-B")
+p.add_argument("--min-identity", default=95, type=int)
+p.add_argument("--min-length", default=1000, type=int)
+args = p.parse_args()
+
+# functions
+def map_genomes(args, tmp_dir):
+
+    """
+    11/03/2022
+    """
+
+    out_prefix_A = f"{tmp_dir}/out_A"
+    cmd = f"nucmer -p {out_prefix_A} --mum {args.ref_A} {args.ref_B}"
+    os.system(cmd)
+
+    outfile_A = f"{tmp_dir}/out_A.f.delta"
+    cmd = f"delta-filter -i {args.min_identity} -l {args.min_length} -g {out_prefix_A}.delta > {outfile_A}"
+    os.system(cmd)
+
+    out_prefix_B = f"{tmp_dir}/out_B"
+    cmd = f"nucmer -p {out_prefix_B} --mum {args.ref_B} {args.ref_A}"
+    os.system(cmd)
+
+    outfile_B = f"{tmp_dir}/out_B.f.delta"
+    cmd = f"delta-filter -i {args.min_identity} -l {args.min_length} -g {out_prefix_B}.delta > {outfile_B}"
+    os.system(cmd)
+
+    return outfile_A, outfile_B
+
+
+def get_snps_from_delta(args, tmp_dir, Delta_files):
+
+    """
+    11/03/2022
+    """
+
+    outfile_A = f"{tmp_dir}/out_A.f.delta.snps"
+    outfile_B = f"{tmp_dir}/out_B.f.delta.snps"
+
+    delta_A = Delta_files[0]
+    delta_B = Delta_files[1]
+
+    cmd = f"show-snps -T {delta_A} > {outfile_A}"
+    os.system(cmd)
+    cmd = f"show-snps -T {delta_B} > {outfile_B}"
+    os.system(cmd)
+
+    return outfile_A, outfile_B
+
+
+def convert_to_vcf(args, tmp_dir, Snps):
+
+    """
+    11/03/2022
+    """
+
+    snps_A = Snps[0]
+    snps_B = Snps[1]
+
+    outfile_A = f"{tmp_dir}/out_A.f.delta.snps.vcf"
+    outfile_B = f"{tmp_dir}/out_B.f.delta.snps.vcf"
+
+    cmd = f"all2vcf mummer --snps {snps_A} --type SNP --reference {args.ref_A} --input-header --output-header --no-Ns > {outfile_A}"
+    os.system(cmd)
+    cmd = f"all2vcf mummer --snps {snps_B} --type SNP --reference {args.ref_B} --input-header --output-header --no-Ns > {outfile_B}"
+    os.system(cmd)
+
+    return outfile_A, outfile_B
+
+
+
+def get_bed_intervals(args, tmp_dir, Vcfs):
+
+    """
+    11/03/2022
+    """
+
+    vcf_A = Vcfs[0]
+    vcf_B = Vcfs[1]
+
+    outfile_A = f"{tmp_dir}/out_A.f.delta.snps.vcf.bed"
+    outfile_B = f"{tmp_dir}/out_B.f.delta.snps.vcf.bed"
+
+    vcf_A = BedTool(vcf_A)
+    vcf_B = BedTool(vcf_B)
+
+    bt_A = vcf_A.merge(o="count", d=100, c=1)
+    bt_B = vcf_B.merge(o="count", d=100, c=1)
+
+    return bt_A, bt_B
+
+
+def get_genome_files(args, tmp_dir):
+
+    """
+    11/03/2022
+    """
+
+    outfile_A = f"{tmp_dir}/genome_file_A.tsv"
+    outfile_B = f"{tmp_dir}/genome_file_B.tsv"
+
+    OUT = open(outfile_A, "w")
+    for record in SeqIO.parse(args.ref_A, "fasta"):
+        OUT.write("\t".join([record.id, str(len(record.seq))]) + "\n")
+
+    OUT.close()
+
+    OUT = open(outfile_B, "w")
+    for record in SeqIO.parse(args.ref_B, "fasta"):
+        OUT.write("\t".join([record.id, str(len(record.seq))]) + "\n")
+
+    OUT.close()
+
+    return outfile_A, outfile_B
+
+
+def sort_intervals(args, tmp_dir, Snp_interval_files, Genome_files):
+
+    """
+    11/03/2022
+    """
+
+    bt_snps_A = BedTool(Snp_interval_files[0])
+    bt_snps_B = BedTool(Snp_interval_files[1])
+
+    bt_sort_A = bt_snps_A.sort(g=Genome_files[0])
+    bt_sort_B = bt_snps_B.sort(g=Genome_files[1])
+
+    return bt_sort_A, bt_sort_B
+
+
+def get_complement_intervals(args, tmp_dir, Sorted_interval_files, Genome_files):
+
+    """
+    11/03/2022
+    """
+
+    bt_sort_A = BedTool(Sorted_interval_files[0])
+    bt_sort_B = BedTool(Sorted_interval_files[1])
+
+    bt_comp_A = bt_sort_A.complement(g=Genome_files[0])
+    bt_comp_B = bt_sort_B.complement(g=Genome_files[1])
+
+    return bt_comp_A, bt_comp_B
+
+
+def main(args):
+
+    """
+    11/03/2022
+    """
+
+    # tmp dir
+    timestamp = time.time()
+    tmp_dir = f"tmp_{timestamp}"
+    if os.path.exists(tmp_dir) == False:
+        os.makedirs(tmp_dir, exist_ok=True)
+    else:
+        timestamp = time.time()
+        tmp_dir = f"tmp_{timestamp}"
+        if os.path.exists(tmp_dir) == False:
+            os.makedirs(tmp_dir, exist_ok=True)
+        else:
+            sys.stderr.write("ERROR: tried twice to create tmp dir with timestamp\n")
+            sys.stderr.write("Something is wrong in the current directory\n")
+            sys.exit()
+
+    # perform operations
+    delta_A, delta_B = map_genomes(args, tmp_dir)
+    snps_A, snps_B = get_snps_from_delta(args, tmp_dir, [delta_A, delta_B])
+    vcf_A, vcf_B = convert_to_vcf(args, tmp_dir, [snps_A, snps_B])
+    snp_bed_A, snp_bed_B = get_bed_intervals(args, tmp_dir, [vcf_A, vcf_B])
+    genome_file_A, genome_file_B = get_genome_files(args, tmp_dir)
+    sort_bed_A, sort_bed_B = sort_intervals(args, tmp_dir, [snp_bed_A, snp_bed_B], [genome_file_A, genome_file_B])
+    comp_bed_A, comp_bed_B = get_complement_intervals(args, tmp_dir, [sort_bed_A, sort_bed_B], [genome_file_A, genome_file_B])
+
+    # write to output
+    for row in comp_bed_A:
+        sys.stdout.write(str(row))
+    for row in comp_bed_B:
+        sys.stdout.write(str(row))
+
+    # remove tmp files
+    shutil.rmtree(tmp_dir)
+
+# main
+if __name__ == "__main__":
+    main(args)
