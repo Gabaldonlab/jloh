@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 11/03/2022
+Last change: 14/03/2022
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 ###
 """
@@ -42,7 +42,7 @@ jloh g2g --target <FASTA> --query <FASTA> [options]
 --ref-B                 Second FASTA sequence                                   [!]
 
 [parameters]
---min-identity          Min. identity (0-100%) to keep an alignment             [95]
+--est-divergence        Estimated divergence between the two genomes (0-100%)   [1]
 --min-length            Min. length to keep an alignment                        [1000]
 
 """)
@@ -52,7 +52,7 @@ jloh g2g --target <FASTA> --query <FASTA> [options]
 p = ap.ArgumentParser()
 p.add_argument("--ref-A")
 p.add_argument("--ref-B")
-p.add_argument("--min-identity", default=95, type=int)
+p.add_argument("--est-divergence", default=1, type=int)
 p.add_argument("--min-length", default=1000, type=int)
 args = p.parse_args()
 
@@ -64,11 +64,13 @@ def map_genomes(args, tmp_dir):
     """
 
     out_prefix_A = f"{tmp_dir}/out_A"
-    cmd = f"nucmer -p {out_prefix_A} --mum {args.ref_A} {args.ref_B}"
+    cmd = f"nucmer -p {out_prefix_A} -c 100 -b 50 -l 50 --mum {args.ref_A} {args.ref_B}"
     os.system(cmd)
 
+    min_identity = 100-args.est_divergence
+
     outfile_A = f"{tmp_dir}/out_A.f.delta"
-    cmd = f"delta-filter -i {args.min_identity} -l {args.min_length} -g {out_prefix_A}.delta > {outfile_A}"
+    cmd = f"delta-filter -i {min_identity} -l {args.min_length} -g {out_prefix_A}.delta > {outfile_A}"
     os.system(cmd)
 
     out_prefix_B = f"{tmp_dir}/out_B"
@@ -76,7 +78,7 @@ def map_genomes(args, tmp_dir):
     os.system(cmd)
 
     outfile_B = f"{tmp_dir}/out_B.f.delta"
-    cmd = f"delta-filter -i {args.min_identity} -l {args.min_length} -g {out_prefix_B}.delta > {outfile_B}"
+    cmd = f"delta-filter -i {min_identity} -l {args.min_length} -g {out_prefix_B}.delta > {outfile_B}"
     os.system(cmd)
 
     return outfile_A, outfile_B
