@@ -42,7 +42,7 @@ jloh g2g --target <FASTA> --query <FASTA> [options]
 --ref-B                 Second FASTA sequence                                   [!]
 
 [parameters]
---est-divergence        Estimated divergence between the two genomes (0-100%)   [1]
+--est-divergence        Estimated divergence between the two genomes (0.0-1.0)  [0.01]
 --min-length            Min. length to keep an alignment                        [1000]
 
 """)
@@ -52,7 +52,7 @@ jloh g2g --target <FASTA> --query <FASTA> [options]
 p = ap.ArgumentParser()
 p.add_argument("--ref-A")
 p.add_argument("--ref-B")
-p.add_argument("--est-divergence", default=1, type=float)
+p.add_argument("--est-divergence", default=0.01, type=float)
 p.add_argument("--min-length", default=1000, type=int)
 args = p.parse_args()
 
@@ -67,7 +67,7 @@ def map_genomes(args, tmp_dir):
     cmd = f"nucmer -p {out_prefix_A} -c 100 -b 50 -l 50 --mum {args.ref_A} {args.ref_B}"
     os.system(cmd)
 
-    min_identity = float(100)-args.est_divergence
+    min_identity = float(100)-float(args.est_divergence*100)
 
     outfile_A = f"{tmp_dir}/out_A.f.delta"
     cmd = f"delta-filter -i {min_identity} -l {args.min_length} -g {out_prefix_A}.delta > {outfile_A}"
@@ -185,20 +185,6 @@ def sort_intervals(args, tmp_dir, Snp_interval_files, Genome_files):
     return bt_sort_A, bt_sort_B
 
 
-# def get_complement_intervals(args, tmp_dir, Sorted_interval_files, Genome_files):
-#
-#     """
-#     11/03/2022
-#     """
-#
-#     bt_sort_A = BedTool(Sorted_interval_files[0])
-#     bt_sort_B = BedTool(Sorted_interval_files[1])
-#
-#     bt_comp_A = bt_sort_A.complement(g=Genome_files[0])
-#     bt_comp_B = bt_sort_B.complement(g=Genome_files[1])
-#
-#     return bt_comp_A, bt_comp_B
-
 
 def main(args):
 
@@ -228,13 +214,7 @@ def main(args):
     snp_bed_A, snp_bed_B = get_bed_intervals(args, tmp_dir, [vcf_A, vcf_B])
     genome_file_A, genome_file_B = get_genome_files(args, tmp_dir)
     sort_bed_A, sort_bed_B = sort_intervals(args, tmp_dir, [snp_bed_A, snp_bed_B], [genome_file_A, genome_file_B])
-    # comp_bed_A, comp_bed_B = get_complement_intervals(args, tmp_dir, [sort_bed_A, sort_bed_B], [genome_file_A, genome_file_B])
 
-    # write to output
-    # for row in comp_bed_A:
-    #     sys.stdout.write(str(row))
-    # for row in comp_bed_B:
-    #     sys.stdout.write(str(row))
     for row in sort_bed_A:
         sys.stdout.write(str(row))
     for row in sort_bed_B:
