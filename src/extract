@@ -56,7 +56,7 @@ jloh extract --vcf <VCF> --ref <FASTA> --bam <BAM> [options]
 --sample            Sample name / Strain name for output files                  [jloh]
 --output-dir        Output directory                                            [jloh_out]
 --threads           Number of parallel computing threads                        [4]
---mask              BED file containing regions to skip in the analysis         [off]
+--regions           BED file containing regions to keep in the analysis         [off]
 
 [parameters]
 --filter-mode       "pass" to keep only PASS variants, "all" to keep everything [all]
@@ -90,7 +90,7 @@ p.add_argument("--refs", nargs="*")
 p.add_argument("--sample", default="jloh")
 p.add_argument("--output-dir", default="jloh_out")
 p.add_argument("--threads", default=4, type=int)
-p.add_argument("--mask")
+p.add_argument("--regions")
 # parameters
 p.add_argument("--filter-mode", choices=["all","pass"], default="all")
 p.add_argument("--snp-distance", default=100, type=int)
@@ -949,16 +949,16 @@ def count_snps_in_bed_interval(bed, vcf):
 	return bt_inter_sorted
 
 
-def remove_masked_intervals(args, LOH):
+def keep_relevant_blocks(args, LOH):
 
 	"""
-	Last update: 11/03/2022
+	Last update: 14/03/2022
 	"""
 
-	bt_mask = BedTool(args.mask)
+	bt_regions = BedTool(args.regions)
 	bt = BedTool(LOH)
 
-	bt_inter = bt.intersect(bt_mask, v=True)
+	bt_inter = bt.intersect(bt_regions, u=True)
 
 	return bt_inter
 
@@ -1099,10 +1099,10 @@ def run_in_default_mode(args):
 	LOH_w_snps = count_snps_in_bed_interval(LOH_w_snps, Vcfs["hetero"])
 	sys.stderr.write(f"[{at()}] {len(LOH_w_snps)} blocks were processed\n")
 
-	# remove masked intervals (if any)
-	if args.mask:
-		sys.stderr.write(f"[{at()}] Removing masked intervals...\n")
-		LOH_w_snps = remove_masked_intervals(args, LOH_W_snps)
+	# keep only intervals inside --regions
+	if args.regions:
+		sys.stderr.write(f"[{at()}] Removing intervals outside of --regions...\n")
+		LOH_w_snps = keep_relevant_blocks(args, LOH_w_snps)
 		sys.stderr.write(f"[{at()}] The final set consists of {len(LOH_w_snps)} blocks\n")
 	else:
 		sys.stderr.write(f"[{at()}] The final set consists of {len(LOH_w_snps)} blocks\n")
@@ -1133,7 +1133,7 @@ def run_in_default_mode(args):
 def run_in_hybrid_mode(args):
 
 	"""
-	Last update: 11/03/2022
+	Last update: 14/03/2022
 	"""
 
 	handle_A = "exp_A"
@@ -1213,10 +1213,10 @@ def run_in_hybrid_mode(args):
 	LOH_w_snps_B = [str(row) for row in LOH_w_snps_B]
 	LOH_w_snps = BedTool(LOH_w_snps_A + LOH_w_snps_B)
 
-	# remove masked intervals (if any)
-	if args.mask:
-		sys.stderr.write(f"[{at()}] Removing masked intervals...\n")
-		LOH_w_snps = remove_masked_intervals(args, LOH_w_snps)
+	# keep only intervals inside --regions
+	if args.regions:
+		sys.stderr.write(f"[{at()}] Removing intervals outside of --regions...\n")
+		LOH_w_snps = keep_relevant_blocks(args, LOH_w_snps)
 		sys.stderr.write(f"[{at()}] The final set consists of {len(LOH_w_snps)} blocks\n")
 	else:
 		sys.stderr.write(f"[{at()}] The final set consists of {len(LOH_w_snps)} blocks\n")
