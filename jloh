@@ -43,6 +43,9 @@ Commands:
  -- Calculations
     density             Estimate heterozygous and homozygous SNP densities
 
+ -- Simulations
+    sim                 Simulate a divergent copy of a genome/protein sequence(s)
+
 """)
 else:
 	args = " ".join(sys.argv[1:])
