@@ -13,7 +13,6 @@ import os
 import sys
 from time import asctime as at
 import time
-import pymummer
 from Bio import SeqIO
 import pybedtools
 from pybedtools import BedTool
@@ -60,21 +59,24 @@ args = p.parse_args()
 def map_genomes(args, tmp_dir):
 
     """
-    11/03/2022
+    14/03/2022
     """
 
+    # map
     out_prefix_A = f"{tmp_dir}/out_A"
     cmd = f"nucmer -p {out_prefix_A} -c 100 -b 50 -l 50 --mum {args.ref_A} {args.ref_B}"
     os.system(cmd)
 
-    min_identity = float(100)-float(args.est_divergence*100)
-
-    outfile_A = f"{tmp_dir}/out_A.f.delta"
-    cmd = f"delta-filter -i {min_identity} -l {args.min_length} -g {out_prefix_A}.delta > {outfile_A}"
+    out_prefix_B = f"{tmp_dir}/out_B"
+    cmd = f"nucmer -p {out_prefix_B} -c 100 -b 50 -l 50 --mum {args.ref_B} {args.ref_A}"
     os.system(cmd)
 
-    out_prefix_B = f"{tmp_dir}/out_B"
-    cmd = f"nucmer -p {out_prefix_B} --mum {args.ref_B} {args.ref_A}"
+    # min identity = twice the estimated divergence
+    min_identity = float(100)-(float(args.est_divergence*100)*2)
+
+    # filter
+    outfile_A = f"{tmp_dir}/out_A.f.delta"
+    cmd = f"delta-filter -i {min_identity} -l {args.min_length} -g {out_prefix_A}.delta > {outfile_A}"
     os.system(cmd)
 
     outfile_B = f"{tmp_dir}/out_B.f.delta"

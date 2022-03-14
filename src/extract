@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 11/03/2022
+Last change: 14/03/2022
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 ###
 """
@@ -1213,13 +1213,17 @@ def run_in_hybrid_mode(args):
 	LOH_w_snps_B = [str(row) for row in LOH_w_snps_B]
 	LOH_w_snps = BedTool(LOH_w_snps_A + LOH_w_snps_B)
 
+	# write candidates to output, pre filtering
+	LOH_w_snps.saveas(f"{args.output_dir}/{args.sample}.LOH_candidates.bed")
+
 	# keep only intervals inside --regions
 	if args.regions:
 		sys.stderr.write(f"[{at()}] Removing intervals outside of --regions...\n")
-		LOH_w_snps = keep_relevant_blocks(args, LOH_w_snps)
+		LOH_w_snps_filt = keep_relevant_blocks(args, LOH_w_snps)
 		sys.stderr.write(f"[{at()}] The final set consists of {len(LOH_w_snps)} blocks\n")
 	else:
-		sys.stderr.write(f"[{at()}] The final set consists of {len(LOH_w_snps)} blocks\n")
+		LOH_w_snps_filt = LOH_w_snps
+		sys.stderr.write(f"[{at()}] The final set consists of {len(LOH_w_snps_filt)} blocks\n")
 
 	# write to output
 	# including a header
@@ -1227,14 +1231,14 @@ def run_in_hybrid_mode(args):
 	out = f"{args.output_dir}/{args.sample}.LOH_blocks.tsv"
 	OUTPUT = open(out, "w")
 	OUTPUT.write("\t".join(["#Chrom", "Start", "End", "Cov", "Cov_frac", "Cov_ratio_up", "Cov_ratio_down", "Zygosity", "Length", "Allele", "Homo_snps", "Hetero_snps"]) + "\n")
-	for row in LOH_w_snps:
+	for row in LOH_w_snps_filt:
 		OUTPUT.write(str(row))
 	OUTPUT.close()
 
 	# create output bed file
 	out = f"{args.output_dir}/{args.sample}.LOH_blocks.bed"
 	OUTPUT = open(out, "w")
-	for row in LOH_w_snps:
+	for row in LOH_w_snps_filt:
 		row = list(row)[0:3]
 		OUTPUT.write("\t".join(row) + "\n")
 	OUTPUT.close()
