@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 11/03/2022
+Last change: 14/03/2022
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 ###
 """
@@ -24,7 +24,7 @@ if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
 	sys.stderr.write("""
 
 
-JLOH, version 0.13.0
+JLOH, version 0.14.0
 
 --------------------------------------------------------------------------------
 by Matteo Schiavinato
