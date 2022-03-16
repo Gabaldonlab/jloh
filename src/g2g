@@ -42,6 +42,11 @@ jloh g2g --target <FASTA> --query <FASTA> [options]
 --ref-B                 Second FASTA sequence                                   [!]
 --output-dir            Where to place the output files                         [.]
 
+[mapping]
+--default               -c 65 -b 200 -l 50
+--sensitive             -c 100 -b 50 -l 50 --mum                                [off]
+--relaxed               -c 50 -b 200 -l 20                                      [off]
+
 [parameters]
 --est-divergence        Estimated divergence between the two genomes (0.0-1.0)  [0.01]
                         Alignments will be retained up to twice this divergence
@@ -56,6 +61,8 @@ p = ap.ArgumentParser()
 p.add_argument("--ref-A")
 p.add_argument("--ref-B")
 p.add_argument("--output-dir", default=".")
+p.add_argument("--default", action="store_true", default=True)
+p.add_argument("--sensitive", action="store_true", default=False)
 p.add_argument("--est-divergence", default=0.01, type=float)
 p.add_argument("--min-length", default=1000, type=int)
 args = p.parse_args()
@@ -68,12 +75,19 @@ def map_genomes(args, tmp_dir):
     """
 
     # map
+    if args.default:
+        params = "-c 65 -b 200 -l 50"
+    elif args.sensitive:
+        params = "-c 100 -b 50 -l 50 --mum"
+    elif args.relaxed:
+        params = "-c 50 -b 200 -l 20"
+
     out_prefix_A = f"{tmp_dir}/out_A"
-    cmd = f"nucmer -p {out_prefix_A} -c 100 -b 50 -l 50 --mum {args.ref_A} {args.ref_B}"
+    cmd = f"nucmer -p {out_prefix_A} {params} {args.ref_A} {args.ref_B}"
     os.system(cmd)
 
     out_prefix_B = f"{tmp_dir}/out_B"
-    cmd = f"nucmer -p {out_prefix_B} -c 100 -b 50 -l 50 --mum {args.ref_B} {args.ref_A}"
+    cmd = f"nucmer -p {out_prefix_B} {params} {args.ref_B} {args.ref_A}"
     os.system(cmd)
 
     # min identity = twice the estimated divergence
