@@ -26,12 +26,13 @@ if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
     sys.stderr.write("""
 
 Align one genome sequence against another with nucmer, extract SNPs, then make
-a complement BED file with regions that show no SNP between the two references
+two BED files with regions that show SNPs between the two references
 
-This BED file represents identical regions between the two genomes
+These BED files represents diverging regions between the two genomes
 
-When using jloh extract in --hybrid mode, you can use this file as a --mask to
-reduce the number of false positive results
+When using jloh extract in --hybrid mode, you can concatenate these files and
+pass them as --regions to try and reduce the number of false positives
+
 
 Usage:
 jloh g2g --target <FASTA> --query <FASTA> [options]
@@ -39,9 +40,12 @@ jloh g2g --target <FASTA> --query <FASTA> [options]
 [I/O/E]
 --ref-A                 First FASTA sequence                                    [!]
 --ref-B                 Second FASTA sequence                                   [!]
+--output-dir            Where to place the output files                         [.]
 
 [parameters]
 --est-divergence        Estimated divergence between the two genomes (0.0-1.0)  [0.01]
+                        Alignments will be retained up to twice this divergence
+                        (e.g. div=0.05 --> min. identity=90%)
 --min-length            Min. length to keep an alignment                        [1000]
 
 """)
@@ -51,6 +55,7 @@ jloh g2g --target <FASTA> --query <FASTA> [options]
 p = ap.ArgumentParser()
 p.add_argument("--ref-A")
 p.add_argument("--ref-B")
+p.add_argument("--output-dir", default=".")
 p.add_argument("--est-divergence", default=0.01, type=float)
 p.add_argument("--min-length", default=1000, type=int)
 args = p.parse_args()
@@ -191,7 +196,7 @@ def sort_intervals(args, tmp_dir, Snp_interval_files, Genome_files):
 def main(args):
 
     """
-    14/03/2022
+    15/03/2022
     """
 
     # tmp dir
@@ -199,6 +204,9 @@ def main(args):
     tmp_dir = f"tmp_{timestamp}"
     if os.path.exists(tmp_dir) == False:
         os.makedirs(tmp_dir, exist_ok=True)
+        uid = os.getuid()
+        gid = os.getgid()
+        os.chown(tmp_dir, uid, gid)
     else:
         timestamp = time.time()
         tmp_dir = f"tmp_{timestamp}"
@@ -217,10 +225,16 @@ def main(args):
     genome_file_A, genome_file_B = get_genome_files(args, tmp_dir)
     sort_bed_A, sort_bed_B = sort_intervals(args, tmp_dir, [snp_bed_A, snp_bed_B], [genome_file_A, genome_file_B])
 
+    OUT_A = open(f"{args.output_dir}/A.bed", "w")
+    OUT_B = open(f"{args.output_dir}/B.bed", "w")
+
     for row in sort_bed_A:
-        sys.stdout.write(str(row))
+        OUT_A.write(str(row))
     for row in sort_bed_B:
-        sys.stdout.write(str(row))
+        OUT_B.write(str(row))
+
+    OUT_A.close()
+    OUT_B.close()
 
     # remove tmp files
     shutil.rmtree(tmp_dir)

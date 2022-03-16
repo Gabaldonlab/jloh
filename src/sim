@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 14/03/2022
+Last change: 16/03/2022
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 ###
 """
@@ -11,10 +11,12 @@ Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 import os, random, sys
 from time import asctime as at
 from Bio import SeqIO, Seq
-import numpy as np
 import argparse as ap
 from operator import itemgetter
-
+import numpy as np
+from pybedtools import BedTool
+import pybedtools
+import multiprocessing as mp
 
 # help section
 if len(sys.argv) == 1:
@@ -30,256 +32,245 @@ Usage:
 jloh sim --input <FASTA> [options]
 
 [I/O/E]
---input                 Input FASTA file to generate mutations on               [!]
---output-dir            Output directory where to place the mutated file(s)     [.]
+--threads               Number of parallel operations                           [4]
+--fasta                 Input FASTA file to generate mutations on               [!]
+--out                   Output filename                                         [mut.fa]
+--verbose               Print progress messages to standard error               [off]
 
 [parameters]
---hybrid                Create two genomes as output, with a series of          [off]
-                        heterozygous and homozygous SNPs between them,
-                        simulating hybrid subgenomes
 --divergence            How much divergence in the mutated genome (0.0-1.0)     [0.01]
 --loh                   Apply this level of LOH (0.0-1.0)                       [0.0]
---frac-homo             Make this fraction of LOH blocks homozygous to the      [0.25]
-                        alternative allele (only in --hybrid mode)
---protein               The input FASTA contains protein sequences and will be  [off]
-                        mutated using aminoacids instead of nucleotides
+--snp-distance          Max. SNP distance to create blocks of heterozygosity    [100]
+
 """)
     sys.exit(0)
 
 
 p  = ap.ArgumentParser()
-p.add_argument("--input")
-p.add_argument("--output_dir", default=".")
+p.add_argument("--threads", default=4, type=int)
+p.add_argument("--fasta")
+p.add_argument("--out", default="mut.fa")
+p.add_argument("--verbose", action="store_true")
 p.add_argument("--hybrid", action="store_true")
 p.add_argument("--divergence", default=0.01, type=float)
-p.add_argument("--frac-homo", default=0.25, type=float)
-p.add_argument("--protein", default=False, action='store_true')
 p.add_argument("--loh", default=0.00, type=float)
+p.add_argument("--snp-distance", default=100, type=int)
 args = p.parse_args()
 
 
-# functions
-def define_alphabet(args):
+def dump_queue(queue):
+
+    out = []
+    while not queue.empty():
+        x = queue.get()
+        out.append(x)
+
+    return out
+
+
+def still_too_little_loh(het_positions, chrom, seq, loh, snp_dist):
 
     """
-    v1, last update: 14/03/2022
+    16/03/2022
     Matteo Schiavinato
     """
 
-    if args.protein:
-        alphabet = 'ACDEFGHIKLMNPQRSTVWY'
-    else:
-        alphabet = 'ACGT'
+    tmp = [[chrom, max(int(pos), 0), min(int(pos), len(seq))] for pos in het_positions]
+    tmp = sorted(tmp, key=itemgetter(0,1,2))
 
-    return alphabet
+    if len(tmp) > 0:
+        bt = BedTool(tmp)
+        bt = bt.merge(d=snp_dist, c=1, o="count")
+        het_ranges = [[str(row[0]), max(int(row[1]), 0), min(int(row[2]), len(seq))] for row in bt]
+        mutated_pos_ranges = sum([int(x[2])-int(x[1]) for x in bt])
+        mutated_pos_ranges = min(len(seq), mutated_pos_ranges)
+        mut_free_frac = (len(seq) - mutated_pos_ranges) / len(seq)
 
-
-def get_heterozygous(positions):
-
-    """
-    v1, last update: 2016
-    Author: Leszek Pryszcz
-    ###
-    v2, last update: 14/03/2022
-    Author: Matteo Schiavinato
-    """
-
-    #count hetero SNPs within 100bp
-    hetero = []
-    pp = 0.0
-    for p in sorted(positions):
-        if   p - pp <=100:
-            if not hetero or len(hetero[-1])==2:
-                hetero.append([pp,])
-            pp = p
-        elif hetero and len(hetero[-1])==1:
-            hetero[-1].append(pp)
-        pp = p
-    if hetero and len(hetero[-1])==1:
-        hetero[-1].append(pp)
-    return sum(e-s for s, e in hetero)
-
-def seq2diverged(args, seq, id, divergence, loh, lohSizes, alphabet):
-
-    """
-    v1, last update: 2016
-    Author: Leszek Pryszcz
-    ###
-    v2, last update: 14/03/2022
-    Author: Matteo Schiavinato
-    """
-
-    # initialize sequences
-    seqlist_het = list(seq)
-    if args.hybrid:
-        seqlist_homo = list(seq)
-
-    # number of position to change
-    # if --hybrid mode, extract fraction of homozygous positions
-    k = int(round(divergence*len(seqlist_het)))
-    positions = random.sample(range(len(seqlist_het)), k)
-    positions_homo = []
-
-    #inclue LOHs
-    lohs = []
-    true_pos_het, true_pos_homo = [], []
-    if loh:
-        if 0 <= loh <= 1:
-            # progressively reduce mutated positions by introducing LOH
-            while get_heterozygous(positions)/len(seq) > 1-loh:
-                #get LOH random start
-                s = random.randint(0, len(seq)-1)
-                #and random LOH length from negative binomial distribution
-                lsize = 0
-                #LOH has to be at least 2x larger than average distance between SNPs
-                while lsize <= 2.0 / divergence:
-                    lohSizes = list(lohSizes)
-                    lsize = int(round(random.sample(lohSizes, 1)[0]))
-                e = s + lsize
-                lohs.append(lsize)
-
-                if args.hybrid:
-                    # randomly choose what type of LOH block it will be
-                    loh_type = random.choices(["REF", "ALT"], weights=[1-args.frac_homo, args.frac_homo], k=1)[0]
-                    #filter snp posiitons
-                    # if marked as REF loh block, remove positions from the positions list
-                    if loh_type == "REF":
-                        positions = filter(lambda p: p<s or p>e, positions)
-                        true_pos_het.append((id,s,e))
-                    # if marked as ALT loh block, add positions within it to the list of those
-                    # that must be changed in both output genomes (simulating homozygosity to the ALT allele)
-                    elif loh_type == "ALT":
-                        positions_homo = positions_homo + [pos for pos in positions if (pos>=s and pos<=e)]
-                        positions = filter(lambda p: p<s or p>e, positions)
-                        true_pos_homo.append((id,s,e))
-
-                else:
-                    positions = filter(lambda p: p<s or p>e, positions)
-                    true_pos_het.append((id,s,e))
-
+        if mut_free_frac < loh:
+            return True
         else:
-            sys.stderr.write("ERROR: you should only use --loh between 0.0 and 1.0\n")
-            sys.exit()
-
-    #change positions
-    if args.hybrid:
-        for i in positions_homo:
-
-            # mutate on ref A
-            nb = seqlist_homo[i]
-            while nb == seqlist_homo[i]:
-                nb = random.choice(alphabet)
-            seqlist_homo[i] = nb
-
-            # mutate on ref B too to make it homozygous for the ALT allele
-            nb = seqlist_het[i]
-            while nb == seqlist_het[i]:
-                nb = random.choice(alphabet)
-            seqlist_het[i] = nb
-
-        return "".join(seqlist_het), "".join(seqlist_homo), true_pos_het, true_pos_homo
+            return False
 
     else:
-        # simply mutate the remaining heterozygous ones
-        for i in positions:
-            nb = seqlist_het[i]
-            while nb == seqlist_het[i]:
-                nb = random.choice(alphabet)
-            seqlist[i] = nb
+        return False
 
-        return "".join(seqlist_het), None, true_pos_het, None
+
+
+def process_chromosome(args, Lohs_q, Snps_q, record, lohSizes):
+
+    """
+    16/03/2022
+    """
+
+    # define chromosome-related variables
+    chrom = record.id
+    seq = record.seq
+    seqlist = list(seq)
+    k = int(round(args.divergence * len(seqlist)))
+    het_positions = random.sample(range(len(seqlist)), k)
+
+    if args.loh > 1:
+        sys.stderr.write("ERROR: you should only use --loh between 0.0 and 1.0\n")
+        sys.exit()
+
+    # introduce LOH by removing chunks of variants
+    elif args.loh > 0 and args.loh <= 1:
+        while still_too_little_loh(het_positions, chrom, seq, args.loh, args.snp_distance) == True:
+            #get LOH random start
+            s = random.randint(0, len(seq)-1)
+            #and random LOH length from negative binomial distribution
+            lsize = 0
+            #LOH has to be at least 2x larger than average distance between SNPs
+            while lsize <= 2.0 / args.divergence:
+                lohSizes = list(lohSizes)
+                lsize = int(round(random.sample(lohSizes, 1)[0]))
+            e = s + lsize
+            het_positions = list(filter(lambda p: p<s or p>e, het_positions))
+            Lohs_q.put((chrom, s, e))
+
+        # once LOH has been applied, save the remaining positions
+        Snps_q.put((chrom, list(het_positions)))
+
+    else:
+        Snps_q.put((chrom, list(het_positions)))
+
+
+def obtain_divergent_positions(args):
+
+    """
+    16/03/2022
+    """
+
+    # multiprocessing stuff
+    pool = mp.Pool(args.threads)
+    Lohs_q = mp.Manager().Queue()
+    Snps_q = mp.Manager().Queue()
+
+    #get LOH sizes distibution
+    lohSizes = np.random.lognormal(0, 1.2, 100000) * 1e3
+
+    if args.verbose:
+        sys.stderr.write(f"[{at()}] Generating list of random SNPs to apply to sequence...\n")
+
+    for record in SeqIO.parse(args.fasta, "fasta"):
+        pool.apply_async(process_chromosome, args=(args, Lohs_q, Snps_q, record, lohSizes))
+
+    pool.close()
+    pool.join()
+
+    if args.verbose:
+        sys.stderr.write(f"[{at()}] Reorganizing and sorting results...\n")
+
+    All_lohs = dump_queue(Lohs_q)
+    All_lohs = sorted(All_lohs, key=itemgetter(0,1,2))
+    All_snps = dump_queue(Snps_q)
+    All_snps = sorted(All_snps, key=itemgetter(0))
+    Snp_positions = { chrom:[] for chrom in list(set([x[0] for x in All_snps])) }
+    for snp_list in All_snps:
+        chrom = snp_list[0]
+        positions = snp_list[1]
+        Snp_positions[chrom] = [int(i) for i in positions]
+
+    return All_lohs, Snp_positions
+
+
+def process_sequence_mutations(Seq_q, Mut_q, record, positions, alphabet):
+
+    """
+    16/03/2022
+    """
+
+    chrom = record.id
+    seq = record.seq
+    seqlist = list(seq)
+
+    for pos in positions:
+        ref = seqlist[pos]
+        alt = random.choice([i for i in alphabet if i != ref])
+        seqlist[pos] = alt
+        Mut_q.put((chrom, pos, ref, alt))
+
+    newseq = "".join(seqlist)
+    Seq_q.put((chrom, newseq))
+
+
+def mutate_reference(args, fasta, Snp_positions, alphabet):
+
+    """
+    16/03/2022
+    """
+
+    pool = mp.Pool(args.threads)
+    Seq_q = mp.Manager().Queue()
+    Mut_q = mp.Manager().Queue()
+
+    for record in SeqIO.parse(fasta, "fasta"):
+        try:
+            positions = Snp_positions[str(record.id)]
+        except KeyError:
+            positions = []
+        pool.apply_async(process_sequence_mutations, args=(Seq_q, Mut_q, record, positions, alphabet))
+
+    pool.close()
+    pool.join()
+
+    Mut_fasta = dump_queue(Seq_q)
+    Mut_fasta = sorted(Mut_fasta, key=itemgetter(0))
+    Mutations = dump_queue(Mut_q)
+    Mutations = sorted(Mutations, key=itemgetter(0,1))
+
+    return Mut_fasta, Mutations
+
+
+def write_to_output(args, Mut_fasta, Lohs, Mutations):
+
+    """
+    16/03/2022
+    """
+
+    # out fasta
+    OUT = open(args.out, "w")
+    for x in Mut_fasta:
+        chrom, seq = x[0], x[1]
+        OUT.write(">" + chrom + "\n")
+        OUT.write(seq + "\n")
+    OUT.close()
+
+    # out lohs
+    Lohs = sorted(Lohs, key=itemgetter(0,1,2))
+    OUT = open(f"{args.out}.lohs", "w")
+    for loh in Lohs:
+        OUT.write("\t".join([str(i) for i in loh]) + "\n")
+    OUT.close()
+
+    # out snps
+    Mutations = sorted(Mutations, key=itemgetter(0,1))
+    OUT = open(f"{args.out}.snps", "w")
+    for snp in Mutations:
+        OUT.write("\t".join([str(i) for i in snp]) + "\n")
+    OUT.close()
 
 
 def main(args):
 
     """
-    v1, last update: 2016
-    Author: Leszek Pryszcz
-    ###
-    v2, last update: 14/03/2022
-    Author: Matteo Schiavinato
+    16/03/2022
     """
 
-    # workspace
-    if os.path.exists(args.output_dir) == False:
-        os.makedirs(args.output_dir, exist_ok=True)
+    alphabet = "ACTG"
 
-    # define alphabet
-    alphabet = define_alphabet(args)
+    # get mutated copy of a reference
+    if args.verbose:
+        sys.stderr.write(f"[{at()}] Generating list of positions to mutate...\n")
+    Lohs, Snp_positions = obtain_divergent_positions(args)
 
-    #get LOH sizes distibution
-    lohSizes = np.random.lognormal(0, 1.2, 100000) * 1e3
+    if args.verbose:
+        sys.stderr.write(f"[{at()}] Mutating reference...\n")
+    Mut_fasta, Mutations = mutate_reference(args, args.fasta, Snp_positions, alphabet)
 
-    # open files
-    IN = open(args.input, "r")
-
-    if args.hybrid:
-        OUT_homo = open(f"{args.output_dir}/out.d_{args.divergence}.f_homo_{args.frac_homo}.loh_{args.loh}.A.fa", "w")
-        OUT_TP_A = open(f"{args.output_dir}/out.d_{args.divergence}.f_homo_{args.frac_homo}.loh_{args.loh}.A.true_pos.bed", "w")
-        OUT_het = open(f"{args.output_dir}/out.d_{args.divergence}.f_homo_{args.frac_homo}.loh_{args.loh}.B.fa", "w")
-        OUT_TP_B = open(f"{args.output_dir}/out.d_{args.divergence}.f_homo_{args.frac_homo}.loh_{args.loh}.B.true_pos.bed", "w")
-        TP_A, TP_B = [], []
-    else:
-        OUT_het = open(f"{args.output_dir}/out.d_{args.divergence}.f_homo_{args.frac_homo}.loh_{args.loh}.fa", "w")
-        OUT_TP = open(f"{args.output_dir}/out.d_{args.divergence}.f_homo_{args.frac_homo}.loh_{args.loh}.true_pos.bed", "w")
-        TP = []
-
-    # process chromosomes
-    for i, r in enumerate(SeqIO.parse(IN, 'fasta'), 1):
-
-        # get new sequence and true positive LOH events introduced
-        seq_het, seq_homo, true_pos_het, true_pos_homo = seq2diverged(args, r.seq, r.id, args.divergence, args.loh, lohSizes, alphabet)
-
-        if args.hybrid:
-            r_A = r
-            r_B = r
-            r_A.seq = Seq.Seq(seq_homo)
-            r_B.seq = Seq.Seq(seq_het)
-            OUT_homo.write(r_A.format('fasta'))
-            OUT_het.write(r_B.format('fasta'))
-            TP_A = TP_A + true_pos_homo
-            TP_B = TP_B + true_pos_het
-        else:
-            r.seq = Seq.Seq(seq_het)
-            OUT_het.write(r.format('fasta'))
-            TP = TP + true_pos_het
-
-    # close input file
-    IN.close()
-
-    # write true positives to output
-    if args.hybrid:
-        if len(TP_A) > 0:
-            TP_A = sorted(TP_A, key=itemgetter(0,1,2))
-            TP_A = "\n".join(["\t".join([str(y) for y in x]) for x in TP_A])
-            # write these true positives to both output files
-            # since they have been mutated in both genomes
-            OUT_TP_A.write(TP_A + "\n")
-            OUT_TP_B.write(TP_A + "\n")
-
-        if len(TP_B) > 0:
-            TP_B = sorted(TP_B, key=itemgetter(0,1,2))
-            TP_B = "\n".join(["\t".join([str(y) for y in x]) for x in TP_B])
-            # write these true positives only to the B genome
-            OUT_TP_B.write(TP_B + "\n")
-
-    else:
-        if len(TP) > 0:
-            TP = sorted(TP, key=itemgetter(0,1,2))
-            TP = "\n".join(["\t".join([str(y) for y in x]) for x in TP])
-            # write these true positives to the only output true positives file
-            OUT_TP.write(TP + "\n")
-
-    # close files
-    if args.hybrid:
-        OUT_homo.close()
-        OUT_TP_A.close()
-        OUT_het.close()
-        OUT_TP_B.close()
-    else:
-        OUT_het.close()
-        OUT_TP.close()
-
+    if args.verbose:
+        sys.stderr.write(f"[{at()}] Writing to output...\n")
+    write_to_output(args, Mut_fasta, Lohs, Mutations)
 
 if __name__=='__main__':
     main(args)

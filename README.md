@@ -26,6 +26,7 @@ A tool to extract, filter, and manage blocks of loss of heterozygosity (LOH) bas
   * [JLOH g2g](#jloh-g2g)
   * [JLOH filter](#jloh-filter)
   * [JLOH density](#jloh-density)
+  * [JLOH sim](#jloh-sim)
 
 
 ## Install
@@ -39,6 +40,7 @@ And it's ready to go! But there are a few dependencies:
 | bedtools    | Program     | 2.30    | [source](https://bedtools.readthedocs.io/en/latest/), [cite](https://doi.org/10.1002/0471250953.bi1112s47) |
 | Biopython   | Module      | 1.79    | [source](https://biopython.org/), [cite](https://doi.org/10.1093/bioinformatics/btp163) |
 | MUMmer      | Program     | 3.1     | [source](https://anaconda.org/bioconda/mummer), [cite](https://doi.org/10.1186%2Fgb-2004-5-2-r12) |
+| numpy       | Module      | 1.21.4  | [source](https://numpy.org/), [cite](https://doi.org/10.1038/s41586-020-2649-2) |
 | pandas      | Module      | 1.3.5   | [source](https://pandas.pydata.org/), [cite](https://doi.org/10.5281/zenodo.3509134) |
 | pybedtools  | Module      | 0.8.2   | [source](https://daler.github.io/pybedtools/main.html), [cite](https://doi.org/10.1093/bioinformatics/btr539) |
 | pysam       | Module      | 0.1.7   | [source](https://pypi.org/project/pysam/), [cite](https://github.com/pysam-developers/pysam) |

@@ -57,6 +57,7 @@ jloh extract --vcf <VCF> --ref <FASTA> --bam <BAM> [options]
 --output-dir        Output directory                                            [jloh_out]
 --threads           Number of parallel computing threads                        [4]
 --regions           BED file containing regions to keep in the analysis         [off]
+					Can include regions from both --refs
 
 [parameters]
 --filter-mode       "pass" to keep only PASS variants, "all" to keep everything [all]
@@ -153,8 +154,11 @@ def organize_workspace(args):
 
 def dump_queue(q):
 
+	"""
+	16/03/2022 
+	"""
+
 	out = []
-	# while q.qsize() > 0:
 	while not q.empty():
 		x = q.get()
 		out.append(x)
@@ -297,7 +301,7 @@ def calculate_chrom_snp_densities(Variants, ref):
 def hetero_and_homo_snp_densities(het_snps_vcf, homo_snps_vcf, ref):
 
 	"""
-	Last update: 09/03/2022
+	Last update: 15/03/2022
 	"""
 
 	Hetero_lines = [ line for line in open(het_snps_vcf, "r") if line[0] != "#" ]
@@ -1044,7 +1048,7 @@ def write_vcfs_to_output(args, Handles, mode, Hetero_lines_lst, Homo_lines_lst, 
 def run_in_default_mode(args):
 
 	"""
-	Last update: 11/03/2022
+	Last update: 15/03/2022
 	"""
 
 	handle = "exp"
@@ -1057,7 +1061,7 @@ def run_in_default_mode(args):
 
 	# divergence
 	sys.stderr.write(f"[{at()}] Calculating heterozygous and homozygous SNP density in both parental genomes...\n")
-	hetero_div, homo_div = hetero_and_homo_snp_densities(Vcfs["hetero"], Vcfs["homo"], args.ref)
+	hetero_div, homo_div = hetero_and_homo_snp_densities(Vcfs["hetero"][0], Vcfs["homo"][0], args.ref)
 	sys.stderr.write(f"[{at()}] Homozygous SNPs/kbp: {homo_div}\n")
 	sys.stderr.write(f"[{at()}] Heterozygous SNPs/kbp: {hetero_div}\n")
 
@@ -1089,51 +1093,52 @@ def run_in_default_mode(args):
 
 	# filter by length
 	sys.stderr.write(f"[{at()}] Filtering candidate blocks by length...\n")
-	LOH_filt = filter_by_length(LOH, args.min_length)
-	sys.stderr.write(f"[{at()}] {len(LOH_filt)} blocks survived the filtering\n")
+	LOH = filter_by_length(LOH, args.min_length)
+	sys.stderr.write(f"[{at()}] {len(LOH)} blocks survived the filtering\n")
 
 	# count homozygous SNPs in intervals
 	sys.stderr.write(f"[{at()}] Adding heterozygous and homozygous SNP counts in each block...\n")
-	LOH_w_snps = count_snps_in_bed_interval(LOH_filt, Vcfs["homo"])
+	LOH = count_snps_in_bed_interval(LOH, Vcfs["homo"])
 	# count heterozygous SNPs in intervals
-	LOH_w_snps = count_snps_in_bed_interval(LOH_w_snps, Vcfs["hetero"])
-	sys.stderr.write(f"[{at()}] {len(LOH_w_snps)} blocks were processed\n")
+	LOH = count_snps_in_bed_interval(LOH, Vcfs["hetero"])
+	sys.stderr.write(f"[{at()}] {len(LOH)} blocks were processed\n")
+
+	# write candidates to output, pre filtering
+	LOH.saveas(f"{args.output_dir}/{args.sample}.LOH_candidates.tsv")
 
 	# keep only intervals inside --regions
 	if args.regions:
 		sys.stderr.write(f"[{at()}] Removing intervals outside of --regions...\n")
-		LOH_w_snps = keep_relevant_blocks(args, LOH_w_snps)
-		sys.stderr.write(f"[{at()}] The final set consists of {len(LOH_w_snps)} blocks\n")
-	else:
-		sys.stderr.write(f"[{at()}] The final set consists of {len(LOH_w_snps)} blocks\n")
+		LOH = keep_relevant_blocks(args, LOH)
+
+	sys.stderr.write(f"[{at()}] The final set consists of {len(LOH)} blocks\n")
 
 	# write to output
 	# including a header
 	sys.stderr.write(f"[{at()}] Writing to output...\n")
 	out = f"{args.output_dir}/{args.sample}.LOH_blocks.tsv"
+	out_bed = f"{args.output_dir}/{args.sample}.LOH_blocks.bed"
 	OUTPUT = open(out, "w")
-	OUTPUT.write("\t".join(["#Chrom", "Start", "End", "Cov", "Cov_frac", "Cov_ratio_up", "Cov_ratio_down", "Zygosity", "Length", "Allele", "Homo_snps", "Hetero_snps"]) + "\n")
-	for row in LOH_w_snps:
-		OUTPUT.write(str(row))
-	OUTPUT.close()
+	OUTPUT_BED = open(out_bed, "w")
 
-	# create output bed file
-	out = f"{args.output_dir}/{args.sample}.LOH_blocks.bed"
-	OUTPUT = open(out, "w")
-	for row in LOH_w_snps:
+	OUTPUT.write("\t".join(["#Chrom", "Start", "End", "Cov", "Cov_frac", "Cov_ratio_up", "Cov_ratio_down", "Zygosity", "Length", "Allele", "Homo_snps", "Hetero_snps"]) + "\n")
+	for row in LOH:
+		OUTPUT.write(str(row))
 		row = list(row)[0:3]
-		OUTPUT.write("\t".join(row) + "\n")
+		OUTPUT_BED.write("\t".join(row) + "\n")
+
 	OUTPUT.close()
+	OUTPUT_BED.close()
+
 	sys.stderr.write(f"[{at()}] Done!\n")
 
 	return True
 
 
-
 def run_in_hybrid_mode(args):
 
 	"""
-	Last update: 14/03/2022
+	Last update: 15/03/2022
 	"""
 
 	handle_A = "exp_A"
@@ -1192,56 +1197,62 @@ def run_in_hybrid_mode(args):
 
 	# filter by length
 	sys.stderr.write(f"[{at()}] Filtering candidate blocks by length...\n")
-	LOH_filt_A = filter_by_length(LOH_A, args.min_length)
-	LOH_filt_B = filter_by_length(LOH_B, args.min_length)
-	sys.stderr.write(f"[{at()}] Parent A: {len(LOH_filt_A)} blocks survived the filtering\n")
-	sys.stderr.write(f"[{at()}] Parent B: {len(LOH_filt_B)} blocks survived the filtering\n")
+	LOH_A = filter_by_length(LOH_A, args.min_length)
+	LOH_B = filter_by_length(LOH_B, args.min_length)
+	sys.stderr.write(f"[{at()}] Parent A: {len(LOH_A)} blocks survived the filtering\n")
+	sys.stderr.write(f"[{at()}] Parent B: {len(LOH_B)} blocks survived the filtering\n")
 
 	# count homozygous SNPs in intervals
 	sys.stderr.write(f"[{at()}] Adding heterozygous and homozygous SNP counts in each block...\n")
-	LOH_w_snps_A = count_snps_in_bed_interval(LOH_filt_A, Vcfs["homo"][0])
-	LOH_w_snps_B = count_snps_in_bed_interval(LOH_filt_B, Vcfs["homo"][1])
+	LOH_A = count_snps_in_bed_interval(LOH_A, Vcfs["homo"][0])
+	LOH_B = count_snps_in_bed_interval(LOH_B, Vcfs["homo"][1])
 	# count heterozygous SNPs in intervals
-	LOH_w_snps_A = count_snps_in_bed_interval(LOH_w_snps_A, Vcfs["hetero"][0])
-	LOH_w_snps_B = count_snps_in_bed_interval(LOH_w_snps_B, Vcfs["hetero"][1])
-	sys.stderr.write(f"[{at()}] Parent A: {len(LOH_w_snps_A)} blocks were processed\n")
-	sys.stderr.write(f"[{at()}] Parent B: {len(LOH_w_snps_B)} blocks were processed\n")
-
-	# concatenate
-	sys.stderr.write(f"[{at()}] Concatenating the results from the two parental genomes of the hybrid...\n")
-	LOH_w_snps_A = [str(row) for row in LOH_w_snps_A]
-	LOH_w_snps_B = [str(row) for row in LOH_w_snps_B]
-	LOH_w_snps = BedTool(LOH_w_snps_A + LOH_w_snps_B)
+	LOH_A = count_snps_in_bed_interval(LOH_A, Vcfs["hetero"][0])
+	LOH_B = count_snps_in_bed_interval(LOH_B, Vcfs["hetero"][1])
+	sys.stderr.write(f"[{at()}] Parent A: {len(LOH_A)} blocks were processed\n")
+	sys.stderr.write(f"[{at()}] Parent B: {len(LOH_B)} blocks were processed\n")
 
 	# write candidates to output, pre filtering
-	LOH_w_snps.saveas(f"{args.output_dir}/{args.sample}.LOH_candidates.bed")
+	LOH_A.saveas(f"{args.output_dir}/{args.sample}.LOH_candidates.A.tsv")
+	LOH_B.saveas(f"{args.output_dir}/{args.sample}.LOH_candidates.B.tsv")
 
 	# keep only intervals inside --regions
 	if args.regions:
 		sys.stderr.write(f"[{at()}] Removing intervals outside of --regions...\n")
-		LOH_w_snps_filt = keep_relevant_blocks(args, LOH_w_snps)
-		sys.stderr.write(f"[{at()}] The final set consists of {len(LOH_w_snps)} blocks\n")
-	else:
-		LOH_w_snps_filt = LOH_w_snps
-		sys.stderr.write(f"[{at()}] The final set consists of {len(LOH_w_snps_filt)} blocks\n")
+		LOH_A = keep_relevant_blocks(args, LOH_A)
+		LOH_B = keep_relevant_blocks(args, LOH_B)
+
+	sys.stderr.write(f"[{at()}] {len(LOH_A)} retained for parent A\n")
+	sys.stderr.write(f"[{at()}] {len(LOH_B)} retained for parent B\n")
 
 	# write to output
 	# including a header
 	sys.stderr.write(f"[{at()}] Writing to output...\n")
-	out = f"{args.output_dir}/{args.sample}.LOH_blocks.tsv"
-	OUTPUT = open(out, "w")
-	OUTPUT.write("\t".join(["#Chrom", "Start", "End", "Cov", "Cov_frac", "Cov_ratio_up", "Cov_ratio_down", "Zygosity", "Length", "Allele", "Homo_snps", "Hetero_snps"]) + "\n")
-	for row in LOH_w_snps_filt:
-		OUTPUT.write(str(row))
-	OUTPUT.close()
+	out_A = f"{args.output_dir}/{args.sample}.LOH_blocks.A.tsv"
+	out_B = f"{args.output_dir}/{args.sample}.LOH_blocks.B.tsv"
+	out_A_bed = f"{args.output_dir}/{args.sample}.LOH_blocks.A.bed"
+	out_B_bed = f"{args.output_dir}/{args.sample}.LOH_blocks.B.bed"
+	OUTPUT_A = open(out_A, "w")
+	OUTPUT_A_BED = open(out_A_bed, "w")
+	OUTPUT_B = open(out_B, "w")
+	OUTPUT_B_BED = open(out_B_bed, "w")
+	OUTPUT_A.write("\t".join(["#Chrom", "Start", "End", "Cov", "Cov_frac", "Cov_ratio_up", "Cov_ratio_down", "Zygosity", "Length", "Allele", "Homo_snps", "Hetero_snps"]) + "\n")
+	OUTPUT_B.write("\t".join(["#Chrom", "Start", "End", "Cov", "Cov_frac", "Cov_ratio_up", "Cov_ratio_down", "Zygosity", "Length", "Allele", "Homo_snps", "Hetero_snps"]) + "\n")
 
-	# create output bed file
-	out = f"{args.output_dir}/{args.sample}.LOH_blocks.bed"
-	OUTPUT = open(out, "w")
-	for row in LOH_w_snps_filt:
+	for row in LOH_A:
+		OUTPUT_A.write(str(row))
 		row = list(row)[0:3]
-		OUTPUT.write("\t".join(row) + "\n")
-	OUTPUT.close()
+		OUTPUT_A_BED.write("\t".join(row) + "\n")
+	OUTPUT_A.close()
+	OUTPUT_A_BED.close()
+
+	for row in LOH_B:
+		OUTPUT_B.write(str(row))
+		row = list(row)[0:3]
+		OUTPUT_B_BED.write("\t".join(row) + "\n")
+	OUTPUT_B.close()
+	OUTPUT_B_BED.close()
+
 	sys.stderr.write(f"[{at()}] Done!\n")
 
 	return True
@@ -1269,6 +1280,7 @@ def main(args, tmp_dir):
 
 	# remove tmp folder
 	shutil.rmtree(tmp_dir)
+
 
 if __name__ == "__main__":
 	main(args, tmp_dir)
