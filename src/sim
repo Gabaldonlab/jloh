@@ -188,7 +188,7 @@ def process_sequence_mutations(Seq_q, Mut_q, record, positions, alphabet):
         ref = seqlist[pos]
         alt = random.choice([i for i in alphabet if i != ref])
         seqlist[pos] = alt
-        Mut_q.put((chrom, pos, ref, alt))
+        Mut_q.put((chrom, str(pos+1), ref, alt))
 
     newseq = "".join(seqlist)
     Seq_q.put((chrom, newseq))

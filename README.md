@@ -23,10 +23,12 @@ A tool to extract, filter, and manage blocks of loss of heterozygosity (LOH) bas
     + [Determination of block zygosity](#determination-of-block-zygosity)
     + [Output](#output)
       - [Interpreting output](#interpreting-output)
+- [Modules](#modules)
+  * [JLOH sim](#jloh-sim)
   * [JLOH g2g](#jloh-g2g)
+  * [JLOH extract](#jloh-extract-1)
   * [JLOH filter](#jloh-filter)
   * [JLOH density](#jloh-density)
-  * [JLOH sim](#jloh-sim)
 
 
 ## Install
@@ -223,6 +225,17 @@ An example as seen in IGV is provided below.
 
 ![Example](images/example.png)
 
+# Modules
+
+## JLOH sim
+
+This module generates a copy of a reference sequence in FASTA format, introducing a series of mutations selected randomly over the sequence of each scaffold/chromosome. Optionally, the module can include a series of LOH blocks defined by percentage of the whole genome (e.g. 20%).
+
+The output is:
+- the mutated reference sequence in FASTA format
+- a tab-separated file with all the introduced SNPs, with positions annotated in 1-based format including reference and alternative allele
+- a BED file with all the introduced LOH blocks, hence in 0-based half-open format
+
 ## JLOH g2g
 
 This program is made for extracting regions of high sequence identity between two genome sequences in FASTA format. The input are the two sequences, and the output is a bed file representing the regions that are depleted of SNPs between the two genomes.
@@ -230,6 +243,10 @@ This program is made for extracting regions of high sequence identity between tw
 `JLOH g2g` runs more than one tool from the MUMmer arsenal to map the two genomes, filter the results, extract the SNPs. Then, it uses `all2vcf mummer` to convert the MUMmer output to VCF format, and `bedtools merge` to generate BED intervals from SNPs. Intervals are expanded as long as there are overlaps, and at the end are reversed, to find regions without SNPs.
 
 These regions are a good `--mask` to pass to `JLOH extract` in `--hybrid` mode.
+
+## JLOH extract
+
+This is the most important module of JLOH. Its functions are well described above. It is used to extract LOH blocks starting from VCF, BAM, and FASTA files.
 
 ## JLOH filter
 
