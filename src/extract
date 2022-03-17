@@ -155,7 +155,7 @@ def organize_workspace(args):
 def dump_queue(q):
 
 	"""
-	16/03/2022 
+	16/03/2022
 	"""
 
 	out = []
@@ -1104,7 +1104,11 @@ def run_in_default_mode(args):
 	sys.stderr.write(f"[{at()}] {len(LOH)} blocks were processed\n")
 
 	# write candidates to output, pre filtering
-	LOH.saveas(f"{args.output_dir}/{args.sample}.LOH_candidates.tsv")
+	LOH.saveas(f"{args.output_dir}/{args.sample}.LOH_candidates.bed")
+
+	# write candidates to output, pre filtering
+	LOH_candidates = BedTool([str(row).rstrip("\b\n\r").split("\t")[0:3] for row in LOH])
+	LOH_candidates.saveas(f"{args.output_dir}/{args.sample}.LOH_candidates.bed")
 
 	# keep only intervals inside --regions
 	if args.regions:
@@ -1127,6 +1131,13 @@ def run_in_default_mode(args):
 		row = list(row)[0:3]
 		OUTPUT_BED.write("\t".join(row) + "\n")
 
+	for row in LOH:
+		row_1based = str(row).rstrip("\b\n\r").split("\t")
+		row_1based = [str(row_1based[0]), int(row_1based[1])+1, int(row_1based[2])]
+		row_1based = "\t".join([str(i) for i in row_1based]) + "\n"
+		OUTPUT.write(str(row_1based))
+		row = list(row)[0:3]
+		OUTPUT_BED.write("\t".join(row) + "\n")
 	OUTPUT.close()
 	OUTPUT_BED.close()
 
@@ -1138,7 +1149,7 @@ def run_in_default_mode(args):
 def run_in_hybrid_mode(args):
 
 	"""
-	Last update: 15/03/2022
+	Last update: 17/03/2022
 	"""
 
 	handle_A = "exp_A"
@@ -1206,6 +1217,7 @@ def run_in_hybrid_mode(args):
 	sys.stderr.write(f"[{at()}] Adding heterozygous and homozygous SNP counts in each block...\n")
 	LOH_A = count_snps_in_bed_interval(LOH_A, Vcfs["homo"][0])
 	LOH_B = count_snps_in_bed_interval(LOH_B, Vcfs["homo"][1])
+
 	# count heterozygous SNPs in intervals
 	LOH_A = count_snps_in_bed_interval(LOH_A, Vcfs["hetero"][0])
 	LOH_B = count_snps_in_bed_interval(LOH_B, Vcfs["hetero"][1])
@@ -1213,8 +1225,10 @@ def run_in_hybrid_mode(args):
 	sys.stderr.write(f"[{at()}] Parent B: {len(LOH_B)} blocks were processed\n")
 
 	# write candidates to output, pre filtering
-	LOH_A.saveas(f"{args.output_dir}/{args.sample}.LOH_candidates.A.tsv")
-	LOH_B.saveas(f"{args.output_dir}/{args.sample}.LOH_candidates.B.tsv")
+	LOH_candidates_A = BedTool([str(row).rstrip("\b\n\r").split("\t")[0:3] for row in LOH_A])
+	LOH_candidates_B = BedTool([str(row).rstrip("\b\n\r").split("\t")[0:3] for row in LOH_B])
+	LOH_candidates_A.saveas(f"{args.output_dir}/{args.sample}.LOH_candidates.A.bed")
+	LOH_candidates_B.saveas(f"{args.output_dir}/{args.sample}.LOH_candidates.B.bed")
 
 	# keep only intervals inside --regions
 	if args.regions:
@@ -1240,13 +1254,20 @@ def run_in_hybrid_mode(args):
 	OUTPUT_B.write("\t".join(["#Chrom", "Start", "End", "Cov", "Cov_frac", "Cov_ratio_up", "Cov_ratio_down", "Zygosity", "Length", "Allele", "Homo_snps", "Hetero_snps"]) + "\n")
 
 	for row in LOH_A:
-		OUTPUT_A.write(str(row))
+		row_1based = str(row).rstrip("\b\n\r").split("\t")
+		row_1based = [str(row_1based[0]), int(row_1based[1])+1, int(row_1based[2])]
+		row_1based = "\t".join([str(i) for i in row_1based]) + "\n"
+		OUTPUT_A.write(str(row_1based))
 		row = list(row)[0:3]
 		OUTPUT_A_BED.write("\t".join(row) + "\n")
 	OUTPUT_A.close()
 	OUTPUT_A_BED.close()
 
 	for row in LOH_B:
+		row_1based = str(row).rstrip("\b\n\r").split("\t")
+		row_1based = [str(row_1based[0]), int(row_1based[1])+1, int(row_1based[2])]
+		row_1based = "\t".join([str(i) for i in row_1based]) + "\n"
+		OUTPUT_B.write(str(row_1based))
 		OUTPUT_B.write(str(row))
 		row = list(row)[0:3]
 		OUTPUT_B_BED.write("\t".join(row) + "\n")

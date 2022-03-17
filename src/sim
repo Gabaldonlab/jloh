@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 16/03/2022
+Last change: 17/03/2022
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 ###
 """
@@ -41,6 +41,8 @@ jloh sim --input <FASTA> [options]
 --divergence            How much divergence in the mutated genome (0.0-1.0)     [0.01]
 --loh                   Apply this level of LOH (0.0-1.0)                       [0.0]
 --snp-distance          Max. SNP distance to create blocks of heterozygosity    [100]
+--chr-name-mod          Comma-separated old and new pattern to rename sequences [off]
+                        in the new FASTA file, e.g. "S_cere,S_dive"
 
 """)
     sys.exit(0)
@@ -55,6 +57,7 @@ p.add_argument("--hybrid", action="store_true")
 p.add_argument("--divergence", default=0.01, type=float)
 p.add_argument("--loh", default=0.00, type=float)
 p.add_argument("--snp-distance", default=100, type=int)
+p.add_argument("--chr-name-mod", type=str)
 args = p.parse_args()
 
 
@@ -99,7 +102,7 @@ def still_too_little_loh(het_positions, chrom, seq, loh, snp_dist):
 def process_chromosome(args, Lohs_q, Snps_q, record, lohSizes):
 
     """
-    16/03/2022
+    17/03/2022
     """
 
     # define chromosome-related variables
@@ -126,6 +129,11 @@ def process_chromosome(args, Lohs_q, Snps_q, record, lohSizes):
                 lsize = int(round(random.sample(lohSizes, 1)[0]))
             e = s + lsize
             het_positions = list(filter(lambda p: p<s or p>e, het_positions))
+            if args.chr_name_mod:
+                old = args.chr_name_mod.split(",")[0]
+                new = args.chr_name_mod.split(",")[1]
+                chrom = chrom.replace(old, new)
+
             Lohs_q.put((chrom, s, e))
 
         # once LOH has been applied, save the remaining positions
@@ -174,7 +182,7 @@ def obtain_divergent_positions(args):
     return All_lohs, Snp_positions
 
 
-def process_sequence_mutations(Seq_q, Mut_q, record, positions, alphabet):
+def process_sequence_mutations(args, Seq_q, Mut_q, record, positions, alphabet):
 
     """
     16/03/2022
@@ -183,6 +191,11 @@ def process_sequence_mutations(Seq_q, Mut_q, record, positions, alphabet):
     chrom = record.id
     seq = record.seq
     seqlist = list(seq)
+
+    if args.chr_name_mod:
+        old = args.chr_name_mod.split(",")[0]
+        new = args.chr_name_mod.split(",")[1]
+        chrom = chrom.replace(old, new)
 
     for pos in positions:
         ref = seqlist[pos]
@@ -209,7 +222,7 @@ def mutate_reference(args, fasta, Snp_positions, alphabet):
             positions = Snp_positions[str(record.id)]
         except KeyError:
             positions = []
-        pool.apply_async(process_sequence_mutations, args=(Seq_q, Mut_q, record, positions, alphabet))
+        pool.apply_async(process_sequence_mutations, args=(args, Seq_q, Mut_q, record, positions, alphabet))
 
     pool.close()
     pool.join()

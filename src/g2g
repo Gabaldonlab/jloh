@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 14/03/2022
+Last change: 17/03/2022
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 ###
 """
@@ -43,9 +43,9 @@ jloh g2g --target <FASTA> --query <FASTA> [options]
 --output-dir            Where to place the output files                         [.]
 
 [mapping]
---default               -c 65 -b 200 -l 50
---sensitive             -c 100 -b 50 -l 50 --mum                                [off]
---relaxed               -c 50 -b 200 -l 20                                      [off]
+--default               nucmer parameters: -c 65 -b 200 -l 20
+--sensitive             nucmer parameters: -c 100 -b 50 -l 50 --mum             [off]
+--relaxed               nucmer parameters: -c 50 -b 500 -l 20                   [off]
 
 [parameters]
 --est-divergence        Estimated divergence between the two genomes (0.0-1.0)  [0.01]
@@ -63,6 +63,7 @@ p.add_argument("--ref-B")
 p.add_argument("--output-dir", default=".")
 p.add_argument("--default", action="store_true", default=True)
 p.add_argument("--sensitive", action="store_true", default=False)
+p.add_argument("--relaxed", action="store_true", default=False)
 p.add_argument("--est-divergence", default=0.01, type=float)
 p.add_argument("--min-length", default=1000, type=int)
 args = p.parse_args()
@@ -71,16 +72,16 @@ args = p.parse_args()
 def map_genomes(args, tmp_dir):
 
     """
-    14/03/2022
+    17/03/2022
     """
 
     # map
     if args.default:
-        params = "-c 65 -b 200 -l 50"
+        params = "-c 65 -b 200 -l 20"
     elif args.sensitive:
         params = "-c 100 -b 50 -l 50 --mum"
     elif args.relaxed:
-        params = "-c 50 -b 200 -l 20"
+        params = "-c 50 -b 500 -l 20"
 
     out_prefix_A = f"{tmp_dir}/out_A"
     cmd = f"nucmer -p {out_prefix_A} {params} {args.ref_A} {args.ref_B}"
