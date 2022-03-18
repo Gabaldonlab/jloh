@@ -28,8 +28,6 @@ A tool to extract, filter, and manage blocks of loss of heterozygosity (LOH) bas
   * [JLOH filter](#jloh-filter)
   * [JLOH density](#jloh-density)
 
-<small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
-
 
 ## Install
 
