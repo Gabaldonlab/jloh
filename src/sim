@@ -71,35 +71,31 @@ def dump_queue(queue):
     return out
 
 
-def still_too_little_loh(het_positions, chrom, seq, loh, snp_dist):
+def get_loh_level(het_positions, chrom, seq, snp_dist):
 
     """
     18/03/2022
     Matteo Schiavinato
     """
 
-    tmp = [[chrom, max(int(pos), 0), min(int(pos), len(seq))] for pos in het_positions]
+    tmp = [[chrom, int(pos), int(pos)+1] for pos in het_positions if 0 <= pos < len(seq)]
     tmp = sorted(tmp, key=itemgetter(0,1,2))
 
     if len(tmp) > 0:
         bt = BedTool(tmp)
         bt = bt.merge(d=snp_dist, c=1, o="count")
-        het_ranges = [[str(row[0]), max(int(row[1]), 0), min(int(row[2]), len(seq))] for row in bt]
-        mutated_pos_ranges = sum([int(x[2])-int(x[1]) for x in bt])
-        mutated_pos_ranges = min(len(seq), mutated_pos_ranges)
-        mut_free_frac = (len(seq) - mutated_pos_ranges) / len(seq)
-
-        if mut_free_frac < 1-loh:
-            return True
-        else:
-            return False
+        bt = [[str(row[0]), max(int(row[1]), 0), min(int(row[2]), len(seq))] for row in bt]
+        het_ranges = sum([int(x[2])-int(x[1]) for x in bt])
+        het_ranges = min(len(seq), het_ranges)
+        mut_free_frac = (len(seq) - het_ranges) / len(seq)
+        return mut_free_frac, bt
 
     else:
-        return False
+        return float(100.0), []
 
 
 
-def process_chromosome(args, Lohs_q, Snps_q, record, lohSizes):
+def process_chromosome(args, Lohs_q, Snps_q, Het_q, record, lohSizes):
 
     """
     18/03/2022
@@ -118,23 +114,47 @@ def process_chromosome(args, Lohs_q, Snps_q, record, lohSizes):
 
     # introduce LOH by removing chunks of variants
     elif args.loh > 0 and args.loh <= 1:
-        while still_too_little_loh(het_positions, chrom, seq, args.loh, args.snp_distance) == True:
-            #get LOH random start
-            s = random.randint(0, len(seq)-1)
-            #and random LOH length from negative binomial distribution
-            lsize = 0
-            #LOH has to be at least 2x larger than average distance between SNPs
-            while lsize <= 2.0 / args.divergence:
-                lohSizes = list(lohSizes)
-                lsize = int(round(random.sample(lohSizes, 1)[0]))
-            e = s + lsize
-            het_positions = list(filter(lambda p: p<s or p>e, het_positions))
-            if args.chr_name_mod:
-                old = args.chr_name_mod.split(",")[0]
-                new = args.chr_name_mod.split(",")[1]
-                chrom = chrom.replace(old, new)
+        # if 20% LOH --> this means that mut_free_frac must be ~ 20%
+        # note that at low divergences, this value can just be higher than 20%
+        # because the SNPs are too sparse
+        loh_level, het_ranges = get_loh_level(het_positions, chrom, seq, args.snp_distance)
 
-            Lohs_q.put((chrom, s, e))
+        if args.verbose:
+            sys.stderr.write(f"[{at()}] Detected {round(loh_level*100, 2)}% non-heterozygous regions on sequence: {chrom}\n")
+
+        # if we already have enough LOH due to scarce divergence selected
+        if loh_level >= args.loh:
+            if args.verbose:
+                sys.stderr.write(f"[{at()}] {chrom}: absence of heterozygosity ({round(loh_level*100, 1)}%) already > {round(args.loh*100, 1)}% LOH\n")
+            if len(het_ranges) > 0:
+                Het_q.put(het_ranges)
+
+        # if we need to increase the LOH levels
+        else:
+            while loh_level < args.loh:
+                if args.verbose:
+                    sys.stderr.write(f"[{at()}] {chrom}: increasing LOH from {round(loh_level*100, 2)}%...\n")
+
+                #get LOH random start
+                s = random.randint(0, len(seq)-1)
+                #and random LOH length from negative binomial distribution
+                lsize = 0
+                #LOH has to be at least 2x larger than average distance between SNPs
+                while lsize <= 2.0 / args.divergence:
+                    lohSizes = list(lohSizes)
+                    lsize = int(round(random.sample(lohSizes, 1)[0]))
+                e = s + lsize
+                het_positions = list(filter(lambda p: p<s or p>e, het_positions))
+                if args.chr_name_mod:
+                    old = args.chr_name_mod.split(",")[0]
+                    new = args.chr_name_mod.split(",")[1]
+                    chrom = chrom.replace(old, new)
+
+                Lohs_q.put((chrom, s, e))
+
+                # recalculate
+                loh_level, het_ranges = get_loh_level(het_positions, chrom, seq, args.snp_distance)
+
 
         # once LOH has been applied, save the remaining positions
         Snps_q.put((chrom, list(het_positions)))
@@ -143,25 +163,56 @@ def process_chromosome(args, Lohs_q, Snps_q, record, lohSizes):
         Snps_q.put((chrom, list(het_positions)))
 
 
+
+def get_nondivergent_regions(args, Het_q):
+
+    """
+    18/03/2022
+    """
+
+    # create genome file
+    genome_file = f"{args.out}.genome_file.tsv"
+    OUT = open(genome_file, "w")
+    for record in SeqIO.parse(args.fasta, "fasta"):
+        OUT.write(f"{record.id}\t{len(record.seq)}\n")
+    OUT.close()
+
+    # get original LOH regions
+    All_het_ranges = dump_queue(Het_q)
+    tmp = []
+    for lst in All_het_ranges:
+        tmp = tmp + lst
+    All_het_ranges = sorted(tmp, key=itemgetter(0,1,2))
+    if len(All_het_ranges) > 0:
+        bt = BedTool(All_het_ranges)
+        bt_comp = bt.sort(g=genome_file).complement(g=genome_file)
+        out = [str(row).rstrip("\r\b\n").split("\t") for row in bt_comp]
+        out = [[str(x[0]), int(x[1]), int(x[2])] for x in out]
+    else:
+        out = []
+
+    return out
+
+
 def obtain_divergent_positions(args):
 
     """
-    16/03/2022
+    18/03/2022
     """
 
     # multiprocessing stuff
     pool = mp.Pool(args.threads)
     Lohs_q = mp.Manager().Queue()
     Snps_q = mp.Manager().Queue()
+    Het_q = mp.Manager().Queue()
 
     #get LOH sizes distibution
     lohSizes = np.random.lognormal(0, 1.2, 100000) * 1e3
-
     if args.verbose:
         sys.stderr.write(f"[{at()}] Generating list of random SNPs to apply to sequence...\n")
 
     for record in SeqIO.parse(args.fasta, "fasta"):
-        pool.apply_async(process_chromosome, args=(args, Lohs_q, Snps_q, record, lohSizes))
+        res = pool.apply_async(process_chromosome, args=(args, Lohs_q, Snps_q, Het_q, record, lohSizes))
 
     pool.close()
     pool.join()
@@ -169,17 +220,19 @@ def obtain_divergent_positions(args):
     if args.verbose:
         sys.stderr.write(f"[{at()}] Reorganizing and sorting results...\n")
 
+    Non_divergent = get_nondivergent_regions(args, Het_q)
     All_lohs = dump_queue(Lohs_q)
     All_lohs = sorted(All_lohs, key=itemgetter(0,1,2))
     All_snps = dump_queue(Snps_q)
     All_snps = sorted(All_snps, key=itemgetter(0))
+
     Snp_positions = { chrom:[] for chrom in list(set([x[0] for x in All_snps])) }
     for snp_list in All_snps:
         chrom = snp_list[0]
         positions = snp_list[1]
         Snp_positions[chrom] = [int(i) for i in positions]
 
-    return All_lohs, Snp_positions
+    return All_lohs, Snp_positions, Non_divergent
 
 
 def process_sequence_mutations(args, Seq_q, Mut_q, record, chrom, positions, alphabet):
@@ -235,10 +288,10 @@ def mutate_reference(args, fasta, Snp_positions, alphabet):
     return Mut_fasta, Mutations
 
 
-def write_to_output(args, Mut_fasta, Lohs, Mutations):
+def write_to_output(args, Mut_fasta, Lohs, Non_divergent, Mutations):
 
     """
-    16/03/2022
+    18/03/2022
     """
 
     # out fasta
@@ -254,6 +307,13 @@ def write_to_output(args, Mut_fasta, Lohs, Mutations):
     OUT = open(f"{args.out}.lohs", "w")
     for loh in Lohs:
         OUT.write("\t".join([str(i) for i in loh]) + "\n")
+    OUT.close()
+
+    # out lohs
+    Non_divergent = sorted(Non_divergent, key=itemgetter(0,1,2))
+    OUT = open(f"{args.out}.non_divergent", "w")
+    for nd in Non_divergent:
+        OUT.write("\t".join([str(i) for i in nd]) + "\n")
     OUT.close()
 
     # out snps
@@ -275,7 +335,7 @@ def main(args):
     # get mutated copy of a reference
     if args.verbose:
         sys.stderr.write(f"[{at()}] Generating list of positions to mutate...\n")
-    Lohs, Snp_positions = obtain_divergent_positions(args)
+    Lohs, Snp_positions, Non_divergent = obtain_divergent_positions(args)
 
     # if name change: change it
     if args.chr_name_mod:
@@ -289,7 +349,7 @@ def main(args):
 
     if args.verbose:
         sys.stderr.write(f"[{at()}] Writing to output...\n")
-    write_to_output(args, Mut_fasta, Lohs, Mutations)
+    write_to_output(args, Mut_fasta, Lohs, Non_divergent, Mutations)
 
 if __name__=='__main__':
     main(args)
