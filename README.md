@@ -13,7 +13,6 @@ A tool to extract, filter, and manage blocks of loss of heterozygosity (LOH) bas
   * [Install](#install)
   * [Run](#run)
     + [Nextflow workflow](#nextflow-workflow)
-  * [Example run - step by step guide](#example-run---step-by-step-guide)
 - [Modules](#modules)
   * [JLOH sim](#jloh-sim)
   * [JLOH g2g](#jloh-g2g)
@@ -27,6 +26,7 @@ A tool to extract, filter, and manage blocks of loss of heterozygosity (LOH) bas
       - [Interpreting output](#interpreting-output)
   * [JLOH filter](#jloh-filter)
   * [JLOH density](#jloh-density)
+- [Hybrid mode - step by step guide](#hybrid-mode---step-by-step-guide)
 
 
 ## Install
