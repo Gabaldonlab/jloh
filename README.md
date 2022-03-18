@@ -83,90 +83,6 @@ In case you're working on a cluster with a slurm queuing system, you can edit th
 
 `sbatch reads_to_LOH_blocks.sh`
 
-
-## Example run - step by step guide
-
-The following steps (apart from the installation) are performed by the nextflow workflow described in the previous section. Maybe have a look at that before doing everything by hand! ;)
-
-The first step is of course making sure that everything has been installed properly. Hence, follow the instructions in the [Install](#install) section prior to trying this guide.
-
-Once everything is installed properly, we start by mapping a set of quality-trimmed paired-end reads sequenced from a hybrid species against both of its parental genome sequences. We do it with **HISAT2** but you can use the tool you prefer. For the whole paragraph we will use four threads, represented here as `-p 4`.
-
-```
-hisat2-build -p 4 parent_A.fasta idx_A
-hisat2-build -p 4 parent_B.fasta idx_B
-
-hisat2-align-s -p 4 --score-min L,0.0,-1.0 -x idx_A -1 hybrid_reads.R1.fastq -2 hybrid_reads.R2.fastq -S A.sam
-hisat2-align-s -p 4 --score-min L,0.0,-1.0 -x idx_B -1 hybrid_reads.R1.fastq -2 hybrid_reads.R2.fastq -S B.sam
-```
-
-Note the particularly relaxed mapping criteria (`--score-min L,0.0,-1.0`). These will allow for most reads to map on both genomes, regardless of which subgenome they come from. The result is that we can simulate heterozygosity in the derived SNPs. When mapping the reads, make sure that you're mapping most of them (85-90%). A fraction may still not map due to the target region being missing from the genome sequence.
-
-After mapping, we filter, sort and index the output **sam** files using **samtools** with 4 threads.
-
-```
-samtools view -@ 4 -h -b -F 0x0100 -F 0x4 A.sam | samtools sort -@ 4 -T tmp_A > A.bam
-samtools view -@ 4 -h -b -F 0x0100 -F 0x4 B.sam | samtools sort -@ 4 -T tmp_B > B.bam
-
-samtools index A.bam
-samtools index B.bam
-```
-
-We then index the reference genomes using **samtools** and we use the filtered mapping records to perform a pileup of the reads using **bcftools**.
-
-```
-samtools faidx parent_A.fasta
-samtools faidx parent_B.fasta
-
-bcftools mpileup --fasta-ref parent_A.fasta \
---annotate FORMAT/AD,FORMAT/ADF,FORMAT/ADR,FORMAT/DP,FORMAT/SP,INFO/AD,INFO/ADF,INFO/ADR \
---output-type v --skip-indels --output A.mpileup.vcf A.bam
-
-bcftools mpileup --fasta-ref parent_B.fasta \
---annotate FORMAT/AD,FORMAT/ADF,FORMAT/ADR,FORMAT/DP,FORMAT/SP,INFO/AD,INFO/ADF,INFO/ADR \
---output-type v --skip-indels --output B.mpileup.vcf B.bam
-```
-
-Note that we don't care about indels in this workflow, using the `--skip-indels` option, and that we care instead to annotate a lot of INFO/ and FORMAT/ fields of the generated VCF file.
-
-We then call the SNPs using **bcftools** again.
-
-```
-bcftools call --threads 4 --multiallelic-caller --variants-only \
---output A.raw.vcf --output-type v A.mpileup.vcf
-
-bcftools call --threads 4 --multiallelic-caller --variants-only \
---output B.raw.vcf --output-type v B.mpileup.vcf
-```
-
-Once we have called the SNPs, we filter them using **all2vcf** and we add the allele frequency subfield in the INFO field also using **all2vcf**.
-
-```
-all2vcf filter_vcf --input-file A.raw.vcf --output-file A.f.vcf --quality 20 --alt-frac 0.05 \
---min-depth 4 --map-qual-zero-frac 0.05
-all2vcf filter_vcf --input-file B.raw.vcf --output-file B.f.vcf --quality 20 --alt-frac 0.05 \
---min-depth 4 --map-qual-zero-frac 0.05
-
-all2vcf frequency --in A.f.vcf --out A.ff.vcf
-all2vcf frequency --in B.f.vcf --out B.ff.vcf
-```
-
-Now, we extract the regions of high sequence identity between the two hybrid genomes used in the analysis with **JLOH g2g**. These regions are going to be masked from the produced LOH blocks later on due to the fact that we can't be sure they are true LOH blocks and not just regions that never were heterozygous in the first place. The `--min-identity` parameters should reflect the expected divergence between the two subgenomes, e.g. with 5% divergence you can set it to 95.
-
-```
-jloh g2g --ref-A parent_A.fasta --ref-B parent_B.fasta --min-identity 95 --min-length 1000 > A_and_B.mask.bed
-```
-
-Finally, we call LOH blocks using **JLOH extract**.
-
-```
-jloh extract --threads 4 --vcfs A.ff.vcf B.ff.vcf --bams A.bam B.bam \
---refs parent_A.fasta parent_B.fasta --mask A_and_B.mask.bed \
---sample <STRING> --output-dir <PATH>
-```
-
-The `<sample>.LOH_blocks.tsv` file contained in `--output-dir` will contain all *bona fide* blocks found with this approach, and is the output of the workflow. **CAREFUL**: these blocks are annotated in 0-based coordinates (e.g. positions from 1 to 20 are annotated as 0:20). A bed version is provided together with it.
-
 # Modules
 
 ## JLOH sim
@@ -249,3 +165,88 @@ This tool filters the output produced by `JLOH extract` according to several cri
 ## JLOH density
 
 This tool computes the densities of all SNPs, heterozygous SNPs, and homozygous SNPs over the genome sequence. It is meant to be an informative tool for the user.
+
+# Hybrid mode - step by step guide
+
+*The following steps (apart from the installation) are automatically performed by the nextflow workflow described in the previous section. Maybe have a look at that before doing everything by hand!* ;)
+
+The first step is making sure that everything has been installed properly. Hence, follow the instructions in the [Install](#install) section prior to trying this guide.
+
+The hybrid mode is used to extract LOH blocks in hybrid genomes. Hybrid genomes have two subgenomes that carry substantial differences between each other, while still being somewhat close in terms of sequence identity. Single-nucleotide positional differences between two subgenomes can be identified as **heterozygous SNPs** if reads are mapped against one subgenome at a time, allowing reads from both subgenomes to map onto it. Regions where little heterozygous SNPs are found are good LOH block candidates.
+
+We start by mapping a set of quality-trimmed paired-end reads sequenced from a hybrid species against both of its parental genome sequences. We do it with **HISAT2** but you can use the tool you prefer. For the whole paragraph we will use four threads, represented here as `-p 4`.
+
+```
+hisat2-build -p 4 parent_A.fasta idx_A
+hisat2-build -p 4 parent_B.fasta idx_B
+
+hisat2-align-s -p 4 --score-min L,0.0,-1.0 -x idx_A -1 hybrid_reads.R1.fastq -2 hybrid_reads.R2.fastq -S A.sam
+hisat2-align-s -p 4 --score-min L,0.0,-1.0 -x idx_B -1 hybrid_reads.R1.fastq -2 hybrid_reads.R2.fastq -S B.sam
+```
+
+Note the particularly relaxed mapping criteria (`--score-min L,0.0,-1.0`). These will allow for most reads to map on both genomes, regardless of which subgenome they come from. The result is that we can simulate heterozygosity in the derived SNPs. When mapping the reads, make sure that you're mapping most of them (85-90%). A fraction may still not map due to the target region being missing from the genome sequence.
+
+After mapping, we filter, sort and index the output **sam** files using **samtools** with 4 threads.
+
+```
+samtools view -@ 4 -h -b -F 0x0100 -F 0x4 A.sam | samtools sort -@ 4 -T tmp_A > A.bam
+samtools view -@ 4 -h -b -F 0x0100 -F 0x4 B.sam | samtools sort -@ 4 -T tmp_B > B.bam
+
+samtools index A.bam
+samtools index B.bam
+```
+
+We then index the reference genomes using **samtools** and we use the filtered mapping records to perform a pileup of the reads using **bcftools**.
+
+```
+samtools faidx parent_A.fasta
+samtools faidx parent_B.fasta
+
+bcftools mpileup --fasta-ref parent_A.fasta \
+--annotate FORMAT/AD,FORMAT/ADF,FORMAT/ADR,FORMAT/DP,FORMAT/SP,INFO/AD,INFO/ADF,INFO/ADR \
+--output-type v --skip-indels --output A.mpileup.vcf A.bam
+
+bcftools mpileup --fasta-ref parent_B.fasta \
+--annotate FORMAT/AD,FORMAT/ADF,FORMAT/ADR,FORMAT/DP,FORMAT/SP,INFO/AD,INFO/ADF,INFO/ADR \
+--output-type v --skip-indels --output B.mpileup.vcf B.bam
+```
+
+Note that we don't care about indels in this workflow, using the `--skip-indels` option, and that we care instead to annotate a lot of INFO/ and FORMAT/ fields of the generated VCF file. We then call the SNPs using **bcftools** again.
+
+```
+bcftools call --threads 4 --multiallelic-caller --variants-only \
+--output A.raw.vcf --output-type v A.mpileup.vcf
+
+bcftools call --threads 4 --multiallelic-caller --variants-only \
+--output B.raw.vcf --output-type v B.mpileup.vcf
+```
+
+Once we have called the SNPs, we filter them using **all2vcf** and we add the allele frequency subfield in the INFO field also using **all2vcf**.
+
+```
+all2vcf filter_vcf --input-file A.raw.vcf --output-file A.f.vcf --quality 20 --alt-frac 0.05 \
+--min-depth 4 --map-qual-zero-frac 0.05
+all2vcf filter_vcf --input-file B.raw.vcf --output-file B.f.vcf --quality 20 --alt-frac 0.05 \
+--min-depth 4 --map-qual-zero-frac 0.05
+
+all2vcf frequency --in A.f.vcf --out A.ff.vcf
+all2vcf frequency --in B.f.vcf --out B.ff.vcf
+```
+
+Now, we extract the regions containing heterozygous SNPs between the two parental progenitors using **JLOH g2g**. These regions are going to be used to limit the output of **JLOH extract**. The `--est-divergence` parameter is the expected divergence between the two subgenomes (range: 0.0-1.0). The cross-mapping between the two parental genomes will be allowed up to to twice the indicated divergence.
+
+```
+jloh g2g --ref-A parent_A.fasta --ref-B parent_B.fasta --est-divergence 0.05 --min-length 1000 > A_and_B.regions.bed
+```
+
+Finally, we call LOH blocks using **JLOH extract**, limiting the output to regions showing divergence in genome-to-genome mapping.
+
+```
+jloh extract --threads 4 --vcfs A.ff.vcf B.ff.vcf --bams A.bam B.bam \
+--refs parent_A.fasta parent_B.fasta --regions A_and_B.regions.bed \
+--sample <STRING> --output-dir <PATH>
+```
+
+The `<sample>.LOH_blocks.tsv` file contained in `--output-dir` will contain all *bona fide* blocks found with this approach, and is the output of the workflow. This file contains blocks annotated in 1-based notation (a block from positions 5 to 2300 is annotated as 5:2300).
+
+Another important output file is the `<sample>.LOH_candidates.tsv` file. This file contains all the blocks that were called from the program, regardless of the regions specified in `--regions`. This helps you assessing whether you've been too strict with your regions file and still lets you know where there could be a block that you missed. These blocks are less trustworthy but may be false negatives.

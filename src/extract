@@ -1048,7 +1048,7 @@ def write_vcfs_to_output(args, Handles, mode, Hetero_lines_lst, Homo_lines_lst, 
 def run_in_default_mode(args):
 
 	"""
-	Last update: 15/03/2022
+	Last update: 18/03/2022
 	"""
 
 	handle = "exp"
@@ -1104,9 +1104,16 @@ def run_in_default_mode(args):
 	sys.stderr.write(f"[{at()}] {len(LOH)} blocks were processed\n")
 
 	# write candidates to output, pre filtering
-	LOH.saveas(f"{args.output_dir}/{args.sample}.LOH_candidates.bed")
+	out = open(f"{args.output_dir}/{args.sample}.LOH_candidates.tsv", "w")
 
-	# write candidates to output, pre filtering
+	for row in LOH:
+		item = str(row).rstrip("\b\n\r").split("\t")
+		item[1] = str(int(item[1])+1)
+		out.write("\t".join(item) + "\n")
+
+	out.close()
+
+	# write candidates to output, pre filtering, in BED format
 	LOH_candidates = BedTool([str(row).rstrip("\b\n\r").split("\t")[0:3] for row in LOH])
 	LOH_candidates.saveas(f"{args.output_dir}/{args.sample}.LOH_candidates.bed")
 
@@ -1221,6 +1228,23 @@ def run_in_hybrid_mode(args):
 	# count heterozygous SNPs in intervals
 	LOH_A = count_snps_in_bed_interval(LOH_A, Vcfs["hetero"][0])
 	LOH_B = count_snps_in_bed_interval(LOH_B, Vcfs["hetero"][1])
+
+	out_A = open(f"{args.output_dir}/{args.sample}.LOH_candidates.A.tsv", "w")
+	out_B = open(f"{args.output_dir}/{args.sample}.LOH_candidates.B.tsv", "w")
+
+	for row in LOH_A:
+		item = str(row).rstrip("\b\n\r").split("\t")
+		item[1] = str(int(item[1])+1)
+		out_A.write("\t".join(item) + "\n")
+
+	for row in LOH_B:
+		item = str(row).rstrip("\b\n\r").split("\t")
+		item[1] = str(int(item[1])+1)
+		out_B.write("\t".join(item) + "\n")
+
+	out_A.close()
+	out_B.close()
+
 	sys.stderr.write(f"[{at()}] Parent A: {len(LOH_A)} blocks were processed\n")
 	sys.stderr.write(f"[{at()}] Parent B: {len(LOH_B)} blocks were processed\n")
 
