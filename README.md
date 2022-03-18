@@ -2,7 +2,7 @@
 
 *[Still the one from the block](https://www.youtube.com/watch?v=dly6p4Fu5TE)*
 
-A tool to extract, filter, and manage blocks of loss of heterozygosity (LOH) based on single-nucleotide polymorphisms (SNPs), read mapping, and a reference genome.
+A tool to extract, filter, and manage blocks of loss of heterozygosity (LOH) based on single-nucleotide polymorphisms (SNPs), read mapping, and a reference genome. Optionally works with a paired set of VCFs, BAMs and FASTAs produced from a hybrid genome (`--hybrid` mode).
 
 ![JLOH workflow](images/j_loh.png)
 
@@ -14,7 +14,9 @@ A tool to extract, filter, and manage blocks of loss of heterozygosity (LOH) bas
   * [Run](#run)
     + [Nextflow workflow](#nextflow-workflow)
   * [Example run - step by step guide](#example-run---step-by-step-guide)
-- [Implementation](#implementation)
+- [Modules](#modules)
+  * [JLOH sim](#jloh-sim)
+  * [JLOH g2g](#jloh-g2g)
   * [JLOH extract](#jloh-extract)
     + [Sorting of SNPs by zygosity](#sorting-of-snps-by-zygosity)
     + [Extraction of heterozygous regions](#extraction-of-heterozygous-regions)
@@ -23,12 +25,10 @@ A tool to extract, filter, and manage blocks of loss of heterozygosity (LOH) bas
     + [Determination of block zygosity](#determination-of-block-zygosity)
     + [Output](#output)
       - [Interpreting output](#interpreting-output)
-- [Modules](#modules)
-  * [JLOH sim](#jloh-sim)
-  * [JLOH g2g](#jloh-g2g)
-  * [JLOH extract](#jloh-extract-1)
   * [JLOH filter](#jloh-filter)
   * [JLOH density](#jloh-density)
+
+<small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
 
 
 ## Install
@@ -167,11 +167,28 @@ jloh extract --threads 4 --vcfs A.ff.vcf B.ff.vcf --bams A.bam B.bam \
 
 The `<sample>.LOH_blocks.tsv` file contained in `--output-dir` will contain all *bona fide* blocks found with this approach, and is the output of the workflow. **CAREFUL**: these blocks are annotated in 0-based coordinates (e.g. positions from 1 to 20 are annotated as 0:20). A bed version is provided together with it.
 
-# Implementation
+# Modules
 
-This section describes in detail what you can achieve with **JLOH**. Later in this guide, a nextflow workflow to go from reads to LOH blocks is also described.
+## JLOH sim
+
+This module generates a copy of a reference sequence in FASTA format, introducing a series of mutations selected randomly over the sequence of each scaffold/chromosome. Optionally, the module can include a series of LOH blocks defined by percentage of the whole genome (e.g. 20%).
+
+The output is:
+- the mutated reference sequence in FASTA format
+- a tab-separated file with all the introduced SNPs, with positions annotated in 1-based format including reference and alternative allele
+- a BED file with all the introduced LOH blocks, hence in 0-based half-open format
+
+## JLOH g2g
+
+This program is made for extracting regions of high sequence identity between two genome sequences in FASTA format. The input are the two sequences, and the output is a bed file representing the regions that are depleted of SNPs between the two genomes.
+
+`JLOH g2g` runs more than one tool from the MUMmer arsenal to map the two genomes, filter the results, extract the SNPs. Then, it uses `all2vcf mummer` to convert the MUMmer output to VCF format, and `bedtools merge` to generate BED intervals from SNPs. Intervals are expanded as long as there are overlaps, and at the end are reversed, to find regions without SNPs.
+
+These regions are a good `--mask` to pass to `JLOH extract` in `--hybrid` mode.
 
 ## JLOH extract
+
+This is the most important module of JLOH. Its functions are well described above. It is used to extract LOH blocks starting from VCF, BAM, and FASTA files.
 
 This tool extracts LOH blocks from a VCF file, a BAM file, and their reference genome in FASTA format.
 
@@ -224,29 +241,6 @@ In terms of zygosity, regions annotated as *homo* should have a read coverage th
 An example as seen in IGV is provided below.  
 
 ![Example](images/example.png)
-
-# Modules
-
-## JLOH sim
-
-This module generates a copy of a reference sequence in FASTA format, introducing a series of mutations selected randomly over the sequence of each scaffold/chromosome. Optionally, the module can include a series of LOH blocks defined by percentage of the whole genome (e.g. 20%).
-
-The output is:
-- the mutated reference sequence in FASTA format
-- a tab-separated file with all the introduced SNPs, with positions annotated in 1-based format including reference and alternative allele
-- a BED file with all the introduced LOH blocks, hence in 0-based half-open format
-
-## JLOH g2g
-
-This program is made for extracting regions of high sequence identity between two genome sequences in FASTA format. The input are the two sequences, and the output is a bed file representing the regions that are depleted of SNPs between the two genomes.
-
-`JLOH g2g` runs more than one tool from the MUMmer arsenal to map the two genomes, filter the results, extract the SNPs. Then, it uses `all2vcf mummer` to convert the MUMmer output to VCF format, and `bedtools merge` to generate BED intervals from SNPs. Intervals are expanded as long as there are overlaps, and at the end are reversed, to find regions without SNPs.
-
-These regions are a good `--mask` to pass to `JLOH extract` in `--hybrid` mode.
-
-## JLOH extract
-
-This is the most important module of JLOH. Its functions are well described above. It is used to extract LOH blocks starting from VCF, BAM, and FASTA files.
 
 ## JLOH filter
 
