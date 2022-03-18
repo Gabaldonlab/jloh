@@ -187,7 +187,12 @@ def get_nondivergent_regions(args, Het_q):
         bt = BedTool(All_het_ranges)
         bt_comp = bt.sort(g=genome_file).complement(g=genome_file)
         out = [str(row).rstrip("\r\b\n").split("\t") for row in bt_comp]
-        out = [[str(x[0]), int(x[1]), int(x[2])] for x in out]
+        if args.chr_name_mod:
+            old = args.chr_name_mod.split(",")[0]
+            new = args.chr_name_mod.split(",")[1]
+            out = [[str(x[0]).replace(old, new), int(x[1]), int(x[2])] for x in out]
+        else:
+            out = [[str(x[0]), int(x[1]), int(x[2])] for x in out]
     else:
         out = []
 
