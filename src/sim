@@ -74,7 +74,7 @@ def dump_queue(queue):
 def still_too_little_loh(het_positions, chrom, seq, loh, snp_dist):
 
     """
-    16/03/2022
+    18/03/2022
     Matteo Schiavinato
     """
 
@@ -89,7 +89,7 @@ def still_too_little_loh(het_positions, chrom, seq, loh, snp_dist):
         mutated_pos_ranges = min(len(seq), mutated_pos_ranges)
         mut_free_frac = (len(seq) - mutated_pos_ranges) / len(seq)
 
-        if mut_free_frac < loh:
+        if mut_free_frac < 1-loh:
             return True
         else:
             return False
@@ -102,7 +102,7 @@ def still_too_little_loh(het_positions, chrom, seq, loh, snp_dist):
 def process_chromosome(args, Lohs_q, Snps_q, record, lohSizes):
 
     """
-    17/03/2022
+    18/03/2022
     """
 
     # define chromosome-related variables
@@ -182,20 +182,14 @@ def obtain_divergent_positions(args):
     return All_lohs, Snp_positions
 
 
-def process_sequence_mutations(args, Seq_q, Mut_q, record, positions, alphabet):
+def process_sequence_mutations(args, Seq_q, Mut_q, record, chrom, positions, alphabet):
 
     """
-    16/03/2022
+    18/03/2022
     """
 
-    chrom = record.id
     seq = record.seq
     seqlist = list(seq)
-
-    if args.chr_name_mod:
-        old = args.chr_name_mod.split(",")[0]
-        new = args.chr_name_mod.split(",")[1]
-        chrom = chrom.replace(old, new)
 
     for pos in positions:
         ref = seqlist[pos]
@@ -210,7 +204,7 @@ def process_sequence_mutations(args, Seq_q, Mut_q, record, positions, alphabet):
 def mutate_reference(args, fasta, Snp_positions, alphabet):
 
     """
-    16/03/2022
+    18/03/2022
     """
 
     pool = mp.Pool(args.threads)
@@ -218,11 +212,17 @@ def mutate_reference(args, fasta, Snp_positions, alphabet):
     Mut_q = mp.Manager().Queue()
 
     for record in SeqIO.parse(fasta, "fasta"):
+        chrom = record.id
+        if args.chr_name_mod:
+            old = args.chr_name_mod.split(",")[0]
+            new = args.chr_name_mod.split(",")[1]
+            chrom = chrom.replace(old, new)
         try:
-            positions = Snp_positions[str(record.id)]
+            positions = Snp_positions[chrom]
         except KeyError:
             positions = []
-        pool.apply_async(process_sequence_mutations, args=(args, Seq_q, Mut_q, record, positions, alphabet))
+
+        pool.apply_async(process_sequence_mutations, args=(args, Seq_q, Mut_q, record, chrom, positions, alphabet))
 
     pool.close()
     pool.join()
@@ -276,6 +276,12 @@ def main(args):
     if args.verbose:
         sys.stderr.write(f"[{at()}] Generating list of positions to mutate...\n")
     Lohs, Snp_positions = obtain_divergent_positions(args)
+
+    # if name change: change it
+    if args.chr_name_mod:
+        old = args.chr_name_mod.split(",")[0]
+        new = args.chr_name_mod.split(",")[1]
+        Snp_positions = { x.replace(old, new) : Snp_positions[x] for x in Snp_positions.keys() }
 
     if args.verbose:
         sys.stderr.write(f"[{at()}] Mutating reference...\n")
