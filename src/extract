@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 14/03/2022
+Last change: 24/03/2022
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 ###
 """
@@ -1048,7 +1048,7 @@ def write_vcfs_to_output(args, Handles, mode, Hetero_lines_lst, Homo_lines_lst, 
 def run_in_default_mode(args):
 
 	"""
-	Last update: 18/03/2022
+	Last update: 24/03/2022
 	"""
 
 	handle = "exp"
@@ -1140,7 +1140,7 @@ def run_in_default_mode(args):
 
 	for row in LOH:
 		row_1based = str(row).rstrip("\b\n\r").split("\t")
-		row_1based = [str(row_1based[0]), int(row_1based[1])+1, int(row_1based[2])]
+		row_1based[1] = int(row_1based[1])+1
 		row_1based = "\t".join([str(i) for i in row_1based]) + "\n"
 		OUTPUT.write(str(row_1based))
 		row = list(row)[0:3]
@@ -1156,7 +1156,7 @@ def run_in_default_mode(args):
 def run_in_hybrid_mode(args):
 
 	"""
-	Last update: 17/03/2022
+	Last update: 24/03/2022
 	"""
 
 	handle_A = "exp_A"
@@ -1279,7 +1279,7 @@ def run_in_hybrid_mode(args):
 
 	for row in LOH_A:
 		row_1based = str(row).rstrip("\b\n\r").split("\t")
-		row_1based = [str(row_1based[0]), int(row_1based[1])+1, int(row_1based[2])]
+		row_1based[1] = int(row_1based[1])+1
 		row_1based = "\t".join([str(i) for i in row_1based]) + "\n"
 		OUTPUT_A.write(str(row_1based))
 		row = list(row)[0:3]
@@ -1289,7 +1289,7 @@ def run_in_hybrid_mode(args):
 
 	for row in LOH_B:
 		row_1based = str(row).rstrip("\b\n\r").split("\t")
-		row_1based = [str(row_1based[0]), int(row_1based[1])+1, int(row_1based[2])]
+		row_1based[1] = int(row_1based[1])+1
 		row_1based = "\t".join([str(i) for i in row_1based]) + "\n"
 		OUTPUT_B.write(str(row_1based))
 		OUTPUT_B.write(str(row))
