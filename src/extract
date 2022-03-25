@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 24/03/2022
+Last change: 25/03/2022
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 ###
 """
@@ -1048,7 +1048,7 @@ def write_vcfs_to_output(args, Handles, mode, Hetero_lines_lst, Homo_lines_lst, 
 def run_in_default_mode(args):
 
 	"""
-	Last update: 24/03/2022
+	Last update: 25/03/2022
 	"""
 
 	handle = "exp"
@@ -1074,6 +1074,8 @@ def run_in_default_mode(args):
 	# bed blocks
 	sys.stderr.write(f"[{at()}] Clustering heterozygous and homozygous SNPs into blocks...\n")
 	Het_blocks, Homo_blocks_REF, Homo_blocks_ALT = snps_to_bed_blocks(args, Vcfs["hetero"], hetero_div, Vcfs["homo"], homo_div, genome_file)
+	out = f"{args.output_dir}/{args.sample}.{handle}.het_blocks.bed"
+	Het_blocks.saveas(out)
 	sys.stderr.write(f"[{at()}] Found {len(Het_blocks)} het blocks, {len(Homo_blocks_REF)} homo REF blocks, {len(Homo_blocks_ALT)} homo ALT blocks\n")
 
 	# remove overlaps with heteroblocks from homoblocks
@@ -1156,7 +1158,7 @@ def run_in_default_mode(args):
 def run_in_hybrid_mode(args):
 
 	"""
-	Last update: 24/03/2022
+	Last update: 25/03/2022
 	"""
 
 	handle_A = "exp_A"
@@ -1189,6 +1191,10 @@ def run_in_hybrid_mode(args):
 	sys.stderr.write(f"[{at()}] Clustering heterozygous and homozygous SNPs into blocks...\n")
 	Het_blocks_A, Homo_blocks_REF_A, Homo_blocks_ALT_A = snps_to_bed_blocks(args, Vcfs["hetero"][0], Vcfs["homo"][0], genome_file_A)
 	Het_blocks_B, Homo_blocks_REF_B, Homo_blocks_ALT_B = snps_to_bed_blocks(args, Vcfs["hetero"][1], Vcfs["homo"][1], genome_file_B)
+	out_A = f"{args.output_dir}/{args.sample}.{handle_A}.het_blocks.A.bed"
+	out_B = f"{args.output_dir}/{args.sample}.{handle_B}.het_blocks.B.bed"
+	Het_blocks_A.saveas(out_A)
+	Het_blocks_B.saveas(out_B)
 	sys.stderr.write(f"[{at()}] Parent A: Found {len(Het_blocks_A)} het blocks, {len(Homo_blocks_REF_A)} homo REF blocks, {len(Homo_blocks_ALT_A)} homo ALT blocks\n")
 	sys.stderr.write(f"[{at()}] Parent B: Found {len(Het_blocks_B)} het blocks, {len(Homo_blocks_REF_B)} homo REF blocks, {len(Homo_blocks_ALT_B)} homo ALT blocks\n")
 
