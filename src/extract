@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 25/03/2022
+Last change: 31/03/2022
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 ###
 """
@@ -113,6 +113,7 @@ timestamp = time.time()
 tmp_dir = f"{args.output_dir}/tmp_{timestamp}"
 if os.path.exists(tmp_dir) == False:
 	os.makedirs(tmp_dir, exist_ok=True)
+	os.chmod(tmp_dir, 0o777)
 
 pybedtools.helpers.set_tempdir(tmp_dir)
 
@@ -456,6 +457,7 @@ def snps_to_bed_blocks(args, het_snps_vcf, homo_snps_vcf, genome_file):
 
 	Het_bed_blocks = Het_bed_blocks.get()
 	Homo_bed_blocks_ALT = Homo_bed_blocks_ALT.get()
+
 	Homo_bed_blocks_REF = get_homo_ref_blocks(Het_bed_blocks, Homo_bed_blocks_ALT, genome_file)
 	Homo_bed_blocks_REF = count_snps_in_bed_interval(Homo_bed_blocks_REF, homo_snps_vcf)
 
@@ -967,6 +969,26 @@ def keep_relevant_blocks(args, LOH):
 	return bt_inter
 
 
+def sort_bed_intervals(bt):
+
+	"""
+	Last update: 31/03/2022
+	"""
+
+	bt = BedTool(bt)
+	bt = [str(row).rstrip("\r\n\b").split("\t") for row in bt]
+	bt_sort = []
+	for x in bt:
+		new_x = x
+		new_x[1]=int(new_x[1])
+		new_x[2]=int(new_x[2])
+		bt_sort.append(new_x)
+
+	bt_sort = sorted(bt_sort, key=itemgetter(0,1,2))
+	bt_sort = BedTool(bt_sort)
+	return bt_sort
+
+
 def write_vcfs_to_output(args, Handles, mode, Hetero_lines_lst, Homo_lines_lst, Headers):
 
 	"""
@@ -1048,7 +1070,7 @@ def write_vcfs_to_output(args, Handles, mode, Hetero_lines_lst, Homo_lines_lst, 
 def run_in_default_mode(args):
 
 	"""
-	Last update: 25/03/2022
+	Last update: 31/03/2022
 	"""
 
 	handle = "exp"
@@ -1073,7 +1095,7 @@ def run_in_default_mode(args):
 
 	# bed blocks
 	sys.stderr.write(f"[{at()}] Clustering heterozygous and homozygous SNPs into blocks...\n")
-	Het_blocks, Homo_blocks_REF, Homo_blocks_ALT = snps_to_bed_blocks(args, Vcfs["hetero"], hetero_div, Vcfs["homo"], homo_div, genome_file)
+	Het_blocks, Homo_blocks_REF, Homo_blocks_ALT = snps_to_bed_blocks(args, Vcfs["hetero"][0], Vcfs["homo"][0], genome_file)
 	out = f"{args.output_dir}/{args.sample}.{handle}.het_blocks.bed"
 	Het_blocks.saveas(out)
 	sys.stderr.write(f"[{at()}] Found {len(Het_blocks)} het blocks, {len(Homo_blocks_REF)} homo REF blocks, {len(Homo_blocks_ALT)} homo ALT blocks\n")
@@ -1100,10 +1122,13 @@ def run_in_default_mode(args):
 
 	# count homozygous SNPs in intervals
 	sys.stderr.write(f"[{at()}] Adding heterozygous and homozygous SNP counts in each block...\n")
-	LOH = count_snps_in_bed_interval(LOH, Vcfs["homo"])
+	LOH = count_snps_in_bed_interval(LOH, Vcfs["homo"][0])
 	# count heterozygous SNPs in intervals
-	LOH = count_snps_in_bed_interval(LOH, Vcfs["hetero"])
+	LOH = count_snps_in_bed_interval(LOH, Vcfs["hetero"][0])
 	sys.stderr.write(f"[{at()}] {len(LOH)} blocks were processed\n")
+
+	# sort
+	LOH = sort_bed_intervals(LOH)
 
 	# write candidates to output, pre filtering
 	out = open(f"{args.output_dir}/{args.sample}.LOH_candidates.tsv", "w")
@@ -1126,6 +1151,9 @@ def run_in_default_mode(args):
 
 	sys.stderr.write(f"[{at()}] The final set consists of {len(LOH)} blocks\n")
 
+	# sort intervals
+	LOH = sort_bed_intervals(LOH)
+
 	# write to output
 	# including a header
 	sys.stderr.write(f"[{at()}] Writing to output...\n")
@@ -1135,10 +1163,6 @@ def run_in_default_mode(args):
 	OUTPUT_BED = open(out_bed, "w")
 
 	OUTPUT.write("\t".join(["#Chrom", "Start", "End", "Cov", "Cov_frac", "Cov_ratio_up", "Cov_ratio_down", "Zygosity", "Length", "Allele", "Homo_snps", "Hetero_snps"]) + "\n")
-	for row in LOH:
-		OUTPUT.write(str(row))
-		row = list(row)[0:3]
-		OUTPUT_BED.write("\t".join(row) + "\n")
 
 	for row in LOH:
 		row_1based = str(row).rstrip("\b\n\r").split("\t")
@@ -1158,7 +1182,7 @@ def run_in_default_mode(args):
 def run_in_hybrid_mode(args):
 
 	"""
-	Last update: 25/03/2022
+	Last update: 31/03/2022
 	"""
 
 	handle_A = "exp_A"
@@ -1234,6 +1258,10 @@ def run_in_hybrid_mode(args):
 	# count heterozygous SNPs in intervals
 	LOH_A = count_snps_in_bed_interval(LOH_A, Vcfs["hetero"][0])
 	LOH_B = count_snps_in_bed_interval(LOH_B, Vcfs["hetero"][1])
+
+	# sort
+	LOH_A = sort_bed_intervals(LOH_A)
+	LOH_B = sort_bed_intervals(LOH_B)
 
 	out_A = open(f"{args.output_dir}/{args.sample}.LOH_candidates.A.tsv", "w")
 	out_B = open(f"{args.output_dir}/{args.sample}.LOH_candidates.B.tsv", "w")

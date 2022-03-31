@@ -457,7 +457,7 @@ do
           --bams ../mapping/Sc.fs.bam ../mapping/Sd.fs.bam \
           --refs ../sim_genome/Sc.fa ../sim_genome/Sd.fa \
           --sample Sc_Sd --output-dir . --regions Sc_Sd.regions.bed \
-          --min-length ${MINLEN} --min-snps 2 \
+          --min-length ${MINLEN} --min-snps ${MIN_SNPS} \
           &> LOH_extraction.stderr &&
           { cat Sc_Sd.LOH_blocks.A.tsv; tail -n+2 Sc_Sd.LOH_blocks.B.tsv; } \
           > Sc_Sd.LOH_blocks.tsv &&
@@ -473,13 +473,13 @@ done
 # remove tmp folders and tmp files that are useless at this point
 echo "Removing tmp files and folders..."
 cd $WD
-find . -type d -name "tmp_*" | xargs rm -r
-find . -type d -name "pileups" | xargs rm -r
-find . -type f -name "*sam" | xargs rm
-find . -type f -name "*.f.bam" | xargs rm
-find . -type d -name "reads" | xargs rm -r
-find . -type f -name "*raw.vcf" | xargs rm
-find . -type f -name "*.f.vcf" | xargs rm
+for i in $(find . -type d -name "tmp_*"); do rm -r ${i}; done
+for i in $(find . -type d -name "pileups"); do rm -r ${i}; done
+for i in $(find . -type f -name "*sam"); do rm ${i}; done
+for i in $(find . -type f -name "*.f.bam"); do rm ${i}; done
+for i in $(find . -type d -name "reads"); do rm -r ${i}; done
+for i in $(find . -type f -name "*raw.vcf"); do rm ${i}; done
+for i in $(find . -type f -name "*.f.vcf"); do rm ${i}; done
 
 # TP / FP verification
 for DIV in ${DIVS[@]}

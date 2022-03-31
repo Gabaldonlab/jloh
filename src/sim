@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 24/03/2022
+Last change: 31/03/2022
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 ###
 """
@@ -115,6 +115,16 @@ def process_chromosome(args, Lohs_q, Snps_q, Het_q, record, lohSizes):
         sys.exit()
 
     # introduce LOH by removing chunks of variants
+    elif args.loh == 0:
+        nondiv_level, het_ranges = get_loh_level(het_positions, chrom, seq, args.snp_distance)
+
+        if args.verbose:
+            sys.stderr.write(f"[{at()}] Detected {round(nondiv_level*100, 2)}% non-heterozygous regions on sequence: {chrom}\n")
+            sys.stderr.write(f"[{at()}] These derive from the random SNP distribution of the simulation\n")
+
+        if len(het_ranges) > 0:
+            Het_q.put(het_ranges)
+
     elif args.loh > 0 and args.loh <= 1:
         # if 20% LOH --> this means that mut_free_frac must be ~ 20%
         # note that at low divergences, this value can just be higher than 20%
@@ -167,10 +177,10 @@ def process_chromosome(args, Lohs_q, Snps_q, Het_q, record, lohSizes):
 
 
 
-def get_nondivergent_regions(args, Het_q):
+def get_nondivergent_regions(args, Het_q, All_lohs):
 
     """
-    18/03/2022
+    31/03/2022
     """
 
     # create genome file
@@ -185,10 +195,18 @@ def get_nondivergent_regions(args, Het_q):
     tmp = []
     for lst in All_het_ranges:
         tmp = tmp + lst
+    All_het_ranges = [(str(x[0]), int(x[1]), int(x[2])) for x in All_het_ranges]
     All_het_ranges = sorted(tmp, key=itemgetter(0,1,2))
     if len(All_het_ranges) > 0:
         bt = BedTool(All_het_ranges)
         bt_comp = bt.sort(g=genome_file).complement(g=genome_file)
+        bt_comp = bt_comp.merge(d=args.snp_distance)
+
+        # if there are LOH events, chop new intervals to not include them
+        if len(All_lohs) > 0:
+            bt_loh = BedTool(All_lohs)
+            bt_comp = bt_comp.subtract(bt_loh)
+
         out = [str(row).rstrip("\r\b\n").split("\t") for row in bt_comp]
         if args.chr_name_mod:
             old = args.chr_name_mod.split(",")[0]
@@ -205,7 +223,7 @@ def get_nondivergent_regions(args, Het_q):
 def obtain_divergent_positions(args):
 
     """
-    24/03/2022
+    29/03/2022
     """
 
     # multiprocessing stuff
@@ -229,9 +247,9 @@ def obtain_divergent_positions(args):
     if args.verbose:
         sys.stderr.write(f"[{at()}] Reorganizing and sorting results...\n")
 
-    Non_divergent = get_nondivergent_regions(args, Het_q)
     All_lohs = dump_queue(Lohs_q)
     All_lohs = sorted(All_lohs, key=itemgetter(0,1,2))
+    Non_divergent = get_nondivergent_regions(args, Het_q, All_lohs)
     All_snps = dump_queue(Snps_q)
     All_snps = sorted(All_snps, key=itemgetter(0))
 
