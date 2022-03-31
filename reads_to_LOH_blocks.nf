@@ -424,6 +424,7 @@ process call_LOH_blocks {
     --vcfs ${par_A_vcf} ${par_B_vcf} \
     --bams ${par_A_fs_bam} ${par_B_fs_bam} \
     --refs ${genome_A} ${genome_B} \
+    --hybrid \
     --sample ${sample_id} \
     --output-dir ${sample_id} \
     --filter-mode all \
