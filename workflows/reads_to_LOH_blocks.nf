@@ -405,7 +405,7 @@ process call_LOH_blocks {
           file(par_B_fs_bam), file(par_B_fs_bam_index), file(par_B_vcf), \
           val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B), \
           file(bed_mask) \
-          from Filt_vcfs_with_mask
+          from Filt_vcfs
 
   output:
     tuple val(sample_id), val(genome_A_name), val(genome_B_name), file(bed_mask), \
