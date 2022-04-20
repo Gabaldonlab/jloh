@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 31/03/2022
+Last change: 20/04/2022
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 ###
 """
@@ -180,7 +180,7 @@ def process_chromosome(args, Lohs_q, Snps_q, Het_q, record, lohSizes):
 def get_nondivergent_regions(args, Het_q, All_lohs):
 
     """
-    31/03/2022
+    20/04/2022
     """
 
     # create genome file
@@ -192,10 +192,12 @@ def get_nondivergent_regions(args, Het_q, All_lohs):
 
     # get original LOH regions
     All_het_ranges = dump_queue(Het_q)
+
     tmp = []
     for lst in All_het_ranges:
         tmp = tmp + lst
-    All_het_ranges = [(str(x[0]), int(x[1]), int(x[2])) for x in All_het_ranges]
+
+    All_het_ranges = [(str(x[0]), int(x[1]), int(x[2])) for x in tmp]
     All_het_ranges = sorted(tmp, key=itemgetter(0,1,2))
     if len(All_het_ranges) > 0:
         bt = BedTool(All_het_ranges)
