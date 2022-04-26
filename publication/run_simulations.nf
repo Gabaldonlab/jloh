@@ -2,10 +2,11 @@
 
 Channel.fromPath("${params.ref_genome}").set{ Ref_genome }
 Channel.from(0.01, 0.03, 0.05, 0.10, 0.15, 0.20).set{ Divergence }
-Channel.from(0.1, 0.2, 0.3, 0.4, 0.5).set{ Loh }
-Channel.from(100, 500, 1000).set{ Minlens }
+Channel.from(0.1, 0.2, 0.3, 0.4).set{ Loh }
+Channel.from(100, 1000).set{ Minlens }
+Channel.from(100, 500, 1000).set{ Min_dist }
 Channel.from(["30X", 3000000], ["10X", 1000000]).set{ Covs }
-Channel.from(2, 3, 4, 5).set{ Snps }
+Channel.from(2, 4, 6).set{ Snps }
 
 Ref_genome
   .combine(Divergence)
@@ -13,8 +14,9 @@ Ref_genome
   .combine(Minlens)
   .combine(Covs)
   .combine(Snps)
-  .map{ it -> [ it[0], "snps_${it[6]}.minlen_${it[3]}.cov_${it[4]}.run.div_${it[1]}.loh_${it[2]}",
-                it[1], it[2], it[3], it[4], it[5], it[6]] }
+  .combine(Min_dist)
+  .map{ it -> [ it[0], "snps_${it[6]}.mindist_${it[7]}.minlen_${it[3]}.cov_${it[4]}.run.div_${it[1]}.loh_${it[2]}",
+                it[1], it[2], it[3], it[4], it[5], it[6], it[7]] }
   .set{ Test_conditions }
 
 
@@ -29,20 +31,21 @@ process mutate_genome {
   executor="local"
   maxForks=12
   cpus=4
+  maxRetries=3
 
   publishDir "${params.output_dir}/${sample_out_dir}/sim_genome", \
   mode: "copy"
 
   input:
     tuple file(ref_genome), val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
+    val(min_len), val(read_cov), val(num_reads), val(min_snps), val(min_dist) \
     from Test_conditions
 
   output:
     tuple file(ref_genome), \
     file("Sd.fa"), file("Sd.fa.lohs"), file("Sd.fa.non_divergent"), file("Sd.fa.snps"), \
     val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
+    val(min_len), val(read_cov), val(num_reads), val(min_snps), val(min_dist) \
     into Mut_ref
 
   script:
@@ -66,6 +69,7 @@ process concatenate_genomes {
   executor="local"
   maxForks=48
   cpus=1
+  maxRetries=3
 
   publishDir "${params.output_dir}/${sample_out_dir}/sim_genome", \
   mode: "copy", \
@@ -76,7 +80,7 @@ process concatenate_genomes {
     file(ref_genome), file(mut_genome), \
     file(true_lohs), file(true_non_divergent), file(true_snps), \
     val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
+    val(min_len), val(read_cov), val(num_reads), val(min_snps), val(min_dist) \
     from Mut_ref
 
   output:
@@ -84,7 +88,7 @@ process concatenate_genomes {
     file(ref_genome), file(mut_genome), file("Sc_Sd.fa"), file("Sc_Sd.fa.fai"), \
     file(true_lohs), file(true_non_divergent), file(true_snps), \
     val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
+    val(min_len), val(read_cov), val(num_reads), val(min_snps), val(min_dist) \
     into Conc_ref
 
   script:
@@ -104,17 +108,14 @@ process simulate_reads {
   executor="local"
   maxForks=48
   cpus=1
-
-  publishDir "${params.output_dir}/${sample_out_dir}/reads", \
-  mode: "copy", \
-  pattern: "Sc_Sd.R{1,2}.fastq"
+  maxRetries=3
 
   input:
     tuple \
     file(ref_genome), file(mut_genome), file(conc_genome), file(conc_genome_idx), \
     file(true_lohs), file(true_non_divergent), file(true_snps), \
     val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
+    val(min_len), val(read_cov), val(num_reads), val(min_snps), val(min_dist) \
     from Conc_ref
 
   output:
@@ -123,7 +124,7 @@ process simulate_reads {
     file(true_lohs), file(true_non_divergent), file(true_snps), \
     file("Sc_Sd.R1.fastq"), file("Sc_Sd.R2.fastq"), \
     val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
+    val(min_len), val(read_cov), val(num_reads), val(min_snps), val(min_dist) \
     into Sim_reads
 
   script:
@@ -144,9 +145,10 @@ process simulate_reads {
 
 process map_reads {
 
-  executor="local"
-  maxForks=1
+  executor="slurm"
+  maxForks=16
   cpus=48
+  maxRetries=3
 
   input:
     tuple \
@@ -154,7 +156,7 @@ process map_reads {
     file(true_lohs), file(true_non_divergent), file(true_snps), \
     file(reads_for), file(reads_rev), \
     val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
+    val(min_len), val(read_cov), val(num_reads), val(min_snps), val(min_dist) \
     from Sim_reads
 
   output:
@@ -164,7 +166,7 @@ process map_reads {
     file(reads_for), file(reads_rev), \
     file("Sc.sam"), file("Sd.sam"), \
     val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
+    val(min_len), val(read_cov), val(num_reads), val(min_snps), val(min_dist) \
     into Hisat2_out
 
   script:
@@ -204,6 +206,7 @@ process filter_and_sort_bams {
   executor="local"
   maxForks=12
   cpus=4
+  maxRetries=3
 
   publishDir "${params.output_dir}/${sample_out_dir}/mapping", \
   mode: "copy", \
@@ -216,7 +219,7 @@ process filter_and_sort_bams {
     file(reads_for), file(reads_rev), \
     file(sc_sam), file(sd_sam), \
     val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
+    val(min_len), val(read_cov), val(num_reads), val(min_snps), val(min_dist) \
     from Hisat2_out
 
   output:
@@ -226,7 +229,7 @@ process filter_and_sort_bams {
     file("Sc.fs.bam"), file("Sd.fs.bam"), \
     file("Sc.fs.bam.bai"), file("Sd.fs.bam.bai"), \
     val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
+    val(min_len), val(read_cov), val(num_reads), val(min_snps), val(min_dist) \
     into Filt_sort_bams
 
   script:
@@ -251,6 +254,7 @@ process perform_pileup {
   executor="local"
   maxForks=48
   cpus=1
+  maxRetries=3
 
   input:
     tuple \
@@ -259,7 +263,7 @@ process perform_pileup {
     file(sc_fs_bam), file(sd_fs_bam), \
     file(sc_fs_bam_idx), file(sd_fs_bam_idx), \
     val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
+    val(min_len), val(read_cov), val(num_reads), val(min_snps), val(min_dist) \
     from Filt_sort_bams
 
   output:
@@ -270,7 +274,7 @@ process perform_pileup {
     file(sc_fs_bam_idx), file(sd_fs_bam_idx), \
     file("Sc.mpileup.vcf"), file("Sd.mpileup.vcf"), \
     val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
+    val(min_len), val(read_cov), val(num_reads), val(min_snps), val(min_dist) \
     into Pileups
 
   script:
@@ -298,6 +302,7 @@ process perform_snp_calling {
   executor="local"
   maxForks=48
   cpus=1
+  maxRetries=3
 
   input:
     tuple \
@@ -307,7 +312,7 @@ process perform_snp_calling {
     file(sc_fs_bam_idx), file(sd_fs_bam_idx), \
     file(sc_pileup), file(sd_pileup), \
     val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
+    val(min_len), val(read_cov), val(num_reads), val(min_snps), val(min_dist) \
     from Pileups
 
   output:
@@ -318,7 +323,7 @@ process perform_snp_calling {
     file(sc_fs_bam_idx), file(sd_fs_bam_idx), \
     file("Sc.raw.vcf"), file("Sd.raw.vcf"), \
     val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
+    val(min_len), val(read_cov), val(num_reads), val(min_snps), val(min_dist) \
     into Var_calls
 
   script:
@@ -342,8 +347,9 @@ process perform_snp_calling {
 process filter_variants {
 
   executor="local"
-  maxForks=12
-  cpus=4
+  maxForks=48
+  cpus=1
+  maxRetries=3
 
   publishDir "${params.output_dir}/${sample_out_dir}/variants", \
   mode: "copy", \
@@ -357,7 +363,7 @@ process filter_variants {
     file(sc_fs_bam_idx), file(sd_fs_bam_idx), \
     file(sc_raw_vcf), file(sd_raw_vcf), \
     val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
+    val(min_len), val(read_cov), val(num_reads), val(min_snps), val(min_dist) \
     from Var_calls
 
   output:
@@ -368,7 +374,7 @@ process filter_variants {
     file(sc_fs_bam_idx), file(sd_fs_bam_idx), \
     file("Sc.ff.vcf"), file("Sd.ff.vcf"), \
     val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
+    val(min_len), val(read_cov), val(num_reads), val(min_snps), val(min_dist) \
     into Filt_var_calls
 
   script:
@@ -386,67 +392,15 @@ process filter_variants {
     """
 }
 
-// perform genome to genome alignment
-// to exclude regions where the two reference genomes
-// are identical to begin with
-// which are regions where we can expect no heterozygosity to happen
-// this doesn't matter with simulated data
-// since we do a copy of the S. cerevisiae genome to get the Sd genome
-// every part that looks exactly the same is bound to be an LOH block
-// this will matter with real data where we cannot expect regions to be
-// exactly identical
 
-process perform_g2g_mapping {
-
-  executor="local"
-  maxForks=48
-  cpus=1
-
-  publishDir "${params.output_dir}/${sample_out_dir}/LOH", \
-  mode: "copy", \
-  pattern: "Sc_Sd.regions.bed"
-
-  input:
-    tuple \
-    file(ref_genome), file(mut_genome), file(conc_genome), file(conc_genome_idx), \
-    file(true_lohs), file(true_non_divergent), file(true_snps), \
-    file(sc_fs_bam), file(sd_fs_bam), \
-    file(sc_fs_bam_idx), file(sd_fs_bam_idx), \
-    file(sc_ff_vcf), file(sd_ff_vcf), \
-    val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
-    from Filt_var_calls
-
-  output:
-    tuple \
-    file(ref_genome), file(mut_genome), file(conc_genome), file(conc_genome_idx), \
-    file(true_lohs), file(true_non_divergent), file(true_snps), \
-    file(sc_fs_bam), file(sd_fs_bam), \
-    file(sc_fs_bam_idx), file(sd_fs_bam_idx), \
-    file(sc_ff_vcf), file(sd_ff_vcf), file("Sc_Sd.regions.bed"), \
-    val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
-    into Regions_out
-
-  script:
-    """
-    ${JLOH} g2g \
-    --sensitive \
-    --ref-A ${ref_genome} --ref-B ${mut_genome} --est-divergence ${div} \
-    --out . \
-    --min-length ${min_len} &&
-    cat A.bed B.bed > Sc_Sd.regions.bed
-    """
-}
-
-
-//
+// extract LOH blocks
 
 process run_jloh_extract {
 
   executor="local"
   maxForks=1
   cpus=48
+  maxRetries=3
 
   publishDir "${params.output_dir}/${sample_out_dir}/LOH", \
   mode: "copy", \
@@ -458,10 +412,10 @@ process run_jloh_extract {
     file(true_lohs), file(true_non_divergent), file(true_snps), \
     file(sc_fs_bam), file(sd_fs_bam), \
     file(sc_fs_bam_idx), file(sd_fs_bam_idx), \
-    file(sc_ff_vcf), file(sd_ff_vcf), file(regions_file), \
+    file(sc_ff_vcf), file(sd_ff_vcf), \
     val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
-    from Regions_out
+    val(min_len), val(read_cov), val(num_reads), val(min_snps), val(min_dist) \
+    from Filt_var_calls
 
   output:
     tuple \
@@ -469,13 +423,13 @@ process run_jloh_extract {
     file(true_lohs), file(true_non_divergent), file(true_snps), \
     file(sc_fs_bam), file(sd_fs_bam), \
     file(sc_fs_bam_idx), file(sd_fs_bam_idx), \
-    file(sc_ff_vcf), file(sd_ff_vcf), file(regions_file), \
+    file(sc_ff_vcf), file(sd_ff_vcf), \
     file("Sc_Sd.LOH_blocks.tsv"), file("Sc_Sd.LOH_blocks.bed"), file("Sc_Sd.LOH_candidates.bed"), \
     file("Sc_Sd.exp_A.het_snps.vcf"), file("Sc_Sd.exp_B.het_snps.vcf"), \
     file("Sc_Sd.exp_A.homo_snps.vcf"), file("Sc_Sd.exp_B.homo_snps.vcf"), \
     file("Sc_Sd.exp_A.chrom_coverage.tsv"), file("Sc_Sd.exp_B.chrom_coverage.tsv"), \
     val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
+    val(min_len), val(read_cov), val(num_reads), val(min_snps), val(min_dist) \
     into Jloh_extract_out
 
   script:
@@ -485,8 +439,8 @@ process run_jloh_extract {
     --vcfs ${sc_ff_vcf} ${sd_ff_vcf} \
     --bams ${sc_fs_bam} ${sd_fs_bam} \
     --refs ${ref_genome} ${mut_genome} \
-    --sample Sc_Sd --output-dir . --regions ${regions_file} \
-    --min-length ${min_len} --min-snps ${min_snps} &&
+    --sample Sc_Sd --output-dir . \
+    --min-length ${min_len} --min-snps ${min_snps} --snp-distance ${min_dist} &&
     { cat Sc_Sd.LOH_blocks.A.tsv; tail -n+2 Sc_Sd.LOH_blocks.B.tsv; } \
     > Sc_Sd.LOH_blocks.tsv &&
     cat Sc_Sd.LOH_blocks.A.bed Sc_Sd.LOH_blocks.B.bed \
@@ -503,8 +457,9 @@ process get_stats_from_run {
   executor="local"
   maxForks=48
   cpus=1
+  maxRetries=3
 
-  publishDir "${params.output_dir}/${sample_out_dir}/TP_FP", \
+  publishDir "${params.output_dir}/${sample_out_dir}/TP_TN", \
   mode: "copy", \
   pattern: "{generated,predicted,stats}.{bed,tsv}"
 
@@ -514,13 +469,13 @@ process get_stats_from_run {
     file(true_lohs), file(true_non_divergent), file(true_snps), \
     file(sc_fs_bam), file(sd_fs_bam), \
     file(sc_fs_bam_idx), file(sd_fs_bam_idx), \
-    file(sc_ff_vcf), file(sd_ff_vcf), file(regions_file), \
+    file(sc_ff_vcf), file(sd_ff_vcf), \
     file(blocks_tsv), file(blocks_bed), file(candidates_bed), \
     file(het_snps_vcf_A), file(het_snps_vcf_B), \
     file(homo_snps_vcf_A), file(homo_snps_vcf_B), \
     file(chrom_cov_A), file(chrom_cov_B), \
     val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
+    val(min_len), val(read_cov), val(num_reads), val(min_snps), val(min_dist) \
     from Jloh_extract_out
 
   output:
@@ -529,14 +484,14 @@ process get_stats_from_run {
     file(true_lohs), file(true_non_divergent), file(true_snps), \
     file(sc_fs_bam), file(sd_fs_bam), \
     file(sc_fs_bam_idx), file(sd_fs_bam_idx), \
-    file(sc_ff_vcf), file(sd_ff_vcf), file(regions_file), \
+    file(sc_ff_vcf), file(sd_ff_vcf), \
     file(blocks_tsv), file(blocks_bed), file(candidates_bed), \
     file(het_snps_vcf_A), file(het_snps_vcf_B), \
     file(homo_snps_vcf_A), file(homo_snps_vcf_B), \
     file(chrom_cov_A), file(chrom_cov_B), \
     file("generated.bed"), file("predicted.bed"), file("stats.tsv"), file("genome_file.tsv"), \
     val(sample_out_dir), val(div), val(loh), \
-    val(min_len), val(read_cov), val(num_reads), val(min_snps) \
+    val(min_len), val(read_cov), val(num_reads), val(min_snps), val(min_dist) \
     into Stats_out
 
   script:
@@ -546,7 +501,7 @@ process get_stats_from_run {
     { cat ${true_non_divergent} | awk -v x=${min_len} '\$3-\$2 >= x'; \
     cat ${true_lohs} | awk -v x=${min_len} '\$3-\$2 >= x'; } | \
     sort -k1,1 -k2n,2 -k3nr,3 > generated.bed &&
-    python3 ${TP_FP_SCRIPT} \
+    python3 ${TP_TN_SCRIPT} \
     --generated generated.bed \
     --predicted predicted.bed \
     --genome-file genome_file.tsv \

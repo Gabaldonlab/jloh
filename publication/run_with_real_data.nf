@@ -9,11 +9,13 @@ Channel
 
 // index genomes and map reads
 
-process map_reads {
+process trim_reads {
 
-  executor="local"
-  maxForks=1
-  cpus=48
+  executor="slurm"
+  maxForks=4
+  cpus=12
+  maxRetries=3
+  clusterOptions="--ntasks-per-node=4"
 
   input:
     tuple \
@@ -21,6 +23,48 @@ process map_reads {
     val(ref_A_name), val(ref_B_name), \
     file(reads_for), file(reads_rev) \
     from Samples
+
+  output:
+    tuple \
+    val(sample_id), val(accession), file(ref_A), file(ref_B), \
+    val(ref_A_name), val(ref_B_name), \
+    file("${sample_id}.P1.fastq"), file("${sample_id}.P2.fastq"), file("${sample_id}.U.fastq") \
+    into Trimmed_reads
+
+  script:
+    """
+    ${TRIMMOMATIC} \
+    PE \
+    -threads 12 \
+    -summary ${sample_id}.summary.tsv \
+    ${reads_for} ${reads_rev} \
+    ${sample_id}.P1.fastq ${sample_id}.U1.fastq \
+    ${sample_id}.P2.fastq ${sample_id}.U2.fastq \
+    ILLUMINACLIP:${params.adapters}:2:30:10 \
+    LEADING:${params.leading} \
+    TRAILING:${params.trailing} \
+    SLIDINGWINDOW:${params.sliding_window} \
+    AVGQUAL:${params.avgqual} \
+    MINLEN:${params.minlen} &&
+    cat ${sample_id}.U1.fastq ${sample_id}.U2.fastq \
+    > ${sample_id}.U.fastq
+    """
+}
+
+process map_reads {
+
+  executor="slurm"
+  maxForks=1
+  cpus=48
+  maxRetries=3
+  clusterOptions="--ntasks-per-node=1"
+
+  input:
+    tuple \
+    val(sample_id), val(accession), file(ref_A), file(ref_B), \
+    val(ref_A_name), val(ref_B_name), \
+    file(reads_for), file(reads_rev), file(reads_unpaired) \
+    from Trimmed_reads
 
   output:
     tuple \
@@ -34,16 +78,16 @@ process map_reads {
     ${HISAT2_BUILD} -p 48 ${ref_A} ${ref_A_name} &&
     ${HISAT2_BUILD} -p 48 ${ref_B} ${ref_B_name} &&
     ${HISAT2} -p 48 \
-    --ignore-quals --no-spliced-alignment \
+    --no-spliced-alignment \
     --score-min L,0.0,-1.0 \
-    -I 800 -X 1200 \
-    -x ${ref_A_name} -1 ${reads_for} -2 ${reads_rev} \
+    -I 0 -X 1000 \
+    -x ${ref_A_name} -1 ${reads_for} -2 ${reads_rev} -U ${reads_unpaired} \
     -S ${sample_id}.${ref_A_name}.sam &&
     ${HISAT2} -p 48 \
-    --ignore-quals --no-spliced-alignment \
+    --no-spliced-alignment \
+    -I 0 -X 1000 \
     --score-min L,0.0,-1.0 \
-    -I 800 -X 1200 \
-    -x ${ref_B_name} -1 ${reads_for} -2 ${reads_rev} \
+    -x ${ref_B_name} -1 ${reads_for} -2 ${reads_rev} -U ${reads_unpaired} \
     -S ${sample_id}.${ref_B_name}.sam
     """
 }
@@ -58,6 +102,7 @@ process filter_and_sort_bams {
   executor="local"
   maxForks=12
   cpus=4
+  maxRetries=3
 
   publishDir "${params.output_dir}/${sample_id}/mapping", \
   mode: "copy", \
@@ -99,6 +144,7 @@ process perform_pileup {
   executor="local"
   maxForks=48
   cpus=1
+  maxRetries=3
 
   input:
     tuple \
@@ -140,6 +186,7 @@ process perform_snp_calling {
   executor="local"
   maxForks=48
   cpus=1
+  maxRetries=3
 
   input:
     tuple \
@@ -178,8 +225,9 @@ process perform_snp_calling {
 process filter_variants {
 
   executor="local"
-  maxForks=12
-  cpus=4
+  maxForks=48
+  cpus=1
+  maxRetries=3
 
   publishDir "${params.output_dir}/${sample_id}/variants", \
   mode: "copy", \
@@ -212,13 +260,19 @@ process filter_variants {
     --input-file ${raw_vcf_B} --map-qual-zero-frac ${params.max_mq0f} \
     --output-file ${sample_id}.${ref_B_name}.f.vcf --quality ${params.min_qual} --alt-frac ${params.min_af} --min-depth ${params.min_depth} &&
     ${ALL2VCF} frequency \
-    --in ${sample_id}.${ref_B_name}.f.vcf --out ${sample_id}.${ref_B_name}.ff.vcf 
+    --in ${sample_id}.${ref_B_name}.f.vcf --out ${sample_id}.${ref_B_name}.ff.vcf
     """
 }
 
 // extract LOH blocks
 
 process run_jloh_extract {
+
+  // executor="slurm"
+  // maxForks=2
+  // cpus=24
+  // maxRetries=3
+  // clusterOptions="--ntasks-per-node=2"
 
   executor="local"
   maxForks=1
