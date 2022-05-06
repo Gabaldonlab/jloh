@@ -1182,7 +1182,7 @@ def run_in_default_mode(args):
 def run_in_hybrid_mode(args):
 
 	"""
-	Last update: 31/03/2022
+	Last update: 06/05/2022
 	"""
 
 	handle_A = "exp_A"
@@ -1326,7 +1326,6 @@ def run_in_hybrid_mode(args):
 		row_1based[1] = int(row_1based[1])+1
 		row_1based = "\t".join([str(i) for i in row_1based]) + "\n"
 		OUTPUT_B.write(str(row_1based))
-		OUTPUT_B.write(str(row))
 		row = list(row)[0:3]
 		OUTPUT_B_BED.write("\t".join(row) + "\n")
 	OUTPUT_B.close()
