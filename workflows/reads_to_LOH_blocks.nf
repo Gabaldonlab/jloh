@@ -61,27 +61,13 @@ exit 0
 
 
 // -----------------------------------------------------------------------------
-// PAIRED END READS
-
-// read input data
-
-def lines = new File("${params.input_data}").collect {it}
+// input reads
 
 Channel
-  .fromList(lines)
-  .map{ it -> it.tokenize("\t") }
-  .map{ it -> [ it[0], file(it[1]), file(it[2]), it[3], file(it[4]), it[5], file(it[6]) ] }
-  .set{ Input_data }
-
-Channel
-  .fromFilePairs("${params.reads_dir}/*_{1,2}.{fq,fastq}", flat: true)
-  .set{ Reads }
-
-Input_data
-  .join(Reads)
-  .map{ it -> [ it[0], it[1], it[2], it[3], it[4], it[5], it[6] ] }
+  .fromPath("${params.input_data}")
+  .splitCsv(sep: "\t", header: false)
+  .map{ it -> [it[0], file(it[1]), file(it[2]), it[3], file(it[4]), it[5], file(it[6])] }
   .into{ Input_pretrim; Input_trim }
-
 
 // -----------------------------------------------------------------------------
 // reads trimming
@@ -409,10 +395,10 @@ process call_LOH_blocks {
 
   output:
     tuple val(sample_id), val(genome_A_name), val(genome_B_name), file(bed_mask), \
-          file("${sample_id}/${sample_id}.exp_A.LOH_blocks.tsv"), \
-          file("${sample_id}/${sample_id}.exp_B.LOH_blocks.tsv"), \
-          file("${sample_id}/${sample_id}.exp_A.LOH_blocks.bed"), \
-          file("${sample_id}/${sample_id}.exp_B.LOH_blocks.bed"), \
+          file("${sample_id}/${sample_id}.LOH_blocks.A.tsv"), \
+          file("${sample_id}/${sample_id}.LOH_blocks.B.tsv"), \
+          file("${sample_id}/${sample_id}.LOH_blocks.A.bed"), \
+          file("${sample_id}/${sample_id}.LOH_blocks.B.bed"), \
           file("${sample_id}/${sample_id}.exp_A.chrom_coverage.tsv"), \
           file("${sample_id}/${sample_id}.exp_B.chrom_coverage.tsv") \
           into Jloh_out
