@@ -413,7 +413,7 @@ process call_LOH_blocks {
     --hybrid \
     --sample ${sample_id} \
     --output-dir ${sample_id} \
-    --filter-mode all \
+    --filter-mode ${params.var_filter} \
     --min-af ${params.min_af} \
     --max-af ${params.max_af} \
     --min-frac-cov ${params.min_frac_cov} \
