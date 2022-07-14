@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 06/05/2022
+Last change: 13/07/2022
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 ###
 """
@@ -24,7 +24,7 @@ if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
 	sys.stderr.write("""
 
 
-JLOH, version 0.16.2
+JLOH, version 0.17.0
 
 --------------------------------------------------------------------------------
 by Matteo Schiavinato
@@ -40,6 +40,7 @@ Commands:
     g2g                 Align genome to genome to find regions to mask
     extract             Extract LOH blocks from VCF, BAM and FASTA files
     filter              Filter extracted LOH blocks
+    intersect           Perform intersection/removal operations with output files
 
  -- Calculations
     density             Estimate heterozygous and homozygous SNP densities
