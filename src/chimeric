@@ -1,0 +1,208 @@
+#!/usr/bin/env python3
+
+script_info = """
+###
+Author: Matteo Schiavinato
+Last change: 25/07/2022
+###
+"""
+
+
+from Bio import SeqIO
+import argparse as ap
+import os
+import sys
+from time import asctime as at
+import time
+import pybedtools
+from pybedtools import BedTool
+import pandas as pd
+
+
+# help section
+if len(sys.argv) == 1:
+	sys.argv.append("--help")
+
+if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
+	sys.stderr.write("""
+
+Extract chimeric genes featuring LOH from two different haplotypes
+
+Usage:
+jloh extract --blocks <TSV> --gff <GFF> [options]
+
+[input/output]
+--blocks-A          A TSV file produced by JLOH extract (haplotype 1)           [!]
+--blocks-B          Another TSV file produced by JLOH extract (haplotype 2)     [!]
+--gff               GFF file containing gene annotations                        [!]
+--out-prefix        Pre-pend this prefix to each output file (path allowed)     [out]
+--quiet             Suppress warnings                                           [off]
+
+[parameters]
+--feature           What feature to look for (see GFF format, 3rd column)       [gene]
+--min-overlap       Min. fraction [0.0 to 1.0] of feature overlapping a block   [0.25]
+--id-attr           Attribute to search for to get the feature names            [ID]
+
+""")
+	sys.exit(0)
+
+
+# parser
+p = ap.ArgumentParser()
+p.add_argument("--blocks-A")
+p.add_argument("--blocks-B")
+p.add_argument("--gff")
+p.add_argument("--out-prefix", default="out", type=str)
+p.add_argument("--quiet", action="store_true")
+p.add_argument("--feature", default="gene")
+p.add_argument("--min-overlap", default=0.25, type=float)
+p.add_argument("--id-attr", default="ID", type=str)
+args = p.parse_args()
+
+def get_bed_intervals(gff, feature):
+
+    """
+    25/07/2022
+    ----
+    This function reads a gff file, selects only lines corresponding to the feature
+    indicated in the arguments, and then generates a BedTool() object in BED format
+    with those lines. To do that, it makes the start coordinate of the file 0-based
+    contrary to the one that is found in GFF files, which is 1-based.
+
+    Args:
+        gff(file):      the path to a gff file to use as input
+        feature(str):   a string indicating which lines to take from the gff file
+                        based on the third field of the GFF file format (feature)
+
+    Returns:
+        A BedTool object containing the intervals of the designed feature
+    """
+
+    INPUT = open(gff, "r")
+    Lines = [line.rstrip("\b\r\n").split("\t") for line in INPUT if line[0] != "#"]
+    Lines = [lst for lst in Lines if lst[2]==feature]
+    INPUT.close()
+
+    if len(Lines) == 0:
+        sys.stderr.write(f"[{at()}] ERROR: no lines in {gff} match feature \"{feature}\"\n")
+        sys.exit()
+    else:
+        Lines = [[str(x[0]), int(x[3])-1, int(x[4])] for x in Lines]
+        bt = BedTool(Lines)
+        return bt
+
+
+def get_features_within_blocks(df, Regions, args):
+
+    """
+    25/07/2022
+    ---
+    This function reads the LOH blocks dataframe produced by "jloh extract" and
+    the BedTool() object produced in the previous step of this script. It filters
+    the blocks contained in the output of "jloh extract" by taking only those blocks
+    that are contained within the designed feature indicated with --feature.
+
+    Args:
+        df(pd.DataFrame):       DataFrame produced by "jloh extract"
+        Regions(BedTool):       List of BED intervals that represent the feature indicated
+                                with --feature
+
+    Returns:
+        df_filt(pd.DataFrame):  Filtered DataFrame containing only blocks that
+                                are found to overlap "Regions"
+    """
+
+    df_bed = df.loc[:,["#Chrom", "Start", "End"]]
+    df_bed["Start"] = df_bed["Start"]-1
+    bt_blocks = BedTool([x[1:4] for x in df_bed.itertuples()])
+    bt_feat = BedTool(Regions)
+    bt = bt_feat.intersect(bt_blocks, u=True, f=args.min_overlap)
+
+    return bt
+
+
+def get_gff_lines_from_bed(bed, gff, args):
+
+    """
+    25/07/2022
+    ---
+    Description
+    """
+
+    INPUT = open(gff, "r")
+    Lines = [line for line in INPUT if (line.split("\t")[2] == args.feature) and (line[0] != "#")]
+    Gff = {}
+    for line in Lines:
+        lst = line.rstrip("\b\r\n").split("\t")
+        chrom, start, end = str(lst[0]), int(lst[3]), int(lst[4])
+        Gff[(chrom, start, end)] = line
+    INPUT.close()
+
+    out = []
+    for bed_line in bed:
+        chrom, start, end = str(bed_line).rstrip("\b\r\n").split("\t")
+        start = int(start) + 1
+        end = int(end)
+        out.append(Gff[(chrom, start, end)])
+
+    return out
+
+
+def get_feat_ID(gff_lines, id_attr):
+
+    """
+    25/07/2022
+    ---
+    Description
+    """
+
+    out = []
+    for line in gff_lines:
+        attributes = line.rstrip("\b\r\n").split("\t")[8].split(";")
+        d = {y.split("=")[0]:y.split("=")[1] for y in attributes}
+        try:
+            out.append(d[id_attr])
+        except KeyError:
+            if args.quiet:
+                pass
+            else:
+                sys.stderr.write(f"Warning: feature {attributes} does not have attribute \"{id_attr}\". Maybe you can use another one with --id-attr\n")
+
+    out = list(set(out))
+
+    return out
+
+
+# functions
+def main(args):
+    # get bed intervals
+    Regions = get_bed_intervals(args.gff, args.feature)
+    # import blocks
+    Blocks_A = pd.read_csv(args.blocks_A, sep="\t")
+    Blocks_B = pd.read_csv(args.blocks_B, sep="\t")
+    # extract only features containing blocks
+    Feats_A = get_features_within_blocks(Blocks_A, Regions, args)
+    Feats_B = get_features_within_blocks(Blocks_B, Regions, args)
+    # retrieve features from original gff file
+    Feats_A = get_gff_lines_from_bed(Feats_A, args.gff, args)
+    Feats_B = get_gff_lines_from_bed(Feats_B, args.gff, args)
+    Feats_common = list(set(Feats_A).intersection(set(Feats_B)))
+    # retrieve feature IDs
+    Feat_IDs_A = get_feat_ID(Feats_A, args.id_attr)
+    Feat_IDs_B = get_feat_ID(Feats_B, args.id_attr)
+    Feat_IDs_common = list(set(Feat_IDs_A).intersection(set(Feat_IDs_B)))
+    # write to output
+    OUT = open(f"{args.out_prefix}.chimeric.features.gff", "w")
+    for line in Feats_common:
+        OUT.write(line)
+    OUT.close()
+
+    OUT = open(f"{args.out_prefix}.chimeric.IDs.gff", "w")
+    for id in Feat_IDs_common:
+        OUT.write(id + "\n")
+    OUT.close()
+
+
+# script
+if __name__ == "__main__":
+    main(args)

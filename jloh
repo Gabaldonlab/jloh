@@ -41,6 +41,7 @@ Commands:
     extract             Extract LOH blocks from VCF, BAM and FASTA files
     filter              Filter extracted LOH blocks
     intersect           Perform intersection/removal operations with output files
+	chimeric            Extract genes featuring LOH blocks from different haplotypes
 
  -- Calculations
     density             Estimate heterozygous and homozygous SNP densities
