@@ -339,6 +339,7 @@ process call_LOH_blocks {
     val(sample_id), \
     file("${sample_id}/${sample_id}.LOH_blocks.tsv"), \
     file("${sample_id}/${sample_id}.LOH_blocks.bed"), \
+    file("${sample_id}/${sample_id}.het_blocks.bed"), \
     file("${sample_id}/${sample_id}.exp.chrom_coverage.tsv") \
     into Jloh_out
 
