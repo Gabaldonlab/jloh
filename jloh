@@ -37,11 +37,11 @@ Mixao et al., 2019      https://doi.org/10.3389/fgene.2019.00383
 Commands:
 
  -- Extraction
-    g2g                 Align genome to genome to find regions to mask
     extract             Extract LOH blocks from VCF, BAM and FASTA files
-    filter              Filter extracted LOH blocks
-    intersect           Perform intersection/removal operations with output files
+	filter              Filter extracted LOH blocks
+	intersect           Perform intersection/removal operations with output files
 	chimeric            Extract genes featuring LOH blocks from different haplotypes
+    g2g                 Align two genomes to find regions that should carry SNPs
 
  -- Calculations
     density             Estimate heterozygous and homozygous SNP densities
