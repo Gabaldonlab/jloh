@@ -399,6 +399,8 @@ process call_LOH_blocks {
           file("${sample_id}/${sample_id}.LOH_blocks.B.tsv"), \
           file("${sample_id}/${sample_id}.LOH_blocks.A.bed"), \
           file("${sample_id}/${sample_id}.LOH_blocks.B.bed"), \
+          file("${sample_id}/${sample_id}.exp_A.het_blocks.bed"), \
+          file("${sample_id}/${sample_id}.exp_B.het_blocks.bed"), \
           file("${sample_id}/${sample_id}.exp_A.chrom_coverage.tsv"), \
           file("${sample_id}/${sample_id}.exp_B.chrom_coverage.tsv") \
           into Jloh_out
