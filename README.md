@@ -83,24 +83,6 @@ This will execute the command contained in the `*.sh` script, which in turn is a
 
 # Modules
 
-## JLOH sim
-
-This module generates a copy of a reference sequence in FASTA format, introducing a series of mutations selected randomly over the sequence of each scaffold/chromosome. Optionally, the module can include a series of LOH blocks defined by percentage of the whole genome (e.g. 20%).
-
-The output is:
-- the mutated reference sequence in FASTA format
-- a tab-separated file with all the introduced SNPs, with positions annotated in 1-based format including reference and alternative allele
-- a BED file with all the introduced LOH blocks, hence in 0-based half-open format
-- another BED file with all the regions that are deemed as non-divergent based on the declared `--snp-distance`.
-
-## JLOH g2g
-
-This program finds diverging regions between two genomes in FASTA format. The input are the two sequences and an estimated divergence value, and the output is a bed file representing the regions that contain SNPs between the two genomes.
-
-`JLOH g2g` runs more than one tool from the MUMmer arsenal to map the two genomes, filter the results, extract the SNPs. Then, it uses `all2vcf mummer` to convert the MUMmer output to VCF format, and `bedtools merge` to generate BED intervals from SNPs. Intervals are expanded as long as there are overlaps.
-
-These regions are a good `--regions` file to pass to `JLOH extract` in `--hybrid` mode, excluding false positives that may arise by mapping.
-
 ## JLOH extract
 
 This is the most important module of JLOH. Its functions are well described in the figure on the top. It is used to extract LOH blocks starting from VCF, BAM, and FASTA files.
@@ -170,9 +152,35 @@ An example as seen in IGV is provided below.
 
 This tool filters the output produced by `JLOH extract` according to several criteria. The user can select to filter the LOH blocks based on their coverage, on their SNP count, SNP density, length, or extract individual regions just like in samtools.
 
+## JLOH intersect
+
+This tool perform ensemble operations with two JLOH output files, namely intersection, complement, and unique elements extraction.
+
+## JLOH chimeric
+
+This tool is a specific module to extract genes that overlap LOH blocks from two different origins (i.e. chimeric genes). It does not assume anything about the lists of LOH blocks that are passed. If a gene has two LOH blocks in its sequence (one from each list) it will be considered a candidate chimeric gene. 
+
+## JLOH g2g
+
+This program finds diverging regions between two genomes in FASTA format. The input are the two sequences and an estimated divergence value, and the output is a bed file representing the regions that contain SNPs between the two genomes.
+
+`JLOH g2g` runs more than one tool from the MUMmer arsenal to map the two genomes, filter the results, extract the SNPs. Then, it uses `all2vcf mummer` to convert the MUMmer output to VCF format, and `bedtools merge` to generate BED intervals from SNPs. Intervals are expanded as long as there are overlaps.
+
+These regions are a good `--regions` file to pass to `JLOH extract` in `--hybrid` mode, excluding false positives that may arise by mapping.
+
 ## JLOH density
 
 This tool computes the densities of all SNPs, heterozygous SNPs, and homozygous SNPs over the genome sequence.
+
+## JLOH sim
+
+This module generates a copy of a reference sequence in FASTA format, introducing a series of mutations selected randomly over the sequence of each scaffold/chromosome. Optionally, the module can include a series of LOH blocks defined by percentage of the whole genome (e.g. 20%).
+
+The output is:
+- the mutated reference sequence in FASTA format
+- a tab-separated file with all the introduced SNPs, with positions annotated in 1-based format including reference and alternative allele
+- a BED file with all the introduced LOH blocks, hence in 0-based half-open format
+- another BED file with all the regions that are deemed as non-divergent based on the declared `--snp-distance`.
 
 # Hybrid mode - step by step guide for data preparation
 
@@ -255,4 +263,4 @@ jloh extract --threads 4 --vcfs A.ff.vcf B.ff.vcf --bams A.bam B.bam \
 --sample <STRING> --output-dir <PATH>
 ```
 
-The `<sample>.LOH_blocks.{A,B}.tsv` files contained in `--output-dir` will contain all *bona fide* blocks found with this approach in either A or B genome. The `<sample>.LOH_candidates.{A,B}.tsv` files, instead, contain all the blocks that were called from the program, regardless of the regions specified in `--regions`. 
+The `<sample>.LOH_blocks.{A,B}.tsv` files contained in `--output-dir` will contain all *bona fide* blocks found with this approach in either A or B genome. The `<sample>.LOH_candidates.{A,B}.tsv` files, instead, contain all the blocks that were called from the program, regardless of the regions specified in `--regions`.

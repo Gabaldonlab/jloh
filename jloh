@@ -38,9 +38,9 @@ Commands:
 
  -- Extraction
     extract             Extract LOH blocks from VCF, BAM and FASTA files
-	filter              Filter extracted LOH blocks
-	intersect           Perform intersection/removal operations with output files
-	chimeric            Extract genes featuring LOH blocks from different haplotypes
+    filter              Filter extracted LOH blocks
+    intersect           Perform intersection/removal operations with output files
+    chimeric            Extract genes featuring LOH blocks from different haplotypes
     g2g                 Align two genomes to find regions that should carry SNPs
 
  -- Calculations
