@@ -87,6 +87,23 @@ This will execute the command contained in the `*.sh` script, which in turn is a
 
 This is the most important module of JLOH. Its functions are well described in the figure on the top. It is used to extract LOH blocks starting from VCF, BAM, and FASTA files.
 
+### output
+
+`jloh extract` functions in two modes (hybrid, and default). In default mode, it produces these output files:
+
+| Output file                 | Description |
+|-----------------------------|-|
+| jloh.exp.het_snps.vcf       | VCF file containing the SNPs that were labelled as "heterozygous" by the algorithm |
+| jloh.exp.homo_snps.vcf      | VCF file containing the SNPs that were labelled as "homozygous" by the algorithm |
+| jloh.exp.het_blocks.bed     | BED file with heterozygous blocks, i.e. intervals in the genome carrying heterozygous SNPs |
+| jloh.exp.genome_file.tsv    | TSV file with chromosomes and their length |
+| jloh.exp.chrom_coverage.tsv | TSV file with chromosomes and their average coverage per position |
+| jloh.LOH_candidates.bed     | BED file with candidate LOH blocks before coverage and length screening |
+| jloh.LOH_candidates.tsv     | TSV file with candidate LOH blocks before coverage and length screening |
+| jloh.LOH_blocks.bed         | BED file with selected LOH blocks |
+| jloh.LOH_blocks.tsv         | TSV file with selected LOH blocks. *This is the main output of the program* | 
+
+
 ### Sorting of SNPs by zygosity
 
 The variants passed with `--vcf` are scanned, subdividing heterozygous and homozygous SNPs into two separate files: `<sample>.het_snps.vcf` and `<sample>.homo_snps.vcf`. Indels and other types of variation are discarded. The heterozygous SNPs are used to extract regions containing heterozygosity. Selected SNPs should also have an allele frequency (`AF`) annotation, and are retained if their `AF` is larger than `--min-af` and lower than `--max-af`. The default parameters (`--min-af 0.2 --max-af 0.8`) are probably ok for most users.
