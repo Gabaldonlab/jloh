@@ -158,7 +158,18 @@ This tool perform ensemble operations with two JLOH output files, namely interse
 
 ## JLOH chimeric
 
-This tool is a specific module to extract genes that overlap LOH blocks from two different origins (i.e. chimeric genes). It does not assume anything about the lists of LOH blocks that are passed. If a gene has two LOH blocks in its sequence (one from each list) it will be considered a candidate chimeric gene. 
+This tool is a specific module to extract genes that overlap LOH blocks from two different origins (i.e. chimeric genes). It does not assume anything about the lists of LOH blocks that are passed. If a gene has two LOH blocks in its sequence (one from each list) it will be considered a candidate chimeric gene.
+
+The usage involves two sets of LOH blocks produced by `jloh extract`, plus the `*het_blocks.bed` file also produced by `jloh extract`. In case the "extract" module was run in `--hybrid` mode, the heterozygous blocks files are two (A and B). In that case, they must be concatenated into a single file using `cat` and provided as a single file to `jloh chimeric`.
+
+### output
+
+`jloh chimeric` produces two files:
+
+| Output file               | Description |
+|---------------------------|-|
+| out.chimeric.features.gff | GFF file containing rows that identify genes marked as chimeric. This file can be directly loaded into IGV or GBrowse for manual inspection, making your job easier. |
+| out.chimeric.IDs.txt      | TXT file containing the gene IDs of all the genes found as chimeric. These can be of three types: 1) A-B chimeras, from a mixture of the two LOH block sources; 2) A-H chimeras, from a mixture of the A source and the heterozygous blocks, 3) B-H chimeras, from a mixture of the B source and the heterozygous blocks. |
 
 ## JLOH g2g
 

@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 25/07/2022
+Last change: 27/07/2022
 ###
 """
 
@@ -17,14 +17,15 @@ import time
 import pybedtools
 from pybedtools import BedTool
 import pandas as pd
+from operator import itemgetter
 
 
 # help section
 if len(sys.argv) == 1:
-	sys.argv.append("--help")
+    sys.argv.append("--help")
 
 if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
-	sys.stderr.write("""
+    sys.stderr.write("""
 
 Extract chimeric genes featuring LOH from two different haplotypes
 
@@ -33,7 +34,11 @@ jloh extract --blocks <TSV> --gff <GFF> [options]
 
 [input/output]
 --blocks-A          A TSV file produced by JLOH extract (haplotype 1)           [!]
+                    If coming from --hybrid mode, use only REF blocks
 --blocks-B          Another TSV file produced by JLOH extract (haplotype 2)     [!]
+                    If coming from --hybrid mode, use only REF blocks
+--het               Heterozygous regions identified by JLOH extract             [!]
+                    If coming from --hybrid mode, "cat" them into a single file
 --gff               GFF file containing gene annotations                        [!]
 --out-prefix        Pre-pend this prefix to each output file (path allowed)     [out]
 --quiet             Suppress warnings                                           [off]
@@ -44,14 +49,15 @@ jloh extract --blocks <TSV> --gff <GFF> [options]
 --id-attr           Attribute to search for to get the feature names            [ID]
 
 """)
-	sys.exit(0)
+    sys.exit(0)
 
 
 # parser
 p = ap.ArgumentParser()
-p.add_argument("--blocks-A")
-p.add_argument("--blocks-B")
-p.add_argument("--gff")
+p.add_argument("--blocks-A", required=True)
+p.add_argument("--blocks-B", required=True)
+p.add_argument("--het", required=True)
+p.add_argument("--gff", required=True)
 p.add_argument("--out-prefix", default="out", type=str)
 p.add_argument("--quiet", action="store_true")
 p.add_argument("--feature", default="gene")
@@ -126,7 +132,17 @@ def get_gff_lines_from_bed(bed, gff, args):
     """
     25/07/2022
     ---
-    Description
+    This function takes as input a BedTool object and uses the chromosome, start
+    and end position to extract the corresponding row on the original GFF file
+    where the feature comes from
+
+    Args:
+        bed(BedTool):   A BedTool() object
+        gff(path):      Path to the provided GFF file
+
+    Returns:
+        out(list):      A list with the rows obtained from the GFF file
+
     """
 
     INPUT = open(gff, "r")
@@ -146,6 +162,45 @@ def get_gff_lines_from_bed(bed, gff, args):
         out.append(Gff[(chrom, start, end)])
 
     return out
+
+
+def combine_gff_lines(Feats_A, Feats_B, Feats_het):
+
+    """
+    27/07/2022
+    ---
+    This function combines the gff rows extracted from the previous function
+    and sorts them according to the chromosome, start and end position
+
+    Args:
+        Feats_A(list):      List of gff rows identifying genes covered by A blocks
+        Feats_B(list):      List of gff rows identifying genes covered by B blocks
+        Feats_het(list):    List of gff rows identifying genes covered by het blocks
+
+    Returns:
+        df(pd.DataFrame):   Sorted dataframe in GFF format ready to be written to
+                            output
+
+    """
+
+    # get common lines
+    Feats_common_AB = list(set(Feats_A).intersection(set(Feats_B)))
+    Feats_common_AH = list(set(Feats_A).intersection(set(Feats_het)))
+    Feats_common_BH = list(set(Feats_B).intersection(set(Feats_het)))
+
+    # unite lists
+    Feats_common = Feats_common_AB + Feats_common_AH + Feats_common_BH
+
+    # split by tab and sort them
+    Feats_common = [x.rstrip("\b\r\n").split("\t") for x in Feats_common]
+    df = pd.DataFrame(Feats_common)
+    df.columns = ["Chrom", "Source", "Feature", "Start", "End", "Score", "Strand", "Frame", "Info"]
+    df = df.astype({"Chrom":"object", "Source":"object", "Feature":"object",
+                    "Start":"int", "End":"int", "Score":"object",
+                    "Strand":"object", "Frame":"object", "Info":"object"})
+    df = df.sort_values(by=["Chrom", "Start", "End"], ascending=[True, True, False])
+
+    return df
 
 
 def get_feat_ID(gff_lines, id_attr):
@@ -173,6 +228,29 @@ def get_feat_ID(gff_lines, id_attr):
     return out
 
 
+def combine_feat_IDs(Feat_IDs_A, Feat_IDs_B, Feat_IDs_het):
+
+    """
+    27/07/2022
+    ---
+    Description
+    """
+
+    # get common IDs
+    Feat_IDs_common_AB = [(x, "AB") for x in list(set(Feat_IDs_A).intersection(set(Feat_IDs_B)))]
+    Feat_IDs_common_AH = [(x, "AH") for x in list(set(Feat_IDs_A).intersection(set(Feat_IDs_het)))]
+    Feat_IDs_common_BH = [(x, "BH") for x in list(set(Feat_IDs_B).intersection(set(Feat_IDs_het)))]
+
+    # merge lists
+    Feat_IDs_common = Feat_IDs_common_AB + Feat_IDs_common_AH + Feat_IDs_common_BH
+
+    # sort
+    Feat_IDs_common = sorted(Feat_IDs_common, key=itemgetter(0,1))
+
+    return Feat_IDs_common
+
+
+
 # functions
 def main(args):
     # get bed intervals
@@ -180,26 +258,29 @@ def main(args):
     # import blocks
     Blocks_A = pd.read_csv(args.blocks_A, sep="\t")
     Blocks_B = pd.read_csv(args.blocks_B, sep="\t")
+    Blocks_het = pd.read_csv(args.het, sep="\t", header=None, usecols=[0,1,2])
+    Blocks_het.columns = ["#Chrom", "Start", "End"]
     # extract only features containing blocks
     Feats_A = get_features_within_blocks(Blocks_A, Regions, args)
     Feats_B = get_features_within_blocks(Blocks_B, Regions, args)
+    Feats_het = get_features_within_blocks(Blocks_het, Regions, args)
     # retrieve features from original gff file
     Feats_A = get_gff_lines_from_bed(Feats_A, args.gff, args)
     Feats_B = get_gff_lines_from_bed(Feats_B, args.gff, args)
-    Feats_common = list(set(Feats_A).intersection(set(Feats_B)))
+    Feats_het = get_gff_lines_from_bed(Feats_het, args.gff, args)
+    # combine these lines into a sorted GFF file
+    Feats_common = combine_gff_lines(Feats_A, Feats_B, Feats_het)
+    Feats_common.to_csv(f"{args.out_prefix}.chimeric.features.gff", sep="\t", header=False, index=False)
     # retrieve feature IDs
     Feat_IDs_A = get_feat_ID(Feats_A, args.id_attr)
     Feat_IDs_B = get_feat_ID(Feats_B, args.id_attr)
-    Feat_IDs_common = list(set(Feat_IDs_A).intersection(set(Feat_IDs_B)))
+    Feat_IDs_het = get_feat_ID(Feats_het, args.id_attr)
+    # combine these into a sorted text file
+    Feat_IDs_common = combine_feat_IDs(Feat_IDs_A, Feat_IDs_B, Feat_IDs_het)
     # write to output
-    OUT = open(f"{args.out_prefix}.chimeric.features.gff", "w")
-    for line in Feats_common:
-        OUT.write(line)
-    OUT.close()
-
-    OUT = open(f"{args.out_prefix}.chimeric.IDs.gff", "w")
+    OUT = open(f"{args.out_prefix}.chimeric.IDs.txt", "w")
     for id in Feat_IDs_common:
-        OUT.write(id + "\n")
+        OUT.write("\t".join(id) + "\n")
     OUT.close()
 
 
