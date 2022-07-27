@@ -45,6 +45,7 @@ Commands:
 
  -- Calculations
     density             Estimate heterozygous and homozygous SNP densities
+	junctions           Calculate number of block-to-block junctions over the genome
 
  -- Simulations
     sim                 Simulate a divergent copy of a genome/protein sequence(s)

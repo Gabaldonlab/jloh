@@ -1,0 +1,276 @@
+#!/usr/bin/env python3
+
+script_info = """
+###
+Author: Matteo Schiavinato
+Last change: 27/07/2022
+###
+"""
+
+
+import argparse as ap
+import sys
+from time import asctime as at
+import time
+import pybedtools
+from pybedtools import BedTool
+import pandas as pd
+from Bio import SeqIO
+
+
+# help section
+if len(sys.argv) == 1:
+    sys.argv.append("--help")
+
+if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
+    sys.stderr.write("""
+
+Calculate number of block-to-block junctions over the genome
+
+Usage:
+jloh junctions --blocks [<TSV>, ...] [options]
+
+[input/output]
+--blocks            TSV file produced by jloh extract containing LOH blocks     [!]
+                    If passing two files, junctions are searched between the
+                    content of the two files (not within a single file)
+
+[optional]
+--gff               GFF file containing gene model annotations for extra stats  [off]
+--genome            FASTA file with genome sequence where blocks are called     [off]
+
+[parameters]
+--max-dist          Maximum distance between LOH blocks to consider junctions   [100]
+
+""")
+    sys.exit(0)
+
+
+# parser
+p = ap.ArgumentParser()
+p.add_argument("--blocks", nargs="*", required=True)
+p.add_argument("--gff")
+p.add_argument("--genome")
+p.add_argument("--max-dist", default=100, type=int)
+args = p.parse_args()
+
+
+def bt_to_df(bt):
+
+    """
+    27/07/2022
+    ---
+    Convert BedTool object into a Pandas DataFrame object
+    """
+
+    df = pd.DataFrame(list([str(x).rstrip("\b\r\n").split("\t") for x in bt]))
+    return df
+
+
+def df_to_bt(df):
+
+    """
+    27/07/2022
+    ---
+    Convert Pandas DataFrame object into a BedTool object
+    """
+
+    bt = BedTool(["\t".join([str(x) for x in row.tolist()]) for index, row in df.iterrows()])
+    return bt
+
+
+def get_genome_size(fasta):
+
+    """
+    27/07/2022
+    ---
+    Get genome length (total, and by chromosome)
+    """
+
+    tot_len = 0
+    Chrom_len = {}
+    for record in SeqIO.parse(fasta, "fasta"):
+        tot_len += len(record.seq)
+        Chrom_len[str(record.id)] = len(record.seq)
+
+    return (tot_len, Chrom_len)
+
+
+def convert_blocks_to_bed(infile, block_type):
+
+    """
+    27/07/2022
+    ---
+    Args:
+        infile (str):       path to the input TSV file produced by jloh extract
+        block_type (str):   which allele to include (REF, ALT, BOTH)
+
+    Returns:
+        bt (BedTool):   BedTool object with 0-based half open coordinates in BED format
+                        Only blocks of allele <block_type> are contained in output
+    """
+
+    df = pd.read_csv(infile, header="infer", sep="\t")
+    df.Start = df.Start -1
+
+    if block_type == "REF":
+        df = df.loc[df["Allele"]=="REF", :]
+        df = df.loc[:,["#Chrom", "Start", "End"]]
+        bt = BedTool([(row["#Chrom"], row["Start"], row["End"]) for index, row in df.iterrows()])
+
+    elif block_type == "ALT":
+        df = df.loc[df["Allele"]=="ALT", :]
+        df = df.loc[:,["#Chrom", "Start", "End"]]
+        bt = BedTool([(row["#Chrom"], row["Start"], row["End"]) for index, row in df.iterrows()])
+
+    elif block_type == "BOTH":
+        df = df.loc[:,["#Chrom", "Start", "End"]]
+        bt = BedTool([(row["#Chrom"], row["Start"], row["End"]) for index, row in df.iterrows()])
+
+    return bt
+
+
+def get_closest_block(bt_A, bt_B, max_dist):
+
+    """
+    27/07/2022
+    ---
+    Args:
+        bt_A (BedTool):   BedTool object from first stream
+        bt_B (BedTool):   BedTool object from second stream
+
+    Returns:
+        bt_closest (BedTool):   BedTool object with closest interval from other stream
+    """
+
+    # get closest
+    bt = bt_A.closest(b=bt_B, D="ref")
+    # filter by distance
+    df = bt_to_df(bt)
+    df.iloc[:,[1,2,4,5,6]] = df.iloc[:,[1,2,4,5,6]].astype("int")
+    df = df.loc[df.iloc[:,6].abs() <= max_dist , :]
+
+    return df
+
+
+def convert_closest_to_interval(df_closest):
+
+    """
+    27/07/2022
+    ---
+    Description
+    """
+
+    df_closest.columns = ["Chrom_A", "Start_A", "End_A", "Chrom_B", "Start_B", "End_B", "Distance"]
+    df_neg = df_closest.loc[df_closest["Distance"] < 0 ,:]
+    df_pos = df_closest.loc[df_closest["Distance"] > 0 ,:]
+
+    df_neg = df_neg.loc[:,["Chrom_A", "End_B", "Start_A"]]
+    df_neg.columns = ["Chrom", "Start", "End"]
+
+    df_pos = df_pos.loc[:,["Chrom_A", "End_A", "Start_B"]]
+    df_pos.columns = ["Chrom", "Start", "End"]
+
+    df = pd.concat([df_neg, df_pos]).sort_values(by=["Chrom", "Start", "End"], ascending=[True, True, False])
+
+    bt_junctions = df_to_bt(df)
+    return bt_junctions
+
+
+def main(args):
+
+    if len(args.blocks) == 1:
+
+        # convert blocks to BED
+        Blocks_REF = convert_blocks_to_bed(args.blocks[0], "REF")
+        Blocks_ALT = convert_blocks_to_bed(args.blocks[0], "ALT")
+
+        # get closest
+        # calculate number of junctions (J) found
+        Closest = get_closest_block(Blocks_REF, Blocks_ALT, args.max_dist)
+
+        sys.stderr.write(f"\n######\nBasic stats\n######\n\n")
+        sys.stderr.write(f"Comparing REF vs ALT within {args.blocks[0]}\n\n")
+
+
+    elif len(args.blocks) == 2:
+
+        # convert blocks to BED
+        Blocks_A = convert_blocks_to_bed(args.blocks[0], "BOTH")
+        Blocks_B = convert_blocks_to_bed(args.blocks[1], "BOTH")
+
+        # get closest
+        # calculate number of junctions (J) found
+        Closest = get_closest_block(Blocks_A, Blocks_B, args.max_dist)
+
+        sys.stderr.write(f"\n######\nBasic stats\n######\n\n")
+        sys.stderr.write(f"Comparing {args.blocks[0]} vs {args.blocks[1]}\n\n")
+
+    else:
+        sys.stderr.write("ERROR: more than 2 block files specified. This tool works only with 1 or 2 at a time.\n")
+        sys.exit()
+
+    # get junctions
+    bt_junctions = convert_closest_to_interval(Closest)
+    num_junc = len(bt_junctions)
+
+    # print stats to output
+    sys.stderr.write(f"Block junctions within {args.max_dist} bp: {num_junc}\n")
+
+    # get genome stats if reference available
+    if args.genome:
+        gsize, Chrom_size = get_genome_size(args.genome)
+        num_junc_kb = num_junc / gsize
+        sys.stderr.write(f"Genome size: {gsize} bp ({gsize/1000000} Mbp)\n")
+        sys.stderr.write(f"Junctions/kb: {num_junc_kb}\n")
+
+    sys.stderr.write("\n")
+
+    # if a gff was passed, calculate feature, specific quantities
+    if args.gff:
+
+        sys.stderr.write(f"######\nGFF stats\n######\n\n")
+        # check which features are available
+        gff = pd.read_csv(args.gff, header=None, sep="\t")
+        gff.columns = ["Chrom", "Source", "Feature", "Start", "End", "Score", "Strand", "Frame", "Info"]
+        features = gff["Feature"].astype("category").cat.categories.tolist()
+
+        # if gene is available:
+        if "gene" in features:
+            # calculate num J within gene
+            gff_gene = gff.loc[gff["Feature"] == "gene", : ]
+            bt_gene = df_to_bt(gff_gene.loc[:,["Chrom", "Start", "End"]])
+            bt_junctions_gene = bt_junctions.intersect(b=bt_gene, u=True)
+            num_junc_gene = len(bt_junctions_gene)
+            sys.stderr.write(f"Junctions within genes: {num_junc_gene}\n")
+
+        # calculate num J within exon
+        if "exon" in features:
+            # calculate num J within exon
+            gff_exon = gff.loc[gff["Feature"] == "exon", : ]
+            bt_exon = df_to_bt(gff_exon.loc[:,["Chrom", "Start", "End"]])
+            bt_junctions_exon = bt_junctions.intersect(b=bt_exon, u=True)
+            num_junc_exon = len(bt_junctions_exon)
+            sys.stderr.write(f"Junctions within exons: {num_junc_exon}\n")
+
+        # calculate num J within CDS
+        if "CDS" in features:
+            # calculate num J within CDS
+            gff_CDS = gff.loc[gff["Feature"] == "CDS", : ]
+            bt_CDS = df_to_bt(gff_CDS.loc[:,["Chrom", "Start", "End"]])
+            bt_junctions_CDS = bt_junctions.intersect(b=bt_CDS, u=True)
+            num_junc_CDS = len(bt_junctions_CDS)
+            sys.stderr.write(f"Junctions within CDS: {num_junc_CDS}\n")
+
+            if "gene" in features:
+                # calculate num J within genes but outside of CDS
+                bt_junctions_nonexon = bt_junctions_gene.intersect(b=bt_CDS, v=True)
+                num_junc_nonexon = len(bt_junctions_nonexon)
+                sys.stderr.write(f"Junctions within non-exon gene parts: {num_junc_nonexon}\n")
+
+        sys.stderr.write("\n")
+
+
+
+if __name__ == "__main__":
+    main(args)

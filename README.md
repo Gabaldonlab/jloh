@@ -47,9 +47,9 @@ Detailed information [can be found here](docs/INSTALL.md).
     sim                 Simulate a divergent copy of a genome/protein sequence(s)
 ```
 
-# Modules detailed description
+## Modules detailed description
 
-## JLOH extract
+### JLOH extract
 
 This is the most important module of JLOH. Its functions are well described in the figure on the top. It is used to extract LOH blocks starting from VCF, BAM, and FASTA files. Detailed information on this algorithm functioning [can be found here](docs/EXTRACT.md).
 
@@ -75,15 +75,15 @@ The output can be assessed in a genome viewer together with the input BAM files,
 
 In `--hybrid` mode, it produces the same output files but repeated twice: once per each parent. More information on the `--hybrid` mode, and how to use it properly, [can be found here](docs/HYBRID.md).
 
-## JLOH filter
+### JLOH filter
 
 This tool filters the output produced by `JLOH extract` according to several criteria. The user can select to filter the LOH blocks based on their coverage, on their SNP count, SNP density, length, or extract individual regions just like in samtools.
 
-## JLOH intersect
+### JLOH intersect
 
 This tool perform ensemble operations with two JLOH output files, namely intersection, complement, and unique elements extraction.
 
-## JLOH chimeric
+### JLOH chimeric
 
 This tool is a specific module to extract genes that overlap LOH blocks from two different origins (i.e. chimeric genes). It does not assume anything about the lists of LOH blocks that are passed. If a gene has two LOH blocks in its sequence (one from each list) it will be considered a candidate chimeric gene.
 
@@ -98,7 +98,7 @@ The usage involves two sets of LOH blocks produced by `jloh extract`, plus the `
 | out.chimeric.features.gff | GFF file containing rows that identify genes marked as chimeric. This file can be directly loaded into IGV or GBrowse for manual inspection, making your job easier. |
 | out.chimeric.IDs.txt      | TXT file containing the gene IDs of all the genes found as chimeric. These can be of three types: 1) A-B chimeras, from a mixture of the two LOH block sources; 2) A-H chimeras, from a mixture of the A source and the heterozygous blocks, 3) B-H chimeras, from a mixture of the B source and the heterozygous blocks. |
 
-## JLOH g2g
+### JLOH g2g
 
 This program finds diverging regions between two genomes in FASTA format. The input are the two sequences and an estimated divergence value, and the output is a bed file representing the regions that contain SNPs between the two genomes.
 
@@ -106,11 +106,11 @@ This program finds diverging regions between two genomes in FASTA format. The in
 
 These regions are a good `--regions` file to pass to `JLOH extract` in `--hybrid` mode, excluding false positives that may arise by mapping.
 
-## JLOH density
+### JLOH density
 
 This tool computes the densities of all SNPs, heterozygous SNPs, and homozygous SNPs over the genome sequence.
 
-## JLOH sim
+### JLOH sim
 
 This module generates a copy of a reference sequence in FASTA format, introducing a series of mutations selected randomly over the sequence of each scaffold/chromosome. Optionally, the module can include a series of LOH blocks defined by percentage of the whole genome (e.g. 20%).
 

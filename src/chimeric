@@ -30,7 +30,7 @@ if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
 Extract chimeric genes featuring LOH from two different haplotypes
 
 Usage:
-jloh extract --blocks <TSV> --gff <GFF> [options]
+jloh chimeric --blocks-A <TSV> --blocks-B <TSV> --het <BED> --gff <GFF> [options]
 
 [input/output]
 --blocks-A          A TSV file produced by JLOH extract (haplotype 1)           [!]
