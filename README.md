@@ -33,6 +33,27 @@ A tool to extract, filter, and manage blocks of loss of heterozygosity (LOH) bas
 
 Detailed information [can be found here](docs/INSTALL.md).
 
+## Basic usage
+
+**jloh** has several modules that can be run independently. Many of them depend on the output of another module, making the analysis intercompatible. This is the list of modules, each of which is described more in detail below.
+
+```
+ -- Extraction
+    extract             Extract LOH blocks from VCF, BAM and FASTA files
+    filter              Filter extracted LOH blocks
+    intersect           Perform intersection/removal operations with output files
+    chimeric            Extract genes featuring LOH blocks from different haplotypes
+    g2g                 Align two genomes to find regions that should carry SNPs
+
+ -- Calculations
+    density             Estimate heterozygous and homozygous SNP densities
+
+ -- Simulations
+    sim                 Simulate a divergent copy of a genome/protein sequence(s)
+```
+
+# Modules detailed description
+
 ## JLOH extract
 
 This is the most important module of JLOH. Its functions are well described in the figure on the top. It is used to extract LOH blocks starting from VCF, BAM, and FASTA files. Detailed information on this algorithm functioning [can be found here](docs/EXTRACT.md).
