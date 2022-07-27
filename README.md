@@ -10,23 +10,21 @@ A tool to extract, filter, and manage blocks of loss of heterozygosity (LOH) bas
 
 - [J LOH](#j-loh)
   * [Table of Contents](#table-of-contents)
-  * [Install](#install)
-  * [Run](#run)
-    + [Nextflow workflow](#nextflow-workflow)
-- [Modules](#modules)
-  * [JLOH sim](#jloh-sim)
-  * [JLOH g2g](#jloh-g2g)
+  * [Install and run](#install-and-run)
+  * [Basic usage](#basic-usage)
+- [Modules detailed description](#modules-detailed-description)
   * [JLOH extract](#jloh-extract)
-    + [Sorting of SNPs by zygosity](#sorting-of-snps-by-zygosity)
-    + [Extraction of heterozygous regions](#extraction-of-heterozygous-regions)
-    + [Extraction of candidate blocks](#extraction-of-candidate-blocks)
-    + [Coverage trimming](#coverage-trimming)
-    + [Determination of block zygosity](#determination-of-block-zygosity)
-    + [Output](#output)
-      - [Interpreting output](#interpreting-output)
+    + [output](#output)
   * [JLOH filter](#jloh-filter)
+  * [JLOH intersect](#jloh-intersect)
+  * [JLOH chimeric](#jloh-chimeric)
+    + [output](#output-1)
+  * [JLOH g2g](#jloh-g2g)
   * [JLOH density](#jloh-density)
-- [Hybrid mode - step by step guide](#hybrid-mode---step-by-step-guide)
+  * [JLOH sim](#jloh-sim)
+- [Hybrid mode - step by step guide for data preparation](#hybrid-mode---step-by-step-guide-for-data-preparation)
+
+<small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
 
 
 ## Install and run
