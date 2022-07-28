@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 27/07/2022
+Last change: 28/07/2022
 ###
 """
 
@@ -28,12 +28,12 @@ if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
 Calculate number of block-to-block junctions over the genome
 
 Usage:
-jloh junctions --blocks [<TSV>, ...] [options]
+jloh junctions --blocks [<TSV> ...] [options]
 
 [input/output]
 --blocks            TSV file produced by jloh extract containing LOH blocks     [!]
-                    If passing two files, junctions are searched between the
-                    content of the two files (not within a single file)
+                    If passing two SPACE-separated files, junctions are searched
+                    between the content of the two files
 
 [optional]
 --gff               GFF file containing gene model annotations for extra stats  [off]
