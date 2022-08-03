@@ -212,8 +212,8 @@ process PE_map_trimmed_reads {
 process filter_and_sort_bam {
 
   executor = "local"
-  cpus = 4
-  maxForks = params.threads
+  cpus = 8
+  maxForks = 6
 
   publishDir  "${params.output_dir}/mapping",
               mode: "copy", pattern: "*.{fs.bam,fs.bam.bai}"
@@ -237,11 +237,11 @@ process filter_and_sort_bam {
     -o ${sample_id}.${genome_A_name}.f.bam ${par_A_sam} &&
     ${SAMTOOLS} view --threads ${params.threads} -F 0x0100 -F 0x4 -h -b \
     -o ${sample_id}.${genome_B_name}.f.bam ${par_B_sam} &&
-    ${SAMTOOLS} sort --threads ${params.threads} --output-fmt bam \
+    ${SAMTOOLS} sort --threads 8 --output-fmt bam \
     -T ${sample_id}.${genome_A_name} \
     -o ${sample_id}.${genome_A_name}.fs.bam \
     ${sample_id}.${genome_A_name}.f.bam &&
-    ${SAMTOOLS} sort --threads ${params.threads} --output-fmt bam \
+    ${SAMTOOLS} sort --threads 8 --output-fmt bam \
     -T ${sample_id}.${genome_B_name} \
     -o ${sample_id}.${genome_B_name}.fs.bam \
     ${sample_id}.${genome_B_name}.f.bam &&
