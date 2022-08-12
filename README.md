@@ -20,7 +20,7 @@ Schematic of the "jloh extract" module workflow.
   * [JLOH intersect](#jloh-intersect)
   * [JLOH chimeric](#jloh-chimeric)
   * [JLOH g2g](#jloh-g2g)
-  * [JLOH density](#jloh-density)
+  * [JLOH stats](#jloh-stats)
   * [JLOH sim](#jloh-sim)
 
 <small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
@@ -43,10 +43,12 @@ Detailed information [can be found here](docs/INSTALL.md).
     g2g                 Align two genomes to find regions that should carry SNPs
 
  -- Calculations
-    density             Estimate heterozygous and homozygous SNP densities
+    stats               Estimate heterozygous and homozygous SNP statistics
+    junctions           Calculate number of block-to-block junctions over the genome
 
  -- Simulations
     sim                 Simulate a divergent copy of a genome/protein sequence(s)
+
 ```
 
 ## Modules detailed description
@@ -108,13 +110,13 @@ This program finds diverging regions between two genomes in FASTA format. The in
 
 These regions are a good `--regions` file to pass to `JLOH extract` in `--hybrid` mode, excluding false positives that may arise by mapping.
 
-### JLOH density
+### JLOH stats
 
 This tool computes the densities of all SNPs, heterozygous SNPs, and homozygous SNPs over the genome sequence.
 
-Besides the mean snp density, it calculates a distribution and extracts the 5%, 10%, 90%, and 95% percentile. These values are useful to set as thresholds in JLOH extract.
+Besides the mean snp density, it calculates a distribution and extracts the most relevant quantiles. It also calculates the same quantiles for the SNP distances.
 
-We suggest to use either the 5% or the 10% percentile as thresholds for heterozygous SNP density in the detection of blocks.
+It then suggests `--min-snps` and `--snp-distance` parameters to be used in `jloh extract`. We suggest to use parameters close to the ones suggested by this tool when using **jloh extract** for the most refined results.
 
 ### JLOH sim
 
