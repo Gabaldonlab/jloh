@@ -59,8 +59,8 @@ jloh extract --vcf <VCF> --ref <FASTA> --bam <BAM> [options]
 
 [parameters]
 --filter-mode       "pass" to keep only PASS variants, "all" to keep everything [all]
---snp-distance      Max. distance (bp) between SNPs for blocks definition       [100]
 --min-snps          Min. number of SNPs (het,homo) to initiate a het block      [2,2]
+--snp-distance      Max. distance (bp) (het/homo) between SNPs in same block    [25,500]
 --min-length        Min. LOH block length                                       [1000]
 --min-af            Min. allele frequency to consider a variant heterozygous    [0.3]
 --max-af            Max. allele frequency to consider a variant heterozygous    [0.7]
@@ -92,8 +92,8 @@ p.add_argument("--threads", default=4, type=int)
 p.add_argument("--regions")
 # parameters
 p.add_argument("--filter-mode", choices=["all","pass"], default="all")
-p.add_argument("--snp-distance", default=100, type=int)
 p.add_argument("--min-snps", default="2,2", type=str)
+p.add_argument("--snp-distance", default="25,500", type=int)
 p.add_argument("--min-length", default=1000, type=int)
 p.add_argument("--min-af", default=0.3, type=float)
 p.add_argument("--max-af", default=0.7, type=float)
@@ -325,7 +325,7 @@ def hetero_and_homo_snp_densities(het_snps_vcf, homo_snps_vcf, ref):
     return hetero_div, homo_div
 
 
-def filter_by_snp_distance_and_count(args, bt, discard, min_snps):
+def filter_by_snp_count(args, bt, discard, min_snps):
 
     """
     v1
@@ -384,7 +384,7 @@ def filter_by_length(bt, min_length):
     return new_bt
 
 
-def get_snp_intervals(args, in_vcf, invert, min_snps):
+def get_snp_intervals(args, in_vcf, invert, min_snps, snp_distance):
 
     """
     Last update: 12/08/2022
@@ -399,8 +399,8 @@ def get_snp_intervals(args, in_vcf, invert, min_snps):
     if invert == False:
         snp_blocks = BedTool(in_vcf)
         if len(snp_blocks) > 0:
-            snp_blocks = snp_blocks.merge(d=args.snp_distance, c=1, o="count")
-            (snp_blocks, skipped) = filter_by_snp_distance_and_count(args, snp_blocks, False, min_snps)
+            snp_blocks = snp_blocks.merge(d=snp_distance, c=1, o="count")
+            (snp_blocks, skipped) = filter_by_snp_count(args, snp_blocks, False, min_snps)
         else:
             (snp_blocks, skipped) = [], 0
 
@@ -408,8 +408,8 @@ def get_snp_intervals(args, in_vcf, invert, min_snps):
     elif invert == True:
         snp_blocks = BedTool(in_vcf)
         if len(snp_blocks) > 0:
-            snp_blocks = snp_blocks.merge(d=args.snp_distance, c=1, o="count")
-            (snp_blocks, skipped) = filter_by_snp_distance_and_count(args, snp_blocks, True, min_snps)
+            snp_blocks = snp_blocks.merge(d=snp_distance, c=1, o="count")
+            (snp_blocks, skipped) = filter_by_snp_count(args, snp_blocks, True, min_snps)
         else:
             (snp_blocks, skipped) = [], 0
 
@@ -445,13 +445,14 @@ def snps_to_bed_blocks(args, het_snps_vcf, homo_snps_vcf, genome_file):
     Last update: 12/08/2022
     """
 
-    # define min snps values
+    # define min snps and snp dist values
     Min_snps = {"het":int(args.min_snps.split(",")[0]), "homo":int(args.min_snps.split(",")[1])}
+    Snp_dist = {"het":int(args.snp_distance.split(",")[0]), "homo":int(args.snp_distance.split(",")[1])}
 
     pool = multiprocessing.Pool(args.threads)
 
-    Het_bed_blocks = pool.apply_async(get_snp_intervals, args=(args, het_snps_vcf, False, Min_snps["het"]))
-    Homo_bed_blocks_ALT = pool.apply_async(get_snp_intervals, args=(args, homo_snps_vcf, False, Min_snps["homo"]))
+    Het_bed_blocks = pool.apply_async(get_snp_intervals, args=(args, het_snps_vcf, False, Min_snps["het"], Snp_dist["het"]))
+    Homo_bed_blocks_ALT = pool.apply_async(get_snp_intervals, args=(args, homo_snps_vcf, False, Min_snps["homo"], , Snp_dist["homo"]))
 
     pool.close()
     pool.join()
@@ -550,9 +551,10 @@ def get_chromosomal_covered_regions(queue, bam, chrom, chrom_len):
 
     # read bam file and convert into bed file
     # index bam file if needed
-    res = index_bam(bam)
-    if res == False:
-        sys.exit("ERROR: The BAM file could not be indexed.\n\n")
+    if os.path.exists(f"{bam}.bai") == False:
+        res = index_bam(bam)
+        if res == False:
+            sys.exit("ERROR: The BAM file could not be indexed.\n\n")
 
     bt = BedTool(bam)
     bt = bt.bamtobed()
@@ -1097,6 +1099,7 @@ def run_in_default_mode(args):
     # bed blocks
     sys.stderr.write(f"[{at()}] Clustering heterozygous and homozygous SNPs into blocks...\n")
     Het_blocks, Homo_blocks_REF, Homo_blocks_ALT = snps_to_bed_blocks(args, Vcfs["hetero"][0], Vcfs["homo"][0], genome_file)
+    Het_blocks = filter_by_length(Het_blocks, args.min_length)
     out = f"{args.output_dir}/{args.sample}.{handle}.het_blocks.bed"
     Het_blocks.saveas(out)
     sys.stderr.write(f"[{at()}] Found {len(Het_blocks)} het blocks, {len(Homo_blocks_REF)} homo REF blocks, {len(Homo_blocks_ALT)} homo ALT blocks\n")
@@ -1216,10 +1219,12 @@ def run_in_hybrid_mode(args):
     sys.stderr.write(f"[{at()}] Clustering heterozygous and homozygous SNPs into blocks...\n")
     Het_blocks_A, Homo_blocks_REF_A, Homo_blocks_ALT_A = snps_to_bed_blocks(args, Vcfs["hetero"][0], Vcfs["homo"][0], genome_file_A)
     Het_blocks_B, Homo_blocks_REF_B, Homo_blocks_ALT_B = snps_to_bed_blocks(args, Vcfs["hetero"][1], Vcfs["homo"][1], genome_file_B)
-    out_A = f"{args.output_dir}/{args.sample}.{handle_A}.het_blocks.A.bed"
-    out_B = f"{args.output_dir}/{args.sample}.{handle_B}.het_blocks.B.bed"
+    Het_blocks_A = filter_by_length(Het_blocks_A, args.min_length)
+    Het_blocks_B = filter_by_length(Het_blocks_B, args.min_length)
     Het_blocks_A.saveas(out_A)
     Het_blocks_B.saveas(out_B)
+    out_A = f"{args.output_dir}/{args.sample}.{handle_A}.het_blocks.A.bed"
+    out_B = f"{args.output_dir}/{args.sample}.{handle_B}.het_blocks.B.bed"
     sys.stderr.write(f"[{at()}] Parent A: Found {len(Het_blocks_A)} het blocks, {len(Homo_blocks_REF_A)} homo REF blocks, {len(Homo_blocks_ALT_A)} homo ALT blocks\n")
     sys.stderr.write(f"[{at()}] Parent B: Found {len(Het_blocks_B)} het blocks, {len(Homo_blocks_REF_B)} homo REF blocks, {len(Homo_blocks_ALT_B)} homo ALT blocks\n")
 

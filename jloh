@@ -44,7 +44,7 @@ Commands:
     g2g                 Align two genomes to find regions that should carry SNPs
 
  -- Calculations
-    density             Estimate heterozygous and homozygous SNP densities
+    stats               Estimate heterozygous and homozygous SNP statistics 
 	junctions           Calculate number of block-to-block junctions over the genome
 
  -- Simulations
