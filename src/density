@@ -3,221 +3,235 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 07/03/2022
+Last change: 12/8/2022
 ###
 """
 
 
 import argparse as ap
 import sys
-from Bio import SeqIO
-from statistics import median
-
+import pandas as pd
+import multiprocessing as mp
 
 # help section
 if len(sys.argv) == 1:
-	sys.argv.append("--help")
+    sys.argv.append("--help")
 
 if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
-	sys.stderr.write("""
+    sys.stderr.write("""
 
-Calculate heterozygous and homozygous SNP density from a VCF file and its reference
-FASTA genome sequence
+Calculate heterozygous and homozygous SNP density distributions from a VCF file
 
 Usage:
-jloh density --vcf <VCF> --ref <FASTA>
+jloh density --vcf <VCF>
+
+[I/O]
 
 --vcf               Input VCF file to use for density calculations              [!]
---ref               Reference FASTA genome on which SNPs were called            [!]
+--threads           Number of parallel operations                               [4]
 
 """)
-	sys.exit(0)
+    sys.exit(0)
 
 
 p = ap.ArgumentParser()
 p.add_argument("--vcf")
-p.add_argument("--ref")
+p.add_argument("--threads", default=4, type=int)
 args = p.parse_args()
 
 
 # functions
 
-def check_conditions(args):
-
-	"""
-	Last update: 07/03/2022
-	"""
-
-	if args.print_info:
-		print(script_info)
-		sys.exit(0)
-
-	if (not args.vcf and not args.ref):
-		sys.stderr.write("ERROR: when using the default mode you must provide a VCF and a REF\n")
-		sys.stderr.write("See --vcf, --ref options\n")
-		sys.exit()
-
-	return True
-
-
-
 def hetero_and_homo_snps(vcf):
 
-	"""
-	Last update: 03/03/2022
-	"""
+    """
+    Last update: 03/03/2022
+    """
 
-	# read SNPs
-	INPUT = open(vcf, "r")
-	Vcf_lines = [ line for line in INPUT if line[0] != "#" ]
-	INPUT.close()
+    # read SNPs
+    INPUT = open(vcf, "r")
+    Vcf_lines = [ line for line in INPUT if line[0] != "#" ]
+    INPUT.close()
 
-	Het_lines, Homo_lines = [],[]
+    Het_lines, Homo_lines = [],[]
 
-	for line in Vcf_lines:
+    for line in Vcf_lines:
 
-		# split by field
-		lst = line.rstrip("\b\r\n").split("\t")
+        # split by field
+        lst = line.rstrip("\b\r\n").split("\t")
 
-		# read values
-		annotations = lst[8].split(":")
-		values = lst[9].split(":")
-		dict = { annotations[i]:values[i] for i in range(0, len(annotations)) }
+        # read values
+        annotations = lst[8].split(":")
+        values = lst[9].split(":")
+        dict = { annotations[i]:values[i] for i in range(0, len(annotations)) }
 
-		# if it's a single heterozygous SNP
-		if ((len(lst[3]) == len(lst[4]) == 1) and (dict["GT"]=="0/1")):
+        # if it's a single heterozygous SNP
+        if ((len(lst[3]) == len(lst[4]) == 1) and (dict["GT"]=="0/1")):
 
-			# 4. write out lines that have fitting values
-			Het_lines.append(line)
+            # 4. write out lines that have fitting values
+            Het_lines.append(line)
 
-		# if homozygous: keep for later assignment to blocks
-		elif ((len(lst[3]) == len(lst[4]) == 1) and (dict["GT"]=="0/0") \
-		or (len(lst[3]) == len(lst[4]) == 1) and (dict["GT"]=="1/1")):
+        # if homozygous: keep for later assignment to blocks
+        elif ((len(lst[3]) == len(lst[4]) == 1) and (dict["GT"]=="0/0") \
+        or (len(lst[3]) == len(lst[4]) == 1) and (dict["GT"]=="1/1")):
 
-			Homo_lines.append(line)
+            Homo_lines.append(line)
 
-		# consider multiallelic sites
-		# only if all alleles are SNPs
-		# and if all alleles are not stars (spanning deletions)
-		elif ((len(lst[3]) == 1) and (len(lst[4].split(",")) > 1)
-		and (all([ len(x)==1 for x in lst[4].split(",") ])) \
-		and (all([ x!="*" for x in lst[4].split(",") ]))):
+        # consider multiallelic sites
+        # only if all alleles are SNPs
+        # and if all alleles are not stars (spanning deletions)
+        elif ((len(lst[3]) == 1) and (len(lst[4].split(",")) > 1)
+        and (all([ len(x)==1 for x in lst[4].split(",") ])) \
+        and (all([ x!="*" for x in lst[4].split(",") ]))):
 
-			# this means that there are two annotations for AF
-			# and that both have to be checked
-			# so it is a variation on the previous block
-			# which could be rendered into a function
-			# assuming that there are > 1 AF annotation
-			# splitting the field based on the comma
-			# and converting to float the content
-			AFs = [ float(x) for x in dict["AF"].split(",") ]
+            # this means that there are two annotations for AF
+            # and that both have to be checked
+            # so it is a variation on the previous block
+            # which could be rendered into a function
+            # assuming that there are > 1 AF annotation
+            # splitting the field based on the comma
+            # and converting to float the content
+            AFs = [ float(x) for x in dict["AF"].split(",") ]
 
-			# all it takes is one of the variants to be heterozygous
-			# for the locus to be conserved
-			# where het = AF comprised between --min-af and --max-af
-			# 4. write out lines that have fitting values
-			Het_lines.append(line)
+            # all it takes is one of the variants to be heterozygous
+            # for the locus to be conserved
+            # where het = AF comprised between --min-af and --max-af
+            # 4. write out lines that have fitting values
+            Het_lines.append(line)
 
-	return Het_lines, Homo_lines
+    return Het_lines, Homo_lines
 
 
-def parse_chromosomes(ref):
+def get_chrom_lengths_from_vcf(vcf):
 
-	"""
-	Last update: 03/03/2022
-	"""
+    """
+    12/08/2022
+    """
 
-	Chrom_lengths = {}
-	for record in SeqIO.parse(ref, "fasta"):
-		id = record.id
-		seq = record.seq
-		seqlen = len(seq)
-		Chrom_lengths[id] = seqlen
+    IN = open(args.vcf, "r")
+    Header = [line.rstrip("\r\b\n") for line in IN if line[0] == "#"]
+    IN.close()
 
-	return Chrom_lengths
+    Ctg_lines = [x.replace("##contig=<", "").replace(">", "") for x in Header if "##contig" in x]
+    Ctg_lines = [x.split(",") for x in Ctg_lines]
+
+    Chrom_lengths = {x[0].split("=")[1] : int(x[1].split("=")[1]) for x in Ctg_lines}
+    return Chrom_lengths
 
 
 def is_a_snp(line):
 
-	"""
-	Last update: 03/03/2022
-	"""
+    """
+    Last update: 03/03/2022
+    """
 
-	lst = line.rstrip("\r\b\n").split("\t")
-	ref, alt = lst[3].split(","), lst[4].split(",")
-	if (all([len(x)==1 for x in ref]) and all([len(y)==1 for y in alt])) == True:
-		return True
-	else:
-		return False
-
-
-def calculate_chrom_snp_densities(Variants, ref):
-
-	"""
-	Last update: 03/03/2022
-	"""
-
-	# extract SNPs and chromosome lengths
-	# subdivide SNPs by chromosome
-	Snps = [ (line.split("\t")[0], line) for line in Variants if is_a_snp(line) == True ]
-	Chrom_lengths = parse_chromosomes(ref)
-	Snps_by_chrom = { chrom : [] for chrom in Chrom_lengths.keys() }
-
-	for snp in Snps:
-		Snps_by_chrom[snp[0]].append(snp[1])
-
-	# calculate densities by chromosome
-	Snp_densities = { chrom : len(Snps_by_chrom[chrom]) / (int(Chrom_lengths[chrom]) / 1000) for chrom in Snps_by_chrom.keys() }
-
-	return Snp_densities
+    lst = line.rstrip("\r\b\n").split("\t")
+    ref, alt = lst[3].split(","), lst[4].split(",")
+    if (all([len(x)==1 for x in ref]) and all([len(y)==1 for y in alt])) == True:
+        return True
+    else:
+        return False
 
 
+def count_snps_in_window(Snps, w_start, w_end):
 
-def run_in_default_mode(args):
+    """
+    12/08/2022
+    """
 
-	"""
-	Last update: 07/03/2022
-	"""
+    tot = 0
+    k = 0
 
-	# split
-	Hetero_lines, Homo_lines = hetero_and_homo_snps(args.vcf)
-	All = Hetero_lines + Homo_lines
+    if len(Snps) > 0:
+        while (k < len(Snps)):
+            if (Snps[k] >= w_start) and (Snps[k] <= w_end):
+                tot+=1
+            if (Snps[k] > w_end):
+                break
+            k += 1
+    else:
+        tot = 0
 
-	# hetero
-	Het_snp_densities = calculate_chrom_snp_densities(Hetero_lines, args.ref)
-	hetero_dens = median([float(i) for i in Het_snp_densities.values()])
-	hetero_dens = round(hetero_dens, 2)
+    return tot
 
-	# homo
-	Homo_snp_densities = calculate_chrom_snp_densities(Homo_lines, args.ref)
-	homo_dens = median([float(i) for i in Homo_snp_densities.values()])
-	homo_dens = round(homo_dens, 2)
 
-	# all
-	All_snp_densities = calculate_chrom_snp_densities(All, args.ref)
-	all_dens = median([float(i) for i in All_snp_densities.values()])
-	all_dens = round(all_dens, 2)
+def calculate_chrom_snp_densities(Variants, Chrom_lengths, args):
 
-	return hetero_dens, homo_dens, all_dens
+    """
+    Last update: 12/08/2022
+    """
+
+    # extract SNPs and chromosome lengths
+    # subdivide SNPs by chromosome
+    Snps = [ (line.split("\t")[0], line) for line in Variants if is_a_snp(line) == True ]
+    Snps_by_chrom = { chrom : [] for chrom in Chrom_lengths.keys() }
+
+    for snp in Snps:
+        Snps_by_chrom[snp[0]].append(int(snp[1].split("\t")[1]))
+
+    out = []
+
+    for chrom in Snps_by_chrom.keys():
+        w_start = 0
+        w_end = w_start + 1000
+        while w_end < Chrom_lengths[chrom]:
+            w_snps = count_snps_in_window(Snps_by_chrom[chrom], w_start, w_end)
+            w_start += 500
+            w_end += 500
+            out.append([chrom, w_start, w_snps])
+
+    df = pd.DataFrame(out)
+    df.columns = ["Chrom", "W_start", "Snps"]
+    df = df.sort_values(by=["Chrom", "W_start"], ascending=True)
+
+    df = df.loc[df["Snps"] > 0, :]
+    df_quant = df.quantile(q=[0.05, 0.10, 0.15, 0.50, 0.85, 0.90, 0.95])
+
+    return (df, df_quant)
 
 
 def main(args):
 
-	"""
-	Last update: 04/03/2022
-	"""
+    """
+    Last update: 12/08/2022
+    """
 
-	# check conditions before starting
-	tmp = check_conditions(args)
+    # split
+    Hetero_lines, Homo_lines = hetero_and_homo_snps(args.vcf)
+    Chrom_lengths = get_chrom_lengths_from_vcf(args.vcf)
+    All = Hetero_lines + Homo_lines
 
-	# run in the selected mode
-	homo_dens, hetero_dens, all_dens = run_in_default_mode(args)
+    # get densities
+    Het, Het_quant = calculate_chrom_snp_densities(Hetero_lines, Chrom_lengths, args)
+    Homo, Homo_quant = calculate_chrom_snp_densities(Homo_lines, Chrom_lengths, args)
+    All, All_quant = calculate_chrom_snp_densities(All, Chrom_lengths, args)
 
-	# write divergence to output
-	sys.stdout.write(f"{all_dens} SNPs/kbp\n")
-	sys.stdout.write(f"{hetero_dens} heterozygous SNPs/kbp\n")
-	sys.stdout.write(f"{homo_dens} homozygous SNPs/kbp\n")
+    # write to output
+    sys.stderr.write(f"""
+
+ ### SNPs/kbp ###
+
+ -- Quantiles --
+
+ Q\tGen\tHet\tHomo
+ 5%\t{All_quant["Snps"].loc[0.05].round(2)}\t{Het_quant["Snps"].loc[0.05].round(2)}\t{Homo_quant["Snps"].loc[0.05].round(2)}
+ 10%\t{All_quant["Snps"].loc[0.10].round(2)}\t{Het_quant["Snps"].loc[0.10].round(2)}\t{Homo_quant["Snps"].loc[0.10].round(2)}
+ 15%\t{All_quant["Snps"].loc[0.15].round(2)}\t{Het_quant["Snps"].loc[0.15].round(2)}\t{Homo_quant["Snps"].loc[0.15].round(2)}
+ 50%\t{All_quant["Snps"].loc[0.50].round(2)}\t{Het_quant["Snps"].loc[0.50].round(2)}\t{Homo_quant["Snps"].loc[0.50].round(2)}
+ 85%\t{All_quant["Snps"].loc[0.85].round(2)}\t{Het_quant["Snps"].loc[0.85].round(2)}\t{Homo_quant["Snps"].loc[0.85].round(2)}
+ 90%\t{All_quant["Snps"].loc[0.90].round(2)}\t{Het_quant["Snps"].loc[0.90].round(2)}\t{Homo_quant["Snps"].loc[0.90].round(2)}
+ 95%\t{All_quant["Snps"].loc[0.95].round(2)}\t{Het_quant["Snps"].loc[0.95].round(2)}\t{Homo_quant["Snps"].loc[0.95].round(2)}
+
+ -- Statistics --
+
+ S\tGen\tHet\tHomo
+ Median\t{All["Snps"].median().round(2)}\t{Het["Snps"].median().round(2)}\t{Homo["Snps"].median().round(2)}
+ Mean\t{All["Snps"].mean().round(2)}\t{Het["Snps"].mean().round(2)}\t{Homo["Snps"].mean().round(2)}
+ Max\t{All["Snps"].max()}\t{Het["Snps"].max()}\t{Homo["Snps"].max()}
+ Min\t{All["Snps"].min()}\t{Het["Snps"].min()}\t{Homo["Snps"].min()}
+
+""")
 
 
 if __name__ == "__main__":
-	main(args)
+    main(args)

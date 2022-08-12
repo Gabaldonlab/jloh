@@ -6,6 +6,8 @@ A tool to extract, filter, and manage blocks of loss of heterozygosity (LOH) bas
 
 ![JLOH workflow](images/j_loh.png)
 
+Schematic of the "jloh extract" module workflow.
+
 ## Table of Contents
 
 - [J LOH](#j-loh)
@@ -109,6 +111,10 @@ These regions are a good `--regions` file to pass to `JLOH extract` in `--hybrid
 ### JLOH density
 
 This tool computes the densities of all SNPs, heterozygous SNPs, and homozygous SNPs over the genome sequence.
+
+Besides the mean snp density, it calculates a distribution and extracts the 5%, 10%, 90%, and 95% percentile. These values are useful to set as thresholds in JLOH extract.
+
+We suggest to use either the 5% or the 10% percentile as thresholds for heterozygous SNP density in the detection of blocks.
 
 ### JLOH sim
 
