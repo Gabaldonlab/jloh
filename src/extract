@@ -93,7 +93,7 @@ p.add_argument("--regions")
 # parameters
 p.add_argument("--filter-mode", choices=["all","pass"], default="all")
 p.add_argument("--min-snps", default="2,2", type=str)
-p.add_argument("--snp-distance", default="25,500", type=int)
+p.add_argument("--snp-distance", default="25,500", type=str)
 p.add_argument("--min-length", default=1000, type=int)
 p.add_argument("--min-af", default=0.3, type=float)
 p.add_argument("--max-af", default=0.7, type=float)
@@ -452,7 +452,7 @@ def snps_to_bed_blocks(args, het_snps_vcf, homo_snps_vcf, genome_file):
     pool = multiprocessing.Pool(args.threads)
 
     Het_bed_blocks = pool.apply_async(get_snp_intervals, args=(args, het_snps_vcf, False, Min_snps["het"], Snp_dist["het"]))
-    Homo_bed_blocks_ALT = pool.apply_async(get_snp_intervals, args=(args, homo_snps_vcf, False, Min_snps["homo"], , Snp_dist["homo"]))
+    Homo_bed_blocks_ALT = pool.apply_async(get_snp_intervals, args=(args, homo_snps_vcf, False, Min_snps["homo"], Snp_dist["homo"]))
 
     pool.close()
     pool.join()
