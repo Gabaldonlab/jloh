@@ -163,6 +163,7 @@ def calculate_chrom_snp_densities(Variants, Chrom_lengths, args):
     # subdivide SNPs by chromosome
     Snps = [ (line.split("\t")[0], line) for line in Variants if is_a_snp(line) == True ]
     Snps_by_chrom = { chrom : [] for chrom in Chrom_lengths.keys() }
+    Distances = []
 
     for snp in Snps:
         Snps_by_chrom[snp[0]].append(int(snp[1].split("\t")[1]))
@@ -185,7 +186,18 @@ def calculate_chrom_snp_densities(Variants, Chrom_lengths, args):
     df = df.loc[df["Snps"] > 0, :]
     df_quant = df.quantile(q=[0.05, 0.10, 0.15, 0.50, 0.85, 0.90, 0.95])
 
-    return (df, df_quant)
+    ## distances
+    for chrom in Snps_by_chrom.keys():
+        for snp in Snps_by_chrom[chrom]:
+            idx = Snps_by_chrom[chrom].index(snp)
+            if idx > 0:
+                d = Snps_by_chrom[chrom][idx] - Snps_by_chrom[chrom][idx-1]
+                Distances.append(d)
+
+    sd = pd.Series(Distances)
+    sd_quant = sd.quantile(q=[0.05, 0.10, 0.15, 0.50, 0.85, 0.90, 0.95])
+
+    return (df, df_quant, sd_quant)
 
 
 def main(args):
@@ -200,33 +212,47 @@ def main(args):
     All = Hetero_lines + Homo_lines
 
     # get densities
-    Het, Het_quant = calculate_chrom_snp_densities(Hetero_lines, Chrom_lengths, args)
-    Homo, Homo_quant = calculate_chrom_snp_densities(Homo_lines, Chrom_lengths, args)
-    All, All_quant = calculate_chrom_snp_densities(All, Chrom_lengths, args)
+    Het, Het_quant, Het_dist = calculate_chrom_snp_densities(Hetero_lines, Chrom_lengths, args)
+    Homo, Homo_quant, Homo_dist = calculate_chrom_snp_densities(Homo_lines, Chrom_lengths, args)
+    All, All_quant, All_dist = calculate_chrom_snp_densities(All, Chrom_lengths, args)
 
     # write to output
     sys.stderr.write(f"""
 
- ### SNPs/kbp ###
-
- -- Quantiles --
-
- Q\tGen\tHet\tHomo
- 5%\t{All_quant["Snps"].loc[0.05].round(2)}\t{Het_quant["Snps"].loc[0.05].round(2)}\t{Homo_quant["Snps"].loc[0.05].round(2)}
- 10%\t{All_quant["Snps"].loc[0.10].round(2)}\t{Het_quant["Snps"].loc[0.10].round(2)}\t{Homo_quant["Snps"].loc[0.10].round(2)}
- 15%\t{All_quant["Snps"].loc[0.15].round(2)}\t{Het_quant["Snps"].loc[0.15].round(2)}\t{Homo_quant["Snps"].loc[0.15].round(2)}
- 50%\t{All_quant["Snps"].loc[0.50].round(2)}\t{Het_quant["Snps"].loc[0.50].round(2)}\t{Homo_quant["Snps"].loc[0.50].round(2)}
- 85%\t{All_quant["Snps"].loc[0.85].round(2)}\t{Het_quant["Snps"].loc[0.85].round(2)}\t{Homo_quant["Snps"].loc[0.85].round(2)}
- 90%\t{All_quant["Snps"].loc[0.90].round(2)}\t{Het_quant["Snps"].loc[0.90].round(2)}\t{Homo_quant["Snps"].loc[0.90].round(2)}
- 95%\t{All_quant["Snps"].loc[0.95].round(2)}\t{Het_quant["Snps"].loc[0.95].round(2)}\t{Homo_quant["Snps"].loc[0.95].round(2)}
-
- -- Statistics --
+ -- SNPs/Kbp Statistics --
 
  S\tGen\tHet\tHomo
- Median\t{All["Snps"].median().round(2)}\t{Het["Snps"].median().round(2)}\t{Homo["Snps"].median().round(2)}
- Mean\t{All["Snps"].mean().round(2)}\t{Het["Snps"].mean().round(2)}\t{Homo["Snps"].mean().round(2)}
+ Median\t{All["Snps"].median().round(1)}\t{Het["Snps"].median().round(1)}\t{Homo["Snps"].median().round(1)}
+ Mean\t{All["Snps"].mean().round(1)}\t{Het["Snps"].mean().round(1)}\t{Homo["Snps"].mean().round(1)}
  Max\t{All["Snps"].max()}\t{Het["Snps"].max()}\t{Homo["Snps"].max()}
  Min\t{All["Snps"].min()}\t{Het["Snps"].min()}\t{Homo["Snps"].min()}
+
+ -- SNPs/Kbp Quantiles --
+
+ Q\tGen\tHet\tHomo
+ 5%\t{All_quant["Snps"].loc[0.05].round(1)}\t{Het_quant["Snps"].loc[0.05].round(1)}\t{Homo_quant["Snps"].loc[0.05].round(1)}
+ 10%\t{All_quant["Snps"].loc[0.10].round(1)}\t{Het_quant["Snps"].loc[0.10].round(1)}\t{Homo_quant["Snps"].loc[0.10].round(1)}
+ 15%\t{All_quant["Snps"].loc[0.15].round(1)}\t{Het_quant["Snps"].loc[0.15].round(1)}\t{Homo_quant["Snps"].loc[0.15].round(1)}
+ 50%\t{All_quant["Snps"].loc[0.50].round(1)}\t{Het_quant["Snps"].loc[0.50].round(1)}\t{Homo_quant["Snps"].loc[0.50].round(1)}
+ 85%\t{All_quant["Snps"].loc[0.85].round(1)}\t{Het_quant["Snps"].loc[0.85].round(1)}\t{Homo_quant["Snps"].loc[0.85].round(1)}
+ 90%\t{All_quant["Snps"].loc[0.90].round(1)}\t{Het_quant["Snps"].loc[0.90].round(1)}\t{Homo_quant["Snps"].loc[0.90].round(1)}
+ 95%\t{All_quant["Snps"].loc[0.95].round(1)}\t{Het_quant["Snps"].loc[0.95].round(1)}\t{Homo_quant["Snps"].loc[0.95].round(1)}
+
+ -- SNPs distance quantiles --
+
+ Q\tGen\tHet\tHomo
+ 5%\t{All_dist.loc[0.05].round(1)}\t{Het_dist.loc[0.05].round(1)}\t{Homo_dist.loc[0.05].round(1)}
+ 10%\t{All_dist.loc[0.10].round(1)}\t{Het_dist.loc[0.10].round(1)}\t{Homo_dist.loc[0.10].round(1)}
+ 15%\t{All_dist.loc[0.15].round(1)}\t{Het_dist.loc[0.15].round(1)}\t{Homo_dist.loc[0.15].round(1)}
+ 50%\t{All_dist.loc[0.50].round(1)}\t{Het_dist.loc[0.50].round(1)}\t{Homo_dist.loc[0.50].round(1)}
+ 85%\t{All_dist.loc[0.85].round(1)}\t{Het_dist.loc[0.85].round(1)}\t{Homo_dist.loc[0.85].round(1)}
+ 90%\t{All_dist.loc[0.90].round(1)}\t{Het_dist.loc[0.90].round(1)}\t{Homo_dist.loc[0.90].round(1)}
+ 95%\t{All_dist.loc[0.95].round(1)}\t{Het_dist.loc[0.95].round(1)}\t{Homo_dist.loc[0.95].round(1)}
+
+ -- Suggested JLOH extract parameters (het/homo) --
+
+ --min-snps\t{int(Het_quant["Snps"].loc[0.05].round(0))},{int(Homo_quant["Snps"].loc[0.05].round(0))}
+ --snp-distance\t{int(Het_dist.loc[0.95].round(1))},{int(Homo_dist.loc[0.95].round(0))}
 
 """)
 
