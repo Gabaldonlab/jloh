@@ -28,7 +28,6 @@ jloh density --vcf <VCF>
 [I/O]
 
 --vcf               Input VCF file to use for density calculations              [!]
---threads           Number of parallel operations                               [4]
 
 """)
     sys.exit(0)
@@ -36,7 +35,6 @@ jloh density --vcf <VCF>
 
 p = ap.ArgumentParser()
 p.add_argument("--vcf")
-p.add_argument("--threads", default=4, type=int)
 args = p.parse_args()
 
 
