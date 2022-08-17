@@ -23,7 +23,7 @@ if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
 Calculate heterozygous and homozygous SNP density distributions from a VCF file
 
 Usage:
-jloh density --vcf <VCF>
+jloh stats --vcf <VCF>
 
 [I/O]
 
@@ -251,7 +251,7 @@ def main(args):
 
  -- Suggested JLOH extract parameters (het/homo) --
 
- --min-snps\t{int(Het_quant["Snps"].loc[0.05].round(0))},{int(Homo_quant["Snps"].loc[0.05].round(0))}
+ --min-snps-kbp\t{int(Het_quant["Snps"].loc[0.05].round(0))},{int(Homo_quant["Snps"].loc[0.05].round(0))}
  --snp-distance\t{int(Het_dist.loc[0.95].round(1))},{int(Homo_dist.loc[0.95].round(0))}
 
 """)

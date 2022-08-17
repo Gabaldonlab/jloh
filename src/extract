@@ -59,7 +59,7 @@ jloh extract --vcf <VCF> --ref <FASTA> --bam <BAM> [options]
 
 [parameters]
 --filter-mode       "pass" to keep only PASS variants, "all" to keep everything [all]
---min-snps          Min. number of SNPs (het,homo) to initiate a het block      [2,2]
+--min-snps-kbp      Min. SNPs/kbp (het,homo) to retain a block                  [3,1]
 --snp-distance      Max. distance (bp) (het/homo) between SNPs in same block    [25,500]
 --min-length        Min. LOH block length                                       [1000]
 --min-af            Min. allele frequency to consider a variant heterozygous    [0.3]
@@ -92,7 +92,7 @@ p.add_argument("--threads", default=4, type=int)
 p.add_argument("--regions")
 # parameters
 p.add_argument("--filter-mode", choices=["all","pass"], default="all")
-p.add_argument("--min-snps", default="2,2", type=str)
+p.add_argument("--min-snps-kbp", default="3,1", type=str)
 p.add_argument("--snp-distance", default="25,500", type=str)
 p.add_argument("--min-length", default=1000, type=int)
 p.add_argument("--min-af", default=0.3, type=float)
@@ -325,7 +325,7 @@ def hetero_and_homo_snp_densities(het_snps_vcf, homo_snps_vcf, ref):
     return hetero_div, homo_div
 
 
-def filter_by_snp_count(args, bt, discard, min_snps):
+def filter_by_snp_count(args, bt, discard, min_snps_kbp):
 
     """
     v1
@@ -334,7 +334,7 @@ def filter_by_snp_count(args, bt, discard, min_snps):
     ###
     v2
     Author: Matteo Schiavinato
-    Last update: 12/08/2022
+    Last update: 17/08/2022
     """
 
     # if False, then these are the SNPs we keep
@@ -344,8 +344,11 @@ def filter_by_snp_count(args, bt, discard, min_snps):
         for row in bt:
             ref,start,end,count = str(row).rstrip("\n\r\b").split("\t")
             ref,start,end,count = str(ref),int(start),int(end),int(count)
+            blocklen = float(int(end)-int(start))
+            blocklen_kb = blocklen / 1000
+            block_snps_kb = float(count) / blocklen_kb
 
-            if (count >= min_snps) and (int(end) > int(start)):
+            if (block_snps_kb >= min_snps_kbp) and (blocklen > 0):
                 out.append(row)
             else:
                 skipped += 1
@@ -357,10 +360,14 @@ def filter_by_snp_count(args, bt, discard, min_snps):
         out = []
         skipped = 0
         for row in bt:
+
             ref,start,end,count = str(row).rstrip("\n\r\b").split("\t")
             ref,start,end,count = str(ref),int(start),int(end),int(count)
+            blocklen = float(int(end)-int(start))
+            blocklen_kb = blocklen / 1000
+            block_snps_kb = float(count) / blocklen_kb
 
-            if (count < min_snps) and (int(end) > int(start)):
+            if (block_snps_kb < min_snps_kbp) and (blocklen > 0):
                 out.append(row)
             else:
                 skipped += 1
@@ -384,10 +391,10 @@ def filter_by_length(bt, min_length):
     return new_bt
 
 
-def get_snp_intervals(args, in_vcf, invert, min_snps, snp_distance):
+def get_snp_intervals(args, in_vcf, invert, min_snps_kbp, snp_distance):
 
     """
-    Last update: 12/08/2022
+    Last update: 17/08/2022
     """
 
     # -------------------------------------------
@@ -400,7 +407,7 @@ def get_snp_intervals(args, in_vcf, invert, min_snps, snp_distance):
         snp_blocks = BedTool(in_vcf)
         if len(snp_blocks) > 0:
             snp_blocks = snp_blocks.merge(d=snp_distance, c=1, o="count")
-            (snp_blocks, skipped) = filter_by_snp_count(args, snp_blocks, False, min_snps)
+            (snp_blocks, skipped) = filter_by_snp_count(args, snp_blocks, False, min_snps_kbp)
         else:
             (snp_blocks, skipped) = [], 0
 
@@ -409,7 +416,7 @@ def get_snp_intervals(args, in_vcf, invert, min_snps, snp_distance):
         snp_blocks = BedTool(in_vcf)
         if len(snp_blocks) > 0:
             snp_blocks = snp_blocks.merge(d=snp_distance, c=1, o="count")
-            (snp_blocks, skipped) = filter_by_snp_count(args, snp_blocks, True, min_snps)
+            (snp_blocks, skipped) = filter_by_snp_count(args, snp_blocks, True, min_snps_kbp)
         else:
             (snp_blocks, skipped) = [], 0
 
@@ -446,7 +453,7 @@ def snps_to_bed_blocks(args, het_snps_vcf, homo_snps_vcf, genome_file):
     """
 
     # define min snps and snp dist values
-    Min_snps = {"het":int(args.min_snps.split(",")[0]), "homo":int(args.min_snps.split(",")[1])}
+    Min_snps = {"het":float(args.min_snps_kbp.split(",")[0]), "homo":float(args.min_snps_kbp.split(",")[1])}
     Snp_dist = {"het":int(args.snp_distance.split(",")[0]), "homo":int(args.snp_distance.split(",")[1])}
 
     pool = multiprocessing.Pool(args.threads)
