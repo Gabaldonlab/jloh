@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 12/8/2022
+Last change: 17/08/2022
 ###
 """
 
@@ -238,24 +238,12 @@ def main(args):
  90%\t{All_quant["Snps"].loc[0.90].round(1)}\t{Het_quant["Snps"].loc[0.90].round(1)}\t{Homo_quant["Snps"].loc[0.90].round(1)}
  95%\t{All_quant["Snps"].loc[0.95].round(1)}\t{Het_quant["Snps"].loc[0.95].round(1)}\t{Homo_quant["Snps"].loc[0.95].round(1)}
 
- -- SNPs distance quantiles --
-
- Q\tGen\tHet\tHomo
- 5%\t{All_dist.loc[0.05].round(1)}\t{Het_dist.loc[0.05].round(1)}\t{Homo_dist.loc[0.05].round(1)}
- 10%\t{All_dist.loc[0.10].round(1)}\t{Het_dist.loc[0.10].round(1)}\t{Homo_dist.loc[0.10].round(1)}
- 15%\t{All_dist.loc[0.15].round(1)}\t{Het_dist.loc[0.15].round(1)}\t{Homo_dist.loc[0.15].round(1)}
- 50%\t{All_dist.loc[0.50].round(1)}\t{Het_dist.loc[0.50].round(1)}\t{Homo_dist.loc[0.50].round(1)}
- 85%\t{All_dist.loc[0.85].round(1)}\t{Het_dist.loc[0.85].round(1)}\t{Homo_dist.loc[0.85].round(1)}
- 90%\t{All_dist.loc[0.90].round(1)}\t{Het_dist.loc[0.90].round(1)}\t{Homo_dist.loc[0.90].round(1)}
- 95%\t{All_dist.loc[0.95].round(1)}\t{Het_dist.loc[0.95].round(1)}\t{Homo_dist.loc[0.95].round(1)}
 
  -- Suggested JLOH extract parameters (het/homo) --
 
  --min-snps-kbp\t{int(Het_quant["Snps"].loc[0.05].round(0))},{int(Homo_quant["Snps"].loc[0.05].round(0))}
- --snp-distance\t{int(Het_dist.loc[0.95].round(1))},{int(Homo_dist.loc[0.95].round(0))}
 
 """)
-
 
 if __name__ == "__main__":
     main(args)
