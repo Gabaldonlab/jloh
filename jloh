@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 12/8/2022
+Last change: 17/08/2022
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 ###
 """
@@ -44,7 +44,7 @@ Commands:
     g2g                 Align two genomes to find regions that should carry SNPs
 
  -- Calculations
-    stats               Estimate heterozygous and homozygous SNP statistics 
+    stats               Estimate heterozygous and homozygous SNP statistics
 	junctions           Calculate number of block-to-block junctions over the genome
 
  -- Simulations

@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 12/08/2022
+Last change: 17/08/2022
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 ###
 """
@@ -68,7 +68,7 @@ jloh extract --vcf <VCF> --ref <FASTA> --bam <BAM> [options]
 --hemi              Frac. of the mean coverage under which LOH is hemizygous    [0.75]
 --overhang          Kb up/downstream of the LOH block for coverage comparison   [5000]
 --min-overhang      Min frac. (0.0-1.0) of overhang to assign zygosity          [0.9]
---min-uncov         Min. uncovered positions (bp) to call uncovered block       [10]
+--merge-uncov       Merge blocks if separated by up to these many uncov pos     [10]
 
 """)
     sys.exit(0)
@@ -101,7 +101,7 @@ p.add_argument("--min-frac-cov", default=0.5, type=float)
 p.add_argument("--hemi", default=0.75, type=float)
 p.add_argument("--overhang", default=5000, type=int)
 p.add_argument("--min-overhang", default=0.9, type=float)
-p.add_argument("--min-uncov", default=10, type=int)
+p.add_argument("--merge-uncov", default=10, type=int)
 
 args = p.parse_args()
 
@@ -442,7 +442,7 @@ def get_homo_ref_blocks(Het, Homo_ALT, genome_file):
 def snps_to_bed_blocks(args, het_snps_vcf, homo_snps_vcf, genome_file):
 
     """
-    Last update: 12/08/2022
+    Last update: 16/08/2022
     """
 
     # define min snps and snp dist values
@@ -458,6 +458,11 @@ def snps_to_bed_blocks(args, het_snps_vcf, homo_snps_vcf, genome_file):
     pool.join()
 
     Het_bed_blocks = Het_bed_blocks.get()
+
+    # combine together het blocks that are nearby
+    merge_len=args.min_length-1
+    Het_bed_blocks = BedTool(Het_bed_blocks).merge(d=merge_len, c=4, o="sum")
+
     Homo_bed_blocks_ALT = Homo_bed_blocks_ALT.get()
 
     Homo_bed_blocks_REF = get_homo_ref_blocks(Het_bed_blocks, Homo_bed_blocks_ALT, genome_file)
@@ -644,7 +649,7 @@ def remove_uncovered_regions(args, bam, ref, Homo_blocks, genome_file):
     cov_regions_bed = [ entry.rstrip("\b\r\n").split("\t") for sublst in out for entry in sublst ]
 
     # convert to bed tool
-    bt = BedTool(cov_regions_bed).sort(faidx=genome_file).merge(d=args.min_uncov)
+    bt = BedTool(cov_regions_bed).sort(faidx=genome_file).merge(d=args.merge_uncov)
     bt = bt.sort(faidx=genome_file)
 
     # invert interval
@@ -1073,7 +1078,7 @@ def write_vcfs_to_output(args, Handles, mode, Hetero_lines_lst, Homo_lines_lst, 
 def run_in_default_mode(args):
 
     """
-    Last update: 31/03/2022
+    Last update: 16/08/2022
     """
 
     handle = "exp"
