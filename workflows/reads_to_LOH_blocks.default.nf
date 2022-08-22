@@ -18,6 +18,7 @@ println """
 
   [trimming]
 
+--skip_trimming     Skip this step                                              [off]
 --adapters          Path to the adapters file to pass to trimmomatic            [off]
 --leading           Trimmomatic "LEADING" setting                               [20]
 --trailing          Trimmomatic "TRAILING" setting                              [20]
@@ -69,28 +70,30 @@ Channel
   .fromPath("${params.input_data}")
   .splitCsv(sep: "\t", header: false)
   .map{ it -> [it[0], file(it[1]), file(it[2]), file(it[3])] }
-  .into{ Input_pretrim; Input_trim }
+  .into{ Input_pretrim; Input_trim; Input_notrim }
 
 // -----------------------------------------------------------------------------
 // reads trimming
 
-process PE_quality_check_before_trim {
+if (!params.skip_trimming) {
 
-  executor = "local"
-  cpus = 4
-  maxForks = params.threads
+  process PE_quality_check_before_trim {
 
-  publishDir "${params.output_dir}/trimmed_reads/quality_check/before", mode: "copy"
+    executor = "local"
+    cpus = 4
+    maxForks = params.threads
 
-  input:
+    publishDir "${params.output_dir}/trimmed_reads/quality_check/before", mode: "copy"
+
+    input:
     tuple \
     val(sample_id), file(reads_for), file(reads_rev), file(ref) \
     from Input_pretrim
 
-  output:
+    output:
     path "${sample_id}"
 
-  script:
+    script:
     """
     if [ ! -d ${sample_id} ]; then mkdir ${sample_id}; fi &&
     ${FASTQC} \
@@ -98,29 +101,29 @@ process PE_quality_check_before_trim {
     --outdir ${sample_id} \
     ${reads_for} ${reads_rev}
     """
-}
+  }
 
-process PE_trim_reads {
+  process PE_trim_reads {
 
-  executor = "local"
-  cpus = 8
-  maxForks = params.threads
+    executor = "local"
+    cpus = 8
+    maxForks = params.threads
 
-  publishDir  "${params.output_dir}/trimmed_reads",
-              mode: "copy", pattern: "*.{P1,P2,U1,U2}.fastq"
+    publishDir  "${params.output_dir}/trimmed_reads",
+    mode: "copy", pattern: "*.{P1,P2,U1,U2}.fastq"
 
-  input:
+    input:
     tuple \
     val(sample_id), file(reads_for), file(reads_rev), file(ref) \
     from Input_trim
 
-  output:
+    output:
     tuple \
     val(sample_id), file("${sample_id}.P1.fastq"), file("${sample_id}.P2.fastq"), \
     file("${sample_id}.U.fastq"), file(ref) \
     into Reads_PE_trimmed
 
-  script:
+    script:
     """
     ${TRIMMOMATIC} \
     PE \
@@ -138,27 +141,27 @@ process PE_trim_reads {
     cat ${sample_id}.U1.fastq ${sample_id}.U2.fastq \
     > ${sample_id}.U.fastq
     """
-}
+  }
 
-Reads_PE_trimmed.into{ Reads_PE_trimmed_MAP; Reads_PE_trimmed_QC }
+  Reads_PE_trimmed.into{ Reads_PE_trimmed_MAP; Reads_PE_trimmed_QC }
 
-process PE_quality_check_after_trim {
+  process PE_quality_check_after_trim {
 
-  executor = "local"
-  cpus = 4
-  maxForks = params.threads
+    executor = "local"
+    cpus = 4
+    maxForks = params.threads
 
-  publishDir "${params.output_dir}/trimmed_reads/quality_check/after", mode: "copy"
+    publishDir "${params.output_dir}/trimmed_reads/quality_check/after", mode: "copy"
 
-  input:
+    input:
     tuple \
     val(sample_id), file(reads_for), file(reads_rev), file(reads_unpaired), file(ref) \
     from Reads_PE_trimmed_QC
 
-  output:
+    output:
     path "${sample_id}"
 
-  script:
+    script:
     """
     if [ ! -d ${sample_id} ]; then mkdir ${sample_id}; fi &&
     ${FASTQC} \
@@ -166,26 +169,26 @@ process PE_quality_check_after_trim {
     --outdir ${sample_id} \
     ${reads_for} ${reads_rev} ${reads_unpaired}
     """
-}
+  }
 
 
-process PE_map_trimmed_reads {
+  process PE_map_trimmed_reads {
 
-  executor = "local"
-  cpus = params.threads
-  maxForks = 1
+    executor = "local"
+    cpus = params.threads
+    maxForks = 1
 
-  input:
+    input:
     tuple \
     val(sample_id), file(reads_for), file(reads_rev), file(reads_unpaired), file(ref) \
     from Reads_PE_trimmed_MAP
 
-  output:
+    output:
     tuple \
     val(sample_id), file("${sample_id}.sam"), file(ref) \
     into Hisat2_out
 
-  script:
+    script:
     """
     ${HISAT2_BUILD} -p ${params.threads} ${ref} ref.idx &&
     ${HISAT2} -p ${params.threads} \
@@ -197,7 +200,40 @@ process PE_map_trimmed_reads {
     -1 ${reads_for} -2 ${reads_rev} -U ${reads_unpaired} \
     -S ${sample_id}.sam
     """
+  }
+} else {
+
+  process PE_map_reads {
+
+    executor = "local"
+    cpus = params.threads
+    maxForks = 1
+
+    input:
+    tuple \
+    val(sample_id), file(reads_for), file(reads_rev), file(ref) \
+    from Input_notrim
+
+    output:
+    tuple \
+    val(sample_id), file("${sample_id}.sam"), file(ref) \
+    into Hisat2_out
+
+    script:
+    """
+    ${HISAT2_BUILD} -p ${params.threads} ${ref} ref.idx &&
+    ${HISAT2} -p ${params.threads} \
+    --no-spliced-alignment \
+    --score-min ${params.scoring_fun} --mp ${params.mm_penalties} \
+    --rdg ${params.gap_penalties} --rfg ${params.gap_penalties} \
+    -I ${params.min_isize} -X ${params.max_isize} \
+    -x ref.idx \
+    -1 ${reads_for} -2 ${reads_rev} \
+    -S ${sample_id}.sam
+    """
+  }
 }
+
 
 process filter_and_sort_bam {
 
