@@ -254,25 +254,25 @@ def main(args):
  -- SNPs/Kbp Statistics --
 
  S\tGen\tHet\tHomo
- Median\t{All["Snps"].median().round(1)}\t{Het["Snps"].median().round(1)}\t{Homo["Snps"].median().round(1)}
- Mean\t{All["Snps"].mean().round(1)}\t{Het["Snps"].mean().round(1)}\t{Homo["Snps"].mean().round(1)}
+ Median\t{round(All["Snps"].median(), 1)}\t{round(Het["Snps"].median(), 1)}\t{round(Homo["Snps"].median(), 1)}
+ Mean\t{round(All["Snps"].mean(), 1)}\t{round(Het["Snps"].mean(), 1)}\t{round(Homo["Snps"].mean(), 1)}
  Max\t{All["Snps"].max()}\t{Het["Snps"].max()}\t{Homo["Snps"].max()}
  Min\t{All["Snps"].min()}\t{Het["Snps"].min()}\t{Homo["Snps"].min()}
 
  -- SNPs/Kbp Quantiles --
 
  Q\tGen\tHet\tHomo
- 5%\t{All_quant["Snps"].loc[0.05].round(1)}\t{Het_quant["Snps"].loc[0.05].round(1)}\t{Homo_quant["Snps"].loc[0.05].round(1)}
- 10%\t{All_quant["Snps"].loc[0.10].round(1)}\t{Het_quant["Snps"].loc[0.10].round(1)}\t{Homo_quant["Snps"].loc[0.10].round(1)}
- 15%\t{All_quant["Snps"].loc[0.15].round(1)}\t{Het_quant["Snps"].loc[0.15].round(1)}\t{Homo_quant["Snps"].loc[0.15].round(1)}
- 50%\t{All_quant["Snps"].loc[0.50].round(1)}\t{Het_quant["Snps"].loc[0.50].round(1)}\t{Homo_quant["Snps"].loc[0.50].round(1)}
- 85%\t{All_quant["Snps"].loc[0.85].round(1)}\t{Het_quant["Snps"].loc[0.85].round(1)}\t{Homo_quant["Snps"].loc[0.85].round(1)}
- 90%\t{All_quant["Snps"].loc[0.90].round(1)}\t{Het_quant["Snps"].loc[0.90].round(1)}\t{Homo_quant["Snps"].loc[0.90].round(1)}
- 95%\t{All_quant["Snps"].loc[0.95].round(1)}\t{Het_quant["Snps"].loc[0.95].round(1)}\t{Homo_quant["Snps"].loc[0.95].round(1)}
+ 5%\t{round(All_quant["Snps"].loc[0.05], 1)}\t{round(Het_quant["Snps"].loc[0.05], 1)}\t{round(Homo_quant["Snps"].loc[0.05], 1)}
+ 10%\t{round(All_quant["Snps"].loc[0.10], 1)}\t{round(Het_quant["Snps"].loc[0.10], 1)}\t{round(Homo_quant["Snps"].loc[0.10], 1)}
+ 15%\t{round(All_quant["Snps"].loc[0.15], 1)}\t{round(Het_quant["Snps"].loc[0.15], 1)}\t{round(Homo_quant["Snps"].loc[0.15], 1)}
+ 50%\t{round(All_quant["Snps"].loc[0.50], 1)}\t{round(Het_quant["Snps"].loc[0.50], 1)}\t{round(Homo_quant["Snps"].loc[0.50], 1)}
+ 85%\t{round(All_quant["Snps"].loc[0.85], 1)}\t{round(Het_quant["Snps"].loc[0.85], 1)}\t{round(Homo_quant["Snps"].loc[0.85], 1)}
+ 90%\t{round(All_quant["Snps"].loc[0.90], 1)}\t{round(Het_quant["Snps"].loc[0.90], 1)}\t{round(Homo_quant["Snps"].loc[0.90], 1)}
+ 95%\t{round(All_quant["Snps"].loc[0.95], 1)}\t{round(Het_quant["Snps"].loc[0.95], 1)}\t{round(Homo_quant["Snps"].loc[0.95], 1)}
 
  -- Suggested JLOH extract parameters (het/homo) --
 
- --min-snps-kbp\t{int(Het_quant["Snps"].loc[0.05].round(0))},{int(Homo_quant["Snps"].loc[0.05].round(0))}
+ --min-snps-kbp\t{int(round(Het_quant["Snps"].loc[0.05], 0))},{int(round(Homo_quant["Snps"].loc[0.05], 0))}
 
 """)
 
