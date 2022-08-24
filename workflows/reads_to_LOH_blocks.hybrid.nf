@@ -462,7 +462,7 @@ process call_LOH_blocks {
     --min-af ${params.min_af} \
     --max-af ${params.max_af} \
     --min-frac-cov ${params.min_frac_cov} \
-    --min-snps-knp ${params.min_snps} \
+    --min-snps-knp ${params.min_snps_kbp} \
     --min-length ${params.min_loh_size} \
     --hemi ${params.hemizygous_cov} \
     --min-uncov ${params.min_uncovered}

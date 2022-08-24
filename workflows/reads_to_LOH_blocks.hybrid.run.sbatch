@@ -28,6 +28,7 @@ ADAPTERS="<path to the FASTA file with the adapter sequences to trim, see /workf
 CONFIG_FILE="<path to the config file, find template in /workflows>"
 THREADS="<number of parallel threads, max 48>"
 VAR_FILTER="<specify pass or all"
+MIN_SNPS_KBP="<result of jloh stats on your vcf>"
 
 ### STOP EDITING FROM HERE ###
 
@@ -54,4 +55,5 @@ run \
 --threads ${THREADS} \
 --run_id ${SAMPLE_ID} \
 --output_dir ${OUTDIR} \
---var_filter ${VAR_FILTER}
+--var_filter ${VAR_FILTER} \
+--min_snps_kbp ${MIN_SNPS_KBP}
