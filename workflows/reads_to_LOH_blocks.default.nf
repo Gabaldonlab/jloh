@@ -48,8 +48,7 @@ println """
 
   [JLOH]
 
---min_snps          Min. number of proximal het SNPs to consider a het block    [2]
---snp_distance      Max. distance between SNPs to assign to same block          [100]
+--min_snps_kbp      Min. SNPs/kbp to retain a het block (het/homo)              [3,1]
 --min_loh_size      Min. size (bp) of the candidate LOH blocks                  [1000]
 --min_af            Min. allele frequency to consider heterozygous              [0.2]
 --max_af            Max. allele frequency to consider heterozygous              [0.8]
@@ -392,8 +391,7 @@ process call_LOH_blocks {
     --min-af ${params.min_af} \
     --max-af ${params.max_af} \
     --min-frac-cov ${params.min_frac_cov} \
-    --min-snps ${params.min_snps} \
-    --snp-distance ${params.snp_distance} \
+    --min-snps-knp ${params.min_snps_kbp} \
     --min-length ${params.min_loh_size} \
     --hemi ${params.hemizygous_cov} \
     --min-uncov ${params.min_uncovered}
