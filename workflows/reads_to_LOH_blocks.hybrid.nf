@@ -465,6 +465,6 @@ process call_LOH_blocks {
     --min-snps-knp ${params.min_snps_kbp} \
     --min-length ${params.min_loh_size} \
     --hemi ${params.hemizygous_cov} \
-    --min-uncov ${params.min_uncovered}
+    --merge-uncov ${params.min_uncovered}
     """
 }
