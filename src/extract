@@ -1231,10 +1231,10 @@ def run_in_hybrid_mode(args):
     Het_blocks_B, Homo_blocks_REF_B, Homo_blocks_ALT_B = snps_to_bed_blocks(args, Vcfs["hetero"][1], Vcfs["homo"][1], genome_file_B)
     Het_blocks_A = filter_by_length(Het_blocks_A, args.min_length)
     Het_blocks_B = filter_by_length(Het_blocks_B, args.min_length)
-    Het_blocks_A.saveas(out_A)
-    Het_blocks_B.saveas(out_B)
     out_A = f"{args.output_dir}/{args.sample}.{handle_A}.het_blocks.A.bed"
     out_B = f"{args.output_dir}/{args.sample}.{handle_B}.het_blocks.B.bed"
+    Het_blocks_A.saveas(out_A)
+    Het_blocks_B.saveas(out_B)
     sys.stderr.write(f"[{at()}] Parent A: Found {len(Het_blocks_A)} het blocks, {len(Homo_blocks_REF_A)} homo REF blocks, {len(Homo_blocks_ALT_A)} homo ALT blocks\n")
     sys.stderr.write(f"[{at()}] Parent B: Found {len(Het_blocks_B)} het blocks, {len(Homo_blocks_REF_B)} homo REF blocks, {len(Homo_blocks_ALT_B)} homo ALT blocks\n")
 
