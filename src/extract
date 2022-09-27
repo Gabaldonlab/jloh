@@ -61,6 +61,7 @@ jloh extract --vcf <VCF> --ref <FASTA> --bam <BAM> [options]
 --filter-mode       "pass" to keep only PASS variants, "all" to keep everything [all]
 --min-snps-kbp      Min. SNPs/kbp to retain a block (het,homo)                  [10,1]
 --min-length        Min. LOH block length                                       [1000]
+--coarseness        Don't consider any interval (het/homo) smaller than this    [100]
 --min-af            Min. allele frequency to consider a variant heterozygous    [0.3]
 --max-af            Max. allele frequency to consider a variant heterozygous    [0.7]
 --min-frac-cov      Min. fraction of LOH block that has to be covered by reads  [0.5]
@@ -93,6 +94,7 @@ p.add_argument("--regions")
 p.add_argument("--filter-mode", choices=["all","pass"], default="all")
 p.add_argument("--min-snps-kbp", default="10,1", type=str)
 p.add_argument("--min-length", default=1000, type=int)
+p.add_argument("--coarseness", default=100, type=int)
 p.add_argument("--min-af", default=0.3, type=float)
 p.add_argument("--max-af", default=0.7, type=float)
 p.add_argument("--min-frac-cov", default=0.5, type=float)
@@ -476,18 +478,20 @@ def snps_to_bed_blocks(args, het_snps_vcf, homo_snps_vcf, genome_file):
     return Het_bed_blocks, Homo_bed_blocks_REF, Homo_bed_blocks_ALT
 
 
-def remove_overlapping_regions(bt_A, bt_B):
+def remove_overlapping_regions(bt_A, bt_B, args):
 
     """
-    Last update: 09/03/2022
+    Last update: 27/09/2022
     """
 
     if ((len(bt_A) > 0) and (len(bt_B) > 0)):
+        # remove small intervals
+        bt_A = BedTool([row for row in bt_A if int(row[2])-int(row[1])>=args.coarseness])
+        bt_B = BedTool([row for row in bt_B if int(row[2])-int(row[1])>=args.coarseness])
         # remove intersection between the two beds
         bt = bt_A.subtract(b=bt_B)
         # remove short ones
-        lst = [str(x).rstrip("\b\r\n").split("\t") for x in bt]
-        lst = [x for x in lst if int(x[2]) > int(x[1])]
+        lst = BedTool([row for row in bt if (int(row[2]) > int(row[1])) and (int(row[2])-int(row[1])>=args.coarseness)])
         # sort
         bt = bt.sort()
         # write to output
@@ -501,16 +505,16 @@ def remove_overlapping_regions(bt_A, bt_B):
 def adjust_homo_coordinates_by_hetero_overlap(args, Het_blocks, Homo_blocks_REF, Homo_blocks_ALT):
 
     """
-    Last update: 09/03/2022
+    Last update: 27/09/2022
     """
 
     pool = multiprocessing.Pool(processes=args.threads)
 
     Homo_blocks_REF = pool.apply_async(remove_overlapping_regions, args=(Homo_blocks_REF,
-                                                                        Het_blocks))
+                                                                        Het_blocks, args))
 
     Homo_blocks_ALT = pool.apply_async(remove_overlapping_regions, args=(Homo_blocks_ALT,
-                                                                        Het_blocks))
+                                                                        Het_blocks, args))
 
     pool.close()
     pool.join()
@@ -570,7 +574,7 @@ def get_chromosomal_covered_regions(queue, bam, chrom, chrom_len):
     bt = bt.bamtobed()
 
     # merge overlapping intervals
-    bt = bt.merge()
+    bt = bt.merge(bed=True)
 
     # convert to list
     bt = [ str(row) for row in bt ]
@@ -641,7 +645,8 @@ def remove_uncovered_regions(args, bam, ref, Homo_blocks, genome_file):
 
     # run function
     for chrom in Chrom_lengths.keys():
-        pool.apply_async(get_chromosomal_covered_regions, args=(queue, bam, chrom, Chrom_lengths[chrom]))
+        # pool.apply_async(get_chromosomal_covered_regions, args=(queue, bam, chrom, Chrom_lengths[chrom]))
+        get_chromosomal_covered_regions(queue, bam, chrom, Chrom_lengths[chrom])
 
     # terminate pool
     pool.close()
