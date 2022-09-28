@@ -25,6 +25,9 @@ import multiprocessing
 from operator import itemgetter
 from statistics import median
 import shutil
+import pandas as pd
+import numpy as np
+from sys import getsizeof
 
 # help section
 if len(sys.argv) == 1:
@@ -105,15 +108,6 @@ p.add_argument("--merge-uncov", default=10, type=int)
 
 args = p.parse_args()
 
-
-# tmp dir
-timestamp = time.time()
-tmp_dir = f"{args.output_dir}/tmp_{timestamp}"
-if os.path.exists(tmp_dir) == False:
-    os.makedirs(tmp_dir, exist_ok=True)
-    os.chmod(tmp_dir, 0o777)
-
-pybedtools.helpers.set_tempdir(tmp_dir)
 
 # functions
 
@@ -262,6 +256,61 @@ def make_genome_file(ref, out_file):
     return True
 
 
+def create_subset_bam_file(bam, tmp_bams, chrom, queue):
+
+    """
+    Last update: 28/09/2022
+    """
+
+    if bam.split(".")[-1] == "bam":
+        b = pysam.AlignmentFile(bam, "rb")
+    elif bam.split(".")[-1] == "sam":
+        b = pysam.AlignmentFile(bam, "r")
+    else:
+        sys.stderr.write(f"\nERROR: could not read bam file:\n{bam}\n\n")
+
+    outfile = f"{tmp_bams}/{chrom}.bam"
+    bsub = pysam.AlignmentFile(outfile, "wb", template=b)
+
+    for read in b.fetch(chrom):
+        if (read.is_unmapped == False) and (read.is_secondary == False):
+            bsub.write(read)
+
+    bsub.close()
+    b.close()
+    pysam.index(outfile)
+
+    queue.put((chrom, outfile))
+
+
+def split_bam_by_chromosome(bam, genome_file, tmp_bams, args):
+
+    """
+    Last update: 28/09/2022
+    """
+
+    Chroms = pd.read_csv(genome_file, sep="\t", header=None)
+    Chroms.columns = ["Chrom", "Length"]
+    Chroms = Chroms["Chrom"].tolist()
+
+    pool = multiprocessing.Pool(processes=args.threads)
+    queue = multiprocessing.Manager().Queue()
+
+    Chrom_bams = {}
+    for chrom in Chroms:
+        pool.apply_async(create_subset_bam_file, args=(bam, tmp_bams, chrom, queue))
+
+    # terminate pool
+    pool.close()
+    pool.join()
+
+    # dump queue
+    out = dump_queue(queue)
+    Chrom_bams = {x[0]:x[1] for x in out}
+
+    return Chrom_bams
+
+
 def is_a_snp(line):
 
     """
@@ -380,7 +429,7 @@ def filter_by_snp_count(args, bt, discard, min_snps_kbp):
 def filter_by_length(bt, min_length):
 
     """
-    Last update: 04/03/2022
+    Last update: 28/09/2022
     Note: Keep only candidate regions of a certain minimum size
     """
 
@@ -388,13 +437,14 @@ def filter_by_length(bt, min_length):
     lst = [ x for x in lst if int(x[2]) > int(x[1]) ]
     lst = [ x for x in lst if int(x[2]) - int(x[1]) >= min_length ]
     new_bt = BedTool(lst)
+
     return new_bt
 
 
 def get_snp_intervals(args, in_vcf, invert, min_snps_kbp, snp_distance):
 
     """
-    Last update: 17/08/2022
+    Last update: 28/09/2022
     """
 
     # -------------------------------------------
@@ -426,7 +476,7 @@ def get_snp_intervals(args, in_vcf, invert, min_snps_kbp, snp_distance):
 def get_homo_ref_blocks(Het, Homo_ALT, genome_file):
 
     """
-    Last update: 07/03/2022
+    Last update: 28/09/2022
     """
 
     HET = [str(row).rstrip("\n\r\b").split("\t") for row in Het]
@@ -449,7 +499,7 @@ def get_homo_ref_blocks(Het, Homo_ALT, genome_file):
 def snps_to_bed_blocks(args, het_snps_vcf, homo_snps_vcf, genome_file):
 
     """
-    Last update: 17/08/2022
+    Last update: 28/09/2022
     """
 
     # define min snps and snp dist values
@@ -481,7 +531,7 @@ def snps_to_bed_blocks(args, het_snps_vcf, homo_snps_vcf, genome_file):
 def remove_overlapping_regions(bt_A, bt_B, args):
 
     """
-    Last update: 27/09/2022
+    Last update: 28/09/2022
     """
 
     if ((len(bt_A) > 0) and (len(bt_B) > 0)):
@@ -494,6 +544,7 @@ def remove_overlapping_regions(bt_A, bt_B, args):
         lst = BedTool([row for row in bt if (int(row[2]) > int(row[1])) and (int(row[2])-int(row[1])>=args.coarseness)])
         # sort
         bt = bt.sort()
+
         # write to output
         return bt
 
@@ -522,7 +573,6 @@ def adjust_homo_coordinates_by_hetero_overlap(args, Het_blocks, Homo_blocks_REF,
     Homo_blocks_ALT = Homo_blocks_ALT.get()
     Homo_blocks_REF = Homo_blocks_REF.get()
 
-
     Homo_REF = add_column(Homo_blocks_REF, "REF")
     Homo_ALT = add_column(Homo_blocks_ALT, "ALT")
     Homo_blocks = combine_beds(Homo_REF, Homo_ALT)
@@ -533,19 +583,20 @@ def adjust_homo_coordinates_by_hetero_overlap(args, Het_blocks, Homo_blocks_REF,
 def add_column(bt, annot):
 
     """
-    Last update: 21/12/2021
+    Last update: 28/09/2022
     Note: Add the "annot" value as extra column to a BED file
     """
 
     x = [ str(row).rstrip("\b\r\n") + "\t" + str(annot) for row in bt ]
     new_bt = BedTool(x)
+
     return new_bt
 
 
 def combine_beds(bt_A, bt_B):
 
     """
-    Last update: 21/12/2021
+    Last update: 28/09/2022
     Note: combine two bed files into one
     """
 
@@ -557,10 +608,10 @@ def combine_beds(bt_A, bt_B):
     return bt
 
 
-def get_chromosomal_covered_regions(queue, bam, chrom, chrom_len):
+def get_chromosomal_covered_regions(queue, chrom_bam, chrom, chrom_len):
 
     """
-    Last update: 07/03/2022
+    Last update: 28/09/2022
     """
 
     # read bam file and convert into bed file
@@ -570,7 +621,7 @@ def get_chromosomal_covered_regions(queue, bam, chrom, chrom_len):
         if res == False:
             sys.exit("ERROR: The BAM file could not be indexed.\n\n")
 
-    bt = BedTool(bam)
+    bt = BedTool(chrom_bam)
     bt = bt.bamtobed()
 
     # merge overlapping intervals
@@ -590,7 +641,7 @@ def get_chromosomal_covered_regions(queue, bam, chrom, chrom_len):
 def remove_negative_intervals(args, bt):
 
     """
-    01/03/2022
+    28/09/2022
     This function only bypasses an issue of bedtools that they haven't fixed yet
     This bug creates an interval going from 1 to -1 which then is impossible to parse
     from pybedtools
@@ -612,7 +663,7 @@ def remove_negative_intervals(args, bt):
 def fix_coordinates_by_cov(Homo_blocks, bt_uncov_regions):
 
     """
-    Last update: 07/03/2022
+    Last update: 28/09/2022
     """
 
     # intersect the two bed files (blocks and uncovered regions)
@@ -632,10 +683,10 @@ def fix_coordinates_by_cov(Homo_blocks, bt_uncov_regions):
     return bt_blocks_adj
 
 
-def remove_uncovered_regions(args, bam, ref, Homo_blocks, genome_file):
+def remove_uncovered_regions(args, Chrom_bams, ref, Homo_blocks, genome_file, tmpdir):
 
     """
-    Last update: 07/03/2022
+    Last update: 28/09/2022
     """
 
     pool = multiprocessing.Pool(processes=args.threads)
@@ -645,8 +696,7 @@ def remove_uncovered_regions(args, bam, ref, Homo_blocks, genome_file):
 
     # run function
     for chrom in Chrom_lengths.keys():
-        # pool.apply_async(get_chromosomal_covered_regions, args=(queue, bam, chrom, Chrom_lengths[chrom]))
-        get_chromosomal_covered_regions(queue, bam, chrom, Chrom_lengths[chrom])
+        pool.apply_async(get_chromosomal_covered_regions, args=(queue, Chrom_bams[chrom], chrom, Chrom_lengths[chrom]))
 
     # terminate pool
     pool.close()
@@ -694,60 +744,6 @@ def index_bam(bam):
         return True
 
 
-def calculate_coverage_of_a_chromosome(queue, bam, chrom, Chrom_lengths):
-
-    """
-    v1
-    Last update: 03/03/2022
-    """
-
-    start = 0
-    end = Chrom_lengths[chrom]
-
-    # open reader
-    # select reads within the region and crop at the end (truncate)
-    py_bam = pysam.AlignmentFile(bam)
-    pileup = py_bam.pileup(chrom, start, end, truncate=True)
-    # get total covered positions using .n which is the number of reads in the "column"
-    tot_cov_pos = len([i for i in pileup if int(i.n) > 0])
-
-    try:
-        # get average coverage of the region
-        py_bam = pysam.AlignmentFile(bam)
-        pileup = py_bam.pileup(chrom, start, end, truncate=True)
-        avg_cov = round(float(sum([int(i.n) for i in pileup if int(i.n) > 0])) / float(tot_cov_pos), 1)
-    except ZeroDivisionError:
-        avg_cov = round(float(0), 1)
-
-    queue.put((chrom, avg_cov))
-
-
-def get_chrom_coverages(args, bam, Chrom_lengths):
-
-    """
-    v1
-    Author: Matteo Schiavinato
-    Last change: 03/03/2022
-    """
-
-    # initiate pool
-    pool = multiprocessing.Pool(processes=args.threads)
-    queue = multiprocessing.Manager().Queue()
-
-    # run
-    for chrom in Chrom_lengths.keys():
-        pool.apply_async(calculate_coverage_of_a_chromosome, args=(queue, bam, chrom, Chrom_lengths))
-
-    # close and join pool so all processes must finish
-    pool.close()
-    pool.join()
-
-    out = dump_queue(queue)
-    Chrom_covs = { x[0]:x[1] for x in out }
-
-    return Chrom_covs
-
-
 
 def get_total_cov_pos(bam, chrom, start, end):
 
@@ -767,6 +763,28 @@ def get_total_cov_pos(bam, chrom, start, end):
     tot_cov_pos = len([i for i in pileup if int(i.n) > 0])
 
     return tot_cov_pos
+
+
+def calculate_coverage_of_a_chromosome(chrom, chrom_bam, chrom_len, queue):
+
+    """
+    v1
+    Last update: 28/09/2022
+    """
+
+    start = 0
+    end = chrom_len
+    tot_cov_pos = get_total_cov_pos(chrom_bam, chrom, start, end)
+
+    py_bam = pysam.AlignmentFile(chrom_bam)
+    pileup = py_bam.pileup(chrom, start, end, truncate=True)
+
+    try:
+        avg_cov = round(float(sum([int(i.n) for i in pileup if int(i.n) > 0])) / float(tot_cov_pos), 1)
+    except ZeroDivisionError:
+        avg_cov = round(float(0), 1)
+
+    queue.put((chrom, avg_cov))
 
 
 def get_coverage(bam, chrom, start, end):
@@ -852,7 +870,7 @@ def get_zygosity(block_cov, bam, chrom, start, end, overhang, min_overhang, hemi
 
 
 
-def process_region_coverage(queue, row, bam, min_frac_cov, hemi_threshold, Chrom_covs, overhang, min_overhang, Chrom_lengths):
+def process_region_coverage(queue, row, chrom_bam, min_frac_cov, hemi_threshold, chrom_meancov, overhang, min_overhang, chrom_len):
 
     """
     v1
@@ -861,20 +879,19 @@ def process_region_coverage(queue, row, bam, min_frac_cov, hemi_threshold, Chrom
     ###
     v2
     Author: Matteo Schiavinato
-    Last Update: 07/03/2022
+    Last Update: 28/09/2022
     """
 
     bed = str(row)
 
     # unload bed coordinate
     chrom, start, end, snps, block_type = bed.rstrip("\n\b\r").split('\t')
-    chrom_len = Chrom_lengths[chrom]
+
     start, end = int(start), int(end)
     length = end-start
-    chrom_meancov = float(Chrom_covs[chrom])
 
     # get total covererd positions
-    tot_cov_pos = get_total_cov_pos(bam, chrom, start, end)
+    tot_cov_pos = get_total_cov_pos(chrom_bam, chrom, start, end)
     # get covered fraction by dividing the two values
     tot_pos = end-start
     cov_frac = round(float(tot_cov_pos) / float(tot_pos), 3)
@@ -888,10 +905,10 @@ def process_region_coverage(queue, row, bam, min_frac_cov, hemi_threshold, Chrom
     if cov_frac >= min_frac_cov:
 
         # get coverage
-        avg_cov = get_coverage(bam, chrom, start, end)
+        avg_cov = get_coverage(chrom_bam, chrom, start, end)
 
         # get zygosity
-        zygosity, up_ratio, down_ratio = get_zygosity(avg_cov, bam, chrom, start, end, overhang, min_overhang, hemi_threshold, chrom_len)
+        zygosity, up_ratio, down_ratio = get_zygosity(avg_cov, chrom_bam, chrom, start, end, overhang, min_overhang, hemi_threshold, chrom_len)
         if up_ratio != None:
             up_ratio = round(up_ratio, 2)
         if down_ratio != None:
@@ -906,7 +923,7 @@ def process_region_coverage(queue, row, bam, min_frac_cov, hemi_threshold, Chrom
 
 
 
-def assess_coverage(args, bam, ref, bt, handle):
+def assess_coverage(args, Chrom_bams, ref, bt, handle):
 
     """
     v1
@@ -914,17 +931,23 @@ def assess_coverage(args, bam, ref, bt, handle):
     ###
     v2
     Author: Matteo Schiavinato
-    Last change: 07/03/2022
+    Last change: 28/09/2022
     """
 
-    # index bam file if needed
-    res = index_bam(bam)
-    if res == False:
-        sys.exit("ERROR: The BAM file could not be indexed.\n\n")
-
     # get coverage of each chromosome independently
+    pool = multiprocessing.Pool(processes=args.threads)
+    queue = multiprocessing.Manager().Queue()
+
     Chrom_lengths = parse_chromosomes(ref)
-    Chrom_covs = get_chrom_coverages(args, bam, Chrom_lengths)
+
+    for chrom in Chrom_lengths.keys():
+        pool.apply_async(calculate_coverage_of_a_chromosome, args=(chrom, Chrom_bams[chrom], Chrom_lengths[chrom], queue))
+
+    pool.close()
+    pool.join()
+
+    Out = dump_queue(queue)
+    Chrom_covs = {x[0]:x[1] for x in Out}
 
     # write chromosome coverages to a file
     OUT = open(f"{args.output_dir}/{args.sample}.{handle}.chrom_coverage.tsv", "w")
@@ -937,11 +960,12 @@ def assess_coverage(args, bam, ref, bt, handle):
     queue = multiprocessing.Manager().Queue()
 
     for row in bt:
+        chrom = str(row[0])
         pool.apply_async(process_region_coverage, args=(queue,
-                                                        row, bam, args.min_frac_cov,
-                                                        args.hemi, Chrom_covs,
+                                                        row, Chrom_bams[chrom], args.min_frac_cov,
+                                                        args.hemi, Chrom_covs[chrom],
                                                         args.overhang, args.min_overhang,
-                                                        Chrom_lengths))
+                                                        Chrom_lengths[chrom]))
 
     pool.close()
     pool.join()
@@ -1004,6 +1028,7 @@ def sort_bed_intervals(bt):
 
     bt_sort = sorted(bt_sort, key=itemgetter(0,1,2))
     bt_sort = BedTool(bt_sort)
+
     return bt_sort
 
 
@@ -1085,10 +1110,10 @@ def write_vcfs_to_output(args, Handles, mode, Hetero_lines_lst, Homo_lines_lst, 
         sys.exit()
 
 
-def run_in_default_mode(args):
+def run_in_default_mode(args, tmp_bams):
 
     """
-    Last update: 16/08/2022
+    Last update: 28/09/2022
     """
 
     handle = "exp"
@@ -1111,6 +1136,12 @@ def run_in_default_mode(args):
     tmp = make_genome_file(args.ref, genome_file)
     sys.stderr.write(f"[{at()}] Done\n")
 
+    # splitting bam file by chromosome
+    sys.stderr.write(f"[{at()}] Creating temporary bam files by chromosome ...\r")
+    Chrom_bams = split_bam_by_chromosome(args.bam, genome_file, tmp_bams, args)
+    sys.stderr.write("\n")
+    sys.stderr.write(f"[{at()}] Done\n")
+
     # bed blocks
     sys.stderr.write(f"[{at()}] Clustering heterozygous and homozygous SNPs into blocks...\n")
     Het_blocks, Homo_blocks_REF, Homo_blocks_ALT = snps_to_bed_blocks(args, Vcfs["hetero"][0], Vcfs["homo"][0], genome_file)
@@ -1125,13 +1156,13 @@ def run_in_default_mode(args):
     sys.stderr.write(f"[{at()}] {len(Homo_blocks)} blocks were trimmed\n")
 
     # remove uncovered regions
-    sys.stderr.write(f"[{at()}] Trimming overlaps of homozygous blocks with any uncovered region...\n")
-    Homo_blocks_adj = remove_uncovered_regions(args, args.bam, args.ref, Homo_blocks, genome_file)
+    sys.stderr.write(f"[{at()}] Trimming overlaps of homo-blocks with uncovered regions...\n")
+    Homo_blocks_adj = remove_uncovered_regions(args, Chrom_bams, args.ref, Homo_blocks, genome_file, tmpdir)
     sys.stderr.write(f"[{at()}] {len(Homo_blocks_adj)} blocks were trimmed\n")
 
     # analyse block coverage
     sys.stderr.write(f"[{at()}] Computing coverage up- , in-, and downstream of any candidate block...\n")
-    LOH = assess_coverage(args, args.bam, args.ref, Homo_blocks, handle)
+    LOH = assess_coverage(args, Chrom_bams, args.ref, Homo_blocks, handle)
     sys.stderr.write(f"[{at()}] {len(LOH)} blocks were processed\n")
 
     # filter by length
@@ -1198,10 +1229,10 @@ def run_in_default_mode(args):
     return True
 
 
-def run_in_hybrid_mode(args):
+def run_in_hybrid_mode(args, tmp_bams):
 
     """
-    Last update: 06/05/2022
+    Last update: 28/09/2022
     """
 
     handle_A = "exp_A"
@@ -1230,6 +1261,16 @@ def run_in_hybrid_mode(args):
     tmp = make_genome_file(args.refs[1], genome_file_B)
     sys.stderr.write(f"[{at()}] Done\n")
 
+    # splitting bam file by chromosome
+    sys.stderr.write(f"[{at()}] Working on parent A BAM file\n")
+    sys.stderr.write(f"[{at()}] Creating temporary bam files by chromosome ...\n")
+    Chrom_bams_A = split_bam_by_chromosome(args.bams[0], genome_file_A, tmp_bams, args)
+
+    sys.stderr.write(f"[{at()}] Working on parent B BAM file\n")
+    sys.stderr.write(f"[{at()}] Creating temporary bam files by chromosome ...\n")
+    Chrom_bams_B = split_bam_by_chromosome(args.bams[1], genome_file_B, tmp_bams, args)
+    sys.stderr.write(f"[{at()}] Done\n")
+
     # bed blocks
     sys.stderr.write(f"[{at()}] Clustering heterozygous and homozygous SNPs into blocks...\n")
     Het_blocks_A, Homo_blocks_REF_A, Homo_blocks_ALT_A = snps_to_bed_blocks(args, Vcfs["hetero"][0], Vcfs["homo"][0], genome_file_A)
@@ -1251,16 +1292,16 @@ def run_in_hybrid_mode(args):
     sys.stderr.write(f"[{at()}] Parent B: {len(Homo_blocks_B)} blocks were trimmed\n")
 
     # remove uncovered regions
-    sys.stderr.write(f"[{at()}] Trimming overlaps of homozygous blocks with any uncovered region...\n")
-    Homo_blocks_adj_A = remove_uncovered_regions(args, args.bams[0], args.refs[0], Homo_blocks_A, genome_file_A)
-    Homo_blocks_adj_B = remove_uncovered_regions(args, args.bams[1], args.refs[1], Homo_blocks_B, genome_file_B)
+    sys.stderr.write(f"[{at()}] Trimming overlaps of homo-blocks with uncovered regions...\n")
+    Homo_blocks_adj_A = remove_uncovered_regions(args, Chrom_bams_A, args.refs[0], Homo_blocks_A, genome_file_A, tmpdir)
+    Homo_blocks_adj_B = remove_uncovered_regions(args, Chrom_bams_B, args.refs[1], Homo_blocks_B, genome_file_B, tmpdir)
     sys.stderr.write(f"[{at()}] Parent A: {len(Homo_blocks_adj_A)} blocks were trimmed\n")
     sys.stderr.write(f"[{at()}] Parent B: {len(Homo_blocks_adj_B)} blocks were trimmed\n")
 
     # analyse block coverage
     sys.stderr.write(f"[{at()}] Computing coverage up- , in-, and downstream of any candidate block...\n")
-    LOH_A = assess_coverage(args, args.bams[0], args.refs[0], Homo_blocks_A, handle_A)
-    LOH_B = assess_coverage(args, args.bams[1], args.refs[1], Homo_blocks_B, handle_B)
+    LOH_A = assess_coverage(args, Chrom_bams_A, args.refs[0], Homo_blocks_A, handle_A)
+    LOH_B = assess_coverage(args, Chrom_bams_B, args.refs[1], Homo_blocks_B, handle_B)
     sys.stderr.write(f"[{at()}] Parent A: {len(LOH_A)} blocks were processed\n")
     sys.stderr.write(f"[{at()}] Parent B: {len(LOH_B)} blocks were processed\n")
 
@@ -1357,10 +1398,10 @@ def run_in_hybrid_mode(args):
     return True
 
 
-def main(args, tmp_dir):
+def main(args, tmp_bams):
 
     """
-    Last update: 11/03/2022
+    Last update: 28/09/2022
     """
 
     # check conditions before starting
@@ -1371,15 +1412,25 @@ def main(args, tmp_dir):
     # run in the selected mode
     if args.hybrid:
         sys.stderr.write(f"[{at()}] Running in hybrid mode...\n")
-        tmp = run_in_hybrid_mode(args)
+        tmp = run_in_hybrid_mode(args, tmp_bams)
 
     else:
         sys.stderr.write(f"[{at()}] Running in default mode...\n")
-        tmp = run_in_default_mode(args)
-
-    # remove tmp folder
-    shutil.rmtree(tmp_dir)
+        tmp = run_in_default_mode(args, tmp_bams)
 
 
 if __name__ == "__main__":
-    main(args, tmp_dir)
+
+    tmpdir = f"{args.output_dir}/tmp"
+    os.makedirs(tmpdir, exist_ok=True)
+    os.chmod(tmpdir, 0o777)
+    pybedtools.helpers.set_tempdir(tmpdir)
+
+    tmp_bams = f"{args.output_dir}/tmp_bams"
+    os.makedirs(tmp_bams, exist_ok=True)
+
+    main(args, tmp_bams)
+
+    # remove tmp folder
+    shutil.rmtree(tmpdir)
+    shutil.rmtree(tmp_bams)
