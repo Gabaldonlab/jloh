@@ -1125,7 +1125,7 @@ def run_in_default_mode(args, tmp_bams):
     sys.stderr.write(f"[{at()}] Found {len(Hetero_lines)} heterozygous SNPs and {len(Homo_lines)} homozygous SNPs\n")
 
     # divergence
-    sys.stderr.write(f"[{at()}] Calculating heterozygous and homozygous SNP density in both parental genomes...\n")
+    sys.stderr.write(f"[{at()}] Getting hetero- and homozygous SNP density...\n")
     hetero_div, homo_div = hetero_and_homo_snp_densities(Vcfs["hetero"][0], Vcfs["homo"][0], args.ref)
     sys.stderr.write(f"[{at()}] Homozygous SNPs/kbp: {homo_div}\n")
     sys.stderr.write(f"[{at()}] Heterozygous SNPs/kbp: {hetero_div}\n")
@@ -1247,7 +1247,7 @@ def run_in_hybrid_mode(args, tmp_bams):
     sys.stderr.write(f"[{at()}] Parent B: Found {len(Hetero_lines_B)} heterozygous SNPs and {len(Homo_lines_B)} homozygous SNPs\n")
 
     # divergence
-    sys.stderr.write(f"[{at()}] Calculating heterozygous and homozygous SNP density in both parental genomes...\n")
+    sys.stderr.write(f"[{at()}] Getting hetero- and homozygous SNP density in both parental genomes...\n")
     hetero_div_A, homo_div_A = hetero_and_homo_snp_densities(Vcfs["hetero"][0], Vcfs["homo"][0], args.refs[0])
     hetero_div_B, homo_div_B = hetero_and_homo_snp_densities(Vcfs["hetero"][1], Vcfs["homo"][1], args.refs[1])
     sys.stderr.write(f"[{at()}] Parent A: homozygous SNPs/kbp: {homo_div_A}, heterozygous SNPs/kbp: {hetero_div_A}\n")
