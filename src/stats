@@ -192,7 +192,7 @@ def get_chrom_distances(chrom_snps, chrom, queue):
             queue.put(d)
 
 
-def calculate_chrom_snp_densities(args, Variants, Chrom_lengths, args):
+def calculate_chrom_snp_densities(Variants, Chrom_lengths, args):
 
     """
     Last update: 03/11/2022
@@ -249,11 +249,11 @@ def main(args):
 
     # get densities
     sys.stderr.write(f"[{at()}] Calculating heterozygous SNP densities\n")
-    Het, Het_quant = calculate_chrom_snp_densities(args, Hetero_lines, Chrom_lengths, args)
+    Het, Het_quant = calculate_chrom_snp_densities(Hetero_lines, Chrom_lengths, args)
     sys.stderr.write(f"[{at()}] Calculating homozygous SNP densities\n")
-    Homo, Homo_quant = calculate_chrom_snp_densities(args, Homo_lines, Chrom_lengths, args)
+    Homo, Homo_quant = calculate_chrom_snp_densities(Homo_lines, Chrom_lengths, args)
     sys.stderr.write(f"[{at()}] Combining to get general SNP densities\n")
-    All, All_quant = calculate_chrom_snp_densities(args, All, Chrom_lengths, args)
+    All, All_quant = calculate_chrom_snp_densities(All, Chrom_lengths, args)
 
     # write to output
     sys.stderr.write(f"""
