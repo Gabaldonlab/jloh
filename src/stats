@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 23/08/2022
+Last change: 03/11/2022
 ###
 """
 
@@ -32,6 +32,11 @@ jloh stats --vcf <VCF>
 --vcf               Input VCF file to use for density calculations              [!]
 --threads           Number of max. parallel operations                          [4]
 
+[parameters]
+
+--window-size       Size in bp to use for distribution                          [1000]
+--step-size         Step size in bp for sliding window                          [500]
+
 """)
     sys.exit(0)
 
@@ -39,6 +44,8 @@ jloh stats --vcf <VCF>
 p = ap.ArgumentParser()
 p.add_argument("--vcf")
 p.add_argument("--threads", default=4, type=int)
+p.add_argument("--window-size", default=1000, type=int)
+p.add_argument("--step-size", default=500, type=int)
 args = p.parse_args()
 
 
@@ -157,18 +164,18 @@ def count_snps_in_window(Snps, w_start, w_end):
     return tot
 
 
-def get_chrom_snps(chrom_snps, chrom_len, chrom, queue):
+def get_chrom_snps(args, chrom_snps, chrom_len, chrom, queue):
 
     """
-    Last update: 23/08/2022
+    Last update: 03/11/2022
     """
 
     w_start = 0
-    w_end = w_start + 1000
+    w_end = w_start + args.window_size
     while w_end < chrom_len:
         w_snps = count_snps_in_window(chrom_snps, w_start, w_end)
-        w_start += 500
-        w_end += 500
+        w_start += args.step_size
+        w_end += args.step_size
         queue.put([chrom, w_start, w_snps])
 
 
@@ -185,10 +192,10 @@ def get_chrom_distances(chrom_snps, chrom, queue):
             queue.put(d)
 
 
-def calculate_chrom_snp_densities(Variants, Chrom_lengths, args):
+def calculate_chrom_snp_densities(args, Variants, Chrom_lengths, args):
 
     """
-    Last update: 23/08/2022
+    Last update: 03/11/2022
     """
 
     # extract SNPs and chromosome lengths
@@ -204,7 +211,7 @@ def calculate_chrom_snp_densities(Variants, Chrom_lengths, args):
     pool = mp.Pool(args.threads)
 
     for chrom in Snps_by_chrom.keys():
-        pool.apply_async(get_chrom_snps, args=(Snps_by_chrom[chrom], Chrom_lengths[chrom], chrom, queue))
+        pool.apply_async(get_chrom_snps, args=(args, Snps_by_chrom[chrom], Chrom_lengths[chrom], chrom, queue))
 
     pool.close()
     pool.join()
@@ -227,7 +234,7 @@ def calculate_chrom_snp_densities(Variants, Chrom_lengths, args):
 def main(args):
 
     """
-    Last update: 12/08/2022
+    Last update: 03/11/2022
     """
 
     # split
@@ -242,11 +249,11 @@ def main(args):
 
     # get densities
     sys.stderr.write(f"[{at()}] Calculating heterozygous SNP densities\n")
-    Het, Het_quant = calculate_chrom_snp_densities(Hetero_lines, Chrom_lengths, args)
+    Het, Het_quant = calculate_chrom_snp_densities(args, Hetero_lines, Chrom_lengths, args)
     sys.stderr.write(f"[{at()}] Calculating homozygous SNP densities\n")
-    Homo, Homo_quant = calculate_chrom_snp_densities(Homo_lines, Chrom_lengths, args)
+    Homo, Homo_quant = calculate_chrom_snp_densities(args, Homo_lines, Chrom_lengths, args)
     sys.stderr.write(f"[{at()}] Combining to get general SNP densities\n")
-    All, All_quant = calculate_chrom_snp_densities(All, Chrom_lengths, args)
+    All, All_quant = calculate_chrom_snp_densities(args, All, Chrom_lengths, args)
 
     # write to output
     sys.stderr.write(f"""
