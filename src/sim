@@ -29,7 +29,7 @@ Simulate a divergent copy of a set of DNA/protein sequences, introducing mutatio
 and, if DNA, loss-of-heterozygosity (LOH)
 
 Usage:
-jloh sim --input <FASTA> [options]
+jloh sim --fasta <FASTA> [options]
 
 [I/O/E]
 --threads               Number of parallel operations                           [4]
