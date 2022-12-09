@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 17/03/2022
+Last change: 09/12/2022
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 ###
 """
@@ -207,11 +207,25 @@ def sort_intervals(args, tmp_dir, Snp_interval_files, Genome_files):
     return bt_sort_A, bt_sort_B
 
 
+def filter_intervals(args, tmp_dir, Snp_interval_files):
+
+    """
+    09/12/2022
+    """
+
+    bt_filt_A = BedTool(Snp_interval_files[0])
+    bt_filt_B = BedTool(Snp_interval_files[1])
+
+    bt_filt_A = ["\t".join([row[0], row[1], row[2]])+"\n" for row in bt_filt_A if int(row[2])-int(row[1])>=int(args.min_length)]    
+    bt_filt_B = ["\t".join([row[0], row[1], row[2]])+"\n" for row in bt_filt_B if int(row[2])-int(row[1])>=int(args.min_length)]    
+
+    return bt_filt_A, bt_filt_B
+
 
 def main(args):
 
     """
-    15/03/2022
+    09/12/2022
     """
 
     # tmp dir
@@ -239,13 +253,14 @@ def main(args):
     snp_bed_A, snp_bed_B = get_bed_intervals(args, tmp_dir, [vcf_A, vcf_B])
     genome_file_A, genome_file_B = get_genome_files(args, tmp_dir)
     sort_bed_A, sort_bed_B = sort_intervals(args, tmp_dir, [snp_bed_A, snp_bed_B], [genome_file_A, genome_file_B])
+    filt_bed_A, filt_bed_B = filter_intervals(args, tmp_dir, [sort_bed_A, sort_bed_B])
 
     OUT_A = open(f"{args.output_dir}/A.bed", "w")
     OUT_B = open(f"{args.output_dir}/B.bed", "w")
 
-    for row in sort_bed_A:
+    for row in filt_bed_A:
         OUT_A.write(str(row))
-    for row in sort_bed_B:
+    for row in filt_bed_B:
         OUT_B.write(str(row))
 
     OUT_A.close()
