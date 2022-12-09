@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 03/11/2022
+Last change: 09/12/2022
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 ###
 """
@@ -24,7 +24,7 @@ if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
     sys.stderr.write("""
 
 
-JLOH, version 0.18.0
+JLOH, version 0.19.0
 
 --------------------------------------------------------------------------------
 by Matteo Schiavinato
@@ -37,11 +37,11 @@ Mixao et al., 2019      https://doi.org/10.3389/fgene.2019.00383
 Commands:
 
  -- Extraction
+    g2g                 Align two genomes to find regions that should carry SNPs
     extract             Extract LOH blocks from VCF, BAM and FASTA files
     filter              Filter extracted LOH blocks
     intersect           Perform intersection/removal operations with output files
     chimeric            Extract genes featuring LOH blocks from different haplotypes
-    g2g                 Align two genomes to find regions that should carry SNPs
 
  -- Calculations
     stats               Estimate heterozygous and homozygous SNP statistics
