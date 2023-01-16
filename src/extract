@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 09/12/2022
+Last change: 16/01/2023
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 ###
 """
@@ -46,14 +46,12 @@ jloh extract --vcf <VCF> --ref <FASTA> --bam <BAM> [options]
 --vcf               Input VCF file                                              [!]
 --bam               BAM file used to call the --vcf variants                    [!]
 --ref               Reference FASTA genome                                      [!]
---min-snps-kbp      Min. SNPs/kbp to retain a block (het,homo)                  [10,1]
 
 [hybrid mode]
 --hybrid            Activate hybrid mode                                        [off]
 --vcfs              Input VCF files (A and B, space-separated)                  [!]
 --bams              BAM files used to call the --vcfs (A and B, space-sep.)     [!]
 --refs              Reference FASTA genomes (A and B, space-sep.)               [!]
---min-snps-kbp      As for default mode, but pass two space-sep settings        [5,1 5,1]
 
 [I/O/E]
 --sample            Sample name / Strain name for output files                  [jloh]
@@ -63,8 +61,9 @@ jloh extract --vcf <VCF> --ref <FASTA> --bam <BAM> [options]
                     Can include regions from both --refs
 
 [parameters]
+--min-snps-kbp      Min. SNPs/kbp to retain a block (het,homo)                  [5,1]
 --filter-mode       "pass" to keep only PASS variants, "all" to keep everything [all]
---min-length        Min. LOH block length                                       [1000]
+--min-length        Min. LOH block length                                       [100]
 --coarseness        Don't consider any interval (het/homo) smaller than this    [100]
 --min-af            Min. allele frequency to consider a variant heterozygous    [0.3]
 --max-af            Max. allele frequency to consider a variant heterozygous    [0.7]
@@ -95,9 +94,9 @@ p.add_argument("--output-dir", default="jloh_out")
 p.add_argument("--threads", default=4, type=int)
 p.add_argument("--regions")
 # parameters
+p.add_argument("--min-snps-kbp", default="5,1", type=str)
 p.add_argument("--filter-mode", choices=["all","pass"], default="all")
-p.add_argument("--min-snps-kbp", default="10,1", type=str, nargs="*")
-p.add_argument("--min-length", default=1000, type=int)
+p.add_argument("--min-length", default=100, type=int)
 p.add_argument("--coarseness", default=100, type=int)
 p.add_argument("--min-af", default=0.3, type=float)
 p.add_argument("--max-af", default=0.7, type=float)
@@ -108,9 +107,6 @@ p.add_argument("--min-overhang", default=0.9, type=float)
 p.add_argument("--merge-uncov", default=10, type=int)
 
 args = p.parse_args()
-
-if args.hybrid:
-    args.min_snps_kbp = ["5,1", "5,1"]
 
 
 # functions
@@ -1237,14 +1233,11 @@ def run_in_default_mode(args, tmp_bams):
 def run_in_hybrid_mode(args, tmp_bams):
 
     """
-    Last update: 28/09/2022
+    Last update: 16/01/2023
     """
 
     handle_A = "exp_A"
     handle_B = "exp_B"
-
-    min_snps_kbp_A = args.min_snps_kbp[0]
-    min_snps_kbp_B = args.min_snps_kbp[1]
 
     # snps
     sys.stderr.write(f"[{at()}] Extracting heterozygous and homozygous SNPs...\n")
@@ -1281,8 +1274,8 @@ def run_in_hybrid_mode(args, tmp_bams):
 
     # bed blocks
     sys.stderr.write(f"[{at()}] Clustering heterozygous and homozygous SNPs into blocks...\n")
-    Het_blocks_A, Homo_blocks_REF_A, Homo_blocks_ALT_A = snps_to_bed_blocks(args, Vcfs["hetero"][0], Vcfs["homo"][0], genome_file_A, min_snps_kbp_A)
-    Het_blocks_B, Homo_blocks_REF_B, Homo_blocks_ALT_B = snps_to_bed_blocks(args, Vcfs["hetero"][1], Vcfs["homo"][1], genome_file_B, min_snps_kbp_B)
+    Het_blocks_A, Homo_blocks_REF_A, Homo_blocks_ALT_A = snps_to_bed_blocks(args, Vcfs["hetero"][0], Vcfs["homo"][0], genome_file_A, args.min_snps_kbp)
+    Het_blocks_B, Homo_blocks_REF_B, Homo_blocks_ALT_B = snps_to_bed_blocks(args, Vcfs["hetero"][1], Vcfs["homo"][1], genome_file_B, args.min_snps_kbp)
     Het_blocks_A = filter_by_length(Het_blocks_A, args.min_length)
     Het_blocks_B = filter_by_length(Het_blocks_B, args.min_length)
     out_A = f"{args.output_dir}/{args.sample}.{handle_A}.het_blocks.A.bed"
