@@ -47,8 +47,11 @@ Commands:
     stats               Estimate heterozygous and homozygous SNP statistics
     junctions           Calculate number of block-to-block junctions over the genome
 
- -- Simulations
+ -- Simulation
     sim                 Simulate a divergent copy of a genome/protein sequence(s)
+
+ -- Visualization
+    plot                Make an LOH propensity plot from "extract" output file(s)
 
 """)
 else:
