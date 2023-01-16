@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+
+import argparse as ap 
+import pandas as pd 
+import sys 
+import os 
+import multiprocessing as mp
+from time import asctime as at 
+# from pandarallel import pandarallel
+# import swifter
+
+
+# parser 
+p = ap.ArgumentParser()
+p.add_argument("--loh", nargs="+")
+p.add_argument("--names", nargs="+")
+p.add_argument("--ref-name", default="REF")
+p.add_argument("--alt-name", default="ALT")
+p.add_argument("--chr", default="ALL")
+p.add_argument("--window-size", default=10000, type=int)
+p.add_argument("--threads", type=int, default=12)
+p.add_argument("--output-dir", default="JLOH_plot_out")
+p.add_argument("--aspect-ratio", default=0.35, type=float)
+p.add_argument("--width", default=2000, type=int)
+p.add_argument("--height", default=750, type=int)
+p.add_argument("--res", default=250, type=int)
+args = p.parse_args()
+
+# env 
+ss = sys.exit 
+# pandarallel.initialize(progress_bar=False, nb_workers=args.threads, use_memory_fs=False)
+
+# functions 
+def organize_input(loh, names):
+
+    """
+    Last update: 16/01/2023 
+    """
+
+    if (len(loh) != len(names)):
+        sys.stderr.write("ERROR: number of LOH files (--loh) doesn't match number of names (--names)\n")
+        ss()
+
+    Files = []
+    i = 0
+    while (i < len(loh)):
+        Files.append([names[i], loh[i]])
+        i+=1
+
+    for x in Files:
+        sample_id = x[0]
+        infile = x[1]
+        df_sub = pd.read_csv(infile, sep="\t")
+        df_sub.insert(loc=0, column="Sample", value=sample_id)
+        df_sub = df_sub.rename({"#Chrom":"Chromosome"}, axis=1)
+        try:
+            df = pd.concat([df, df_sub])
+        except NameError:
+            df = df_sub.copy()
+
+    return df
+
+
+def split_into_windows(df_sub, w_size, q):
+
+    """
+    Last update: 16/01/2023
+    """
+
+    start, end = df_sub["Start"], df_sub["End"]
+    w_start = start - (start % w_size)
+    w_end = w_start + w_size
+
+    if (w_start <= start <= w_end) and (w_start <= end <= w_end):
+        df_sub["Window"] = (w_start, w_end)
+        df_sub["LOH_pos"] = df_sub["End"] - df_sub["Start"]
+        q.put(df_sub)
+
+    elif (w_start <= start <= w_end) and (end > w_end):
+        out = []
+        df_tmp = df_sub.copy()
+        df_tmp.End = w_end
+        df_tmp["Window"] = (w_start, w_end)
+        df_tmp["LOH_pos"] = df_tmp["End"] - df_tmp["Start"]
+        out.append(df_tmp.copy())
+
+        while (end > w_end):
+            w_start += w_size
+            w_end += w_size
+            df_tmp.Start = max(start, w_start)
+            df_tmp.End = min(end, w_end)
+            df_tmp["Window"] = (w_start, w_end)
+            df_tmp["LOH_pos"] = df_tmp["End"] - df_tmp["Start"]
+            out.append(df_tmp.copy())
+
+        for x in out:
+            q.put(x)
+
+    elif (start < w_start) and (start <= end <= w_end):
+        sys.stderr.write("ERROR: debug!\n")
+        sys.exit()
+
+    elif (start < w_start) and (end > w_end):
+        sys.stderr.write("ERROR: debug!\n")
+        sys.exit()
+
+
+def count_ratios(df_sub, w_size):
+
+    """
+    16/01/2023
+    """
+
+    window = df_sub.loc[:,"Window"].tolist()[0]
+
+    df_sub = df_sub.loc[:,["Allele", "Window", "LOH_pos"]].groupby(["Allele"]).sum().loc[:,["LOH_pos"]]
+    df_sub = df_sub.reset_index(drop=False)
+    df_sub["LOH_ratio"] = df_sub["LOH_pos"] / w_size
+    df_sub["W_start"] = window[0]
+    df_sub["W_end"] = window[1]
+    
+    for loh_type in ["REF", "ALT"]:
+        if loh_type not in df_sub["Allele"].tolist():
+            df_sub = df_sub.append({"Allele":loh_type, "LOH_pos":0, "LOH_ratio":0, "W_start":window[0], "W_end":window[1]}, ignore_index=True)
+
+    df_sub = df_sub.set_index("Allele")
+    
+    d = {   "LOH_pos_REF" : [df_sub.loc["REF", "LOH_pos"]],
+            "LOH_ratio_REF" : [df_sub.loc["REF", "LOH_ratio"]],
+            "LOH_pos_ALT" : [df_sub.loc["ALT", "LOH_pos"]],
+            "LOH_ratio_ALT" : [df_sub.loc["ALT", "LOH_ratio"]] }
+
+    df_sub = pd.DataFrame.from_dict(d)
+
+    return df_sub
+
+
+def quantize_intervals(df, window_size, threads):
+
+    """
+    Last update: 16/01/2023 
+    """
+
+    pool = mp.Pool(processes=threads)
+    q = mp.Manager().Queue()
+
+    for index, row in df.iterrows():
+        pool.apply_async(split_into_windows, args=(row, window_size, q))
+
+    pool.close()
+    pool.join()
+
+    out = []
+    while q.empty() == False:
+        out.append(q.get())
+
+    df = pd.DataFrame(out).sort_values(by=["Sample", "Chromosome", "Window"])
+
+    # df = df.groupby(["Sample", "Chromosome", "Window"]).parallel_apply(count_ratios, (window_size))
+    df = df.groupby(["Sample", "Chromosome", "Window"]).apply(lambda x : count_ratios(x, window_size))
+
+    return df
+
+
+def reorganise_output_dataframe(df):
+
+    """
+    Last update: 16/01/2023
+    """
+
+    df = df.reset_index(drop=False)
+    df["W_start"] = df["Window"].str[0]
+    df["W_end"] = df["Window"].str[1]
+    df = df.loc[:,[ "Sample", "Chromosome", "W_start", "W_end", 
+                    "LOH_pos_REF", "LOH_ratio_REF", "LOH_pos_ALT", "LOH_ratio_ALT"]]
+
+    return df 
+
+
+def main(args):
+
+    # organise workspace
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    # create input table
+    sys.stderr.write(f"[{at()}] Reading input information\n") 
+    df = organize_input(args.loh, args.names)
+
+    # select specific chromosome if user wants 
+    if args.chr != "ALL":
+        sys.stderr.write(f"[{at()}] Selecting only chromosome {args.chr}\n")
+        df = df.loc[df["Chromosome"]==args.chr, :]
+
+    if df.shape[0] == 0:
+        sys.stderr.write(f"ERROR: dataframe is empty after selecting only chromosome {args.chr}\n")
+        ss()
+    
+    # quantize in windows 
+    sys.stderr.write(f"[{at()}] Quantizing in windows of {args.window_size} bp\n") 
+    df = quantize_intervals(df, args.window_size, args.threads)
+    df = reorganise_output_dataframe(df)
+
+    # write table to output
+    sys.stderr.write(f"[{at()}] Writing table to output\n") 
+    df.to_csv(f"{args.output_dir}/LOH_rate_by_window.tsv", sep="\t", header=True, index=False)
+
+    # plot 
+    sys.stderr.write(f"[{at()}] Plotting\n") 
+    src_dir = "/".join(sys.argv[0].split("/")[0:-1]) + "/" + "scripts"
+    cmd = " ".join([
+        "Rscript", f"{src_dir}/loh-bin-plots.Rscript", 
+        f"{args.output_dir}/LOH_rate_by_window.tsv", 
+        f"{args.output_dir}/plots",
+        str(args.aspect_ratio), 
+        str(args.width),
+        str(args.height),
+        str(args.res),
+        args.ref_name, args.alt_name ])
+    
+    sys.stderr.write(f"\nPlot command that was run:\n{cmd}\n\n")
+    os.system(cmd)
+
+
+# main 
+if __name__ == "__main__":
+    main(args)
