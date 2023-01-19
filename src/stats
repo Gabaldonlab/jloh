@@ -255,6 +255,10 @@ def main(args):
     sys.stderr.write(f"[{at()}] Combining to get general SNP densities\n")
     All, All_quant = calculate_chrom_snp_densities(All, Chrom_lengths, args)
 
+    All_quant = All_quant.fillna(1)
+    Het_quant = Het_quant.fillna(1)
+    Homo_quant = Homo_quant.fillna(1)
+
     # write to output
     sys.stderr.write(f"""
 

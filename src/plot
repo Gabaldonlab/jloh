@@ -6,8 +6,42 @@ import sys
 import os 
 import multiprocessing as mp
 from time import asctime as at 
-# from pandarallel import pandarallel
-# import swifter
+from pandarallel import pandarallel
+import swifter
+
+# help section
+if len(sys.argv) == 1:
+    sys.argv.append("--help")
+
+if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
+    sys.stderr.write("""
+
+Plot LOH propensity over all or specific chromosomes from multiple JLOH extract 
+TSV output files  
+
+Usage:
+jloh plot --loh <TSV_1> ... <TSV_n> --names <STR_1> ... <STR_n> [options]
+
+[I/O]
+--loh               Input TSV file(s) containing LOH blocks from JLOH extract   [!]
+--names             Names to use in plot for each of the files (same order)     [!]
+--output-dir        Output directory, created if not existitng                  [JLOH_plot_out]
+
+[parameters]
+--threads           Number of parallel threads                                  [12]
+--ref-name          Name to use in plot for REF allele                          [REF]
+--alt-name          Name to use in plot for ALT allele                          [ALT]
+--chr               Restrict the analysis to this specific chromosome           [off]
+--window-size       Size of window for plotting, the shorter the slower         [10000]
+
+[ggplot2]
+--aspect-ratio      Ratio between y / x for the output plot                     [0.35]
+--width             Width (px) of the output plot                               [2000]
+--height            Height (px) of the output plot                              [750]
+--res               Resolution of the output plot                               [250]
+
+""")
+    sys.exit(0)
 
 
 # parser 
@@ -28,7 +62,7 @@ args = p.parse_args()
 
 # env 
 ss = sys.exit 
-# pandarallel.initialize(progress_bar=False, nb_workers=args.threads, use_memory_fs=False)
+pandarallel.initialize(progress_bar=False, nb_workers=args.threads, use_memory_fs=False)
 
 # functions 
 def organize_input(loh, names):
@@ -156,8 +190,7 @@ def quantize_intervals(df, window_size, threads):
 
     df = pd.DataFrame(out).sort_values(by=["Sample", "Chromosome", "Window"])
 
-    # df = df.groupby(["Sample", "Chromosome", "Window"]).parallel_apply(count_ratios, (window_size))
-    df = df.groupby(["Sample", "Chromosome", "Window"]).apply(lambda x : count_ratios(x, window_size))
+    df = df.groupby(["Sample", "Chromosome", "Window"]).parallel_apply(count_ratios, (window_size))
 
     return df
 

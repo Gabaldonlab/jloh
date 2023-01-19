@@ -1117,7 +1117,6 @@ def run_in_default_mode(args, tmp_bams):
     """
 
     handle = "exp"
-    min_snps_kbp = args.min_snps_kbp[0]
 
     # snps
     sys.stderr.write(f"[{at()}] Extracting heterozygous and homozygous SNPs...\n")
@@ -1145,7 +1144,7 @@ def run_in_default_mode(args, tmp_bams):
 
     # bed blocks
     sys.stderr.write(f"[{at()}] Clustering heterozygous and homozygous SNPs into blocks...\n")
-    Het_blocks, Homo_blocks_REF, Homo_blocks_ALT = snps_to_bed_blocks(args, Vcfs["hetero"][0], Vcfs["homo"][0], genome_file, min_snps_kbp)
+    Het_blocks, Homo_blocks_REF, Homo_blocks_ALT = snps_to_bed_blocks(args, Vcfs["hetero"][0], Vcfs["homo"][0], genome_file, args.min_snps_kbp)
     Het_blocks = filter_by_length(Het_blocks, args.min_length)
     out = f"{args.output_dir}/{args.sample}.{handle}.het_blocks.bed"
     Het_blocks.saveas(out)
