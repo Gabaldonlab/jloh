@@ -7,7 +7,7 @@ import os
 import multiprocessing as mp
 from time import asctime as at 
 from pandarallel import pandarallel
-import swifter
+# import swifter
 
 # help section
 if len(sys.argv) == 1:
