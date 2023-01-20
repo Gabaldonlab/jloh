@@ -12,6 +12,7 @@ And it's ready to go! But there are a few dependencies:
 | numpy       | Module      | 1.21.4  | [source](https://numpy.org/), [cite](https://doi.org/10.1038/s41586-020-2649-2) |
 | pandas      | Module      | 1.3.5   | [source](https://pandas.pydata.org/), [cite](https://doi.org/10.5281/zenodo.3509134) |
 | pybedtools  | Module      | 0.8.2   | [source](https://daler.github.io/pybedtools/main.html), [cite](https://doi.org/10.1093/bioinformatics/btr539) |
+| pandarallel | Module      | 1.6.1   | [source](https://pypi.org/project/pandarallel/1.6.1/), [cite](https://github.com/nalepae/pandarallel) | 
 | pysam       | Module      | 0.1.7   | [source](https://pypi.org/project/pysam/), [cite](https://github.com/pysam-developers/pysam) |
 | Python      | Interpreter | 3.6.1   | [source](https://www.python.org/downloads/release/python-397/), [cite](http://citebay.com/how-to-cite/python/) |
 | samtools    |  Program    | 1.13    | [source](http://www.htslib.org/), [cite](https://doi.org/10.1093/gigascience/giab008) |
