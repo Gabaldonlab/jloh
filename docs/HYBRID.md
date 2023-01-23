@@ -71,12 +71,44 @@ Now, we extract the regions containing heterozygous SNPs between the two parenta
 jloh g2g --ref-A parent_A.fasta --ref-B parent_B.fasta --est-divergence 0.05 --min-length 1000 > A_and_B.regions.bed
 ```
 
+Then, we run the **JLOH stats** module to calculate the distribution of SNP densities across the genome in windows of adjustable size. Default is 10 kbp. We do this for *both parental genomes*. 
+
+```
+jloh stats --vcf A.ff.vcf 
+jloh stats --vcf B.ff.vcf 
+```
+
+The suggested parameter setting from `jloh stats` is the one correspoonding to the 50th quantile (Q50). We suggest to make a decision based on how the quantiles look. SNP-dense datasets will benefit from higher quantiles to separate real LOH blocks from background noise (for example Q50). More SNP-depleted datasets will, instead, benefit from a lower quantile (e.g. Q10) so to not exclude many true positives.
+
+Details on this rationale are available [here](../docs/QUANTILES.md). 
+
+The final values to be used in `jloh extract` in the `--min-snps-kbp` parameter are two: one corresponding to heterozygous SNPs/Kbp, the other to homozygous SNPs/kbp. When using two parental genomes, you will generate two sets of these values (one set per genome). We suggest you average them and use the two averages as final parameter setting in `jloh extract`. 
+
+For example: 
+```
+Parent A (Q25): 20 heterozygous, 10 homozygous 
+Parent B (Q25): 14 heterozygous, 6 homozygous 
+
+Final parameter setting: 
+(20 + 14) / 2 = 17
+(10 + 6) / 2  = 8
+
+jloh extract --min-snps-kbp 17,8 <other_options>
+
+```
+
 Finally, we call LOH blocks using **JLOH extract**, limiting the output to regions showing divergence in genome-to-genome mapping.
 
 ```
-jloh extract --threads 4 --vcfs A.ff.vcf B.ff.vcf --bams A.bam B.bam \
---refs parent_A.fasta parent_B.fasta --regions A_and_B.regions.bed \
---sample <STRING> --output-dir <PATH>
+jloh extract \
+--threads 4 \
+--vcfs A.ff.vcf B.ff.vcf \
+--min-snps-kbp <Het>,<Homo> \
+--bams A.bam B.bam \
+--refs parent_A.fasta parent_B.fasta \
+--regions A_and_B.regions.bed \
+--sample <STRING> \
+--output-dir <PATH>
 ```
 
 The `<sample>.LOH_blocks.{A,B}.tsv` files contained in `--output-dir` will contain all *bona fide* blocks found with this approach in either A or B genome. The `<sample>.LOH_candidates.{A,B}.tsv` files, instead, contain all the blocks that were called from the program, regardless of the regions specified in `--regions`.
