@@ -24,20 +24,24 @@ Schematic of the "jloh extract" module workflow.
 ## Table of Contents
 
 - [J LOH](#j-loh)
-  * [Table of Contents](#table-of-contents)
   * [Install and run](#install-and-run)
   * [Basic usage](#basic-usage)
 - [Modules detailed description](#modules-detailed-description)
-  * [JLOH extract](#jloh-extract)
-  * [JLOH filter](#jloh-filter)
-  * [JLOH intersect](#jloh-intersect)
-  * [JLOH chimeric](#jloh-chimeric)
-  * [JLOH g2g](#jloh-g2g)
-  * [JLOH stats](#jloh-stats)
-  * [JLOH sim](#jloh-sim)
+  * [Extraction tools](#extraction-tools)
+    + [JLOH extract](#jloh-extract)
+    + [JLOH filter](#jloh-filter)
+    + [JLOH intersect](#jloh-intersect)
+    + [JLOH chimeric](#jloh-chimeric)
+    + [JLOH g2g](#jloh-g2g)
+  * [Calculation tools](#calculation-tools)
+    + [JLOH stats](#jloh-stats)
+    + [JLOH junctions](#jloh-junctions)
+  * [Simulation tools](#simulation-tools)
+    + [JLOH sim](#jloh-sim)
+  * [Visualization tools](#visualization-tools)
+    + [JLOH plot](#jloh-plot)
 
 <small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
-
 
 ## Install and run
 
@@ -49,30 +53,35 @@ Detailed information [can be found here](docs/INSTALL.md).
 
 ```
  -- Extraction
+    g2g                 Align two genomes to find regions that should carry SNPs
     extract             Extract LOH blocks from VCF, BAM and FASTA files
     filter              Filter extracted LOH blocks
     intersect           Perform intersection/removal operations with output files
     chimeric            Extract genes featuring LOH blocks from different haplotypes
-    g2g                 Align two genomes to find regions that should carry SNPs
 
  -- Calculations
     stats               Estimate heterozygous and homozygous SNP statistics
     junctions           Calculate number of block-to-block junctions over the genome
 
- -- Simulations
+ -- Simulation
     sim                 Simulate a divergent copy of a genome/protein sequence(s)
+
+ -- Visualization
+    plot                Make an LOH propensity plot from "extract" output file(s)
 
 ```
 
-## Modules detailed description
+# Modules detailed description
+
+## Extraction tools 
 
 ### JLOH extract
 
-This is the most important module of JLOH. Its functions are well described in the figure on the top. It is used to extract LOH blocks starting from VCF, BAM, and FASTA files. Detailed information on this algorithm functioning [can be found here](docs/EXTRACT.md).
+This is the most important module of JLOH. Its functions are well described in the figure on the top. It is used to extract LOH blocks starting from VCF, BAM, and FASTA file(s). Detailed information on how this algorithm works [can be found here](docs/EXTRACT.md).
 
 **Output**
 
-`jloh extract` functions in two modes (hybrid, and default). In default mode, it produces these output files:
+`jloh extract` functions in two modes (default and hybrid). In default mode, it produces these output files:
 
 | Output file                 | Description |
 |-----------------------------|-|
@@ -117,19 +126,29 @@ The usage involves two sets of LOH blocks produced by `jloh extract`, plus the `
 
 ### JLOH g2g
 
-This program finds diverging regions between two genomes in FASTA format. The input are the two sequences and an estimated divergence value, and the output is a bed file representing the regions that contain SNPs between the two genomes.
+This program finds diverging regions between two genomes in FASTA format. The input are the two sequences and an estimated divergence value, and the output is a bed file representing the regions that contain SNPs between the two genomes. This module is useful only when using the `--hybrid` mode in `jloh extract`, as the output BED file of `g2g` can be directly passed to the `--regions` parameter.
 
 `JLOH g2g` runs more than one tool from the MUMmer arsenal to map the two genomes, filter the results, extract the SNPs. Then, it uses `all2vcf mummer` to convert the MUMmer output to VCF format, and `bedtools merge` to generate BED intervals from SNPs. Intervals are expanded as long as there are overlaps.
 
-These regions are a good `--regions` file to pass to `JLOH extract` in `--hybrid` mode, excluding false positives that may arise by mapping.
+## Calculation tools 
 
 ### JLOH stats
 
 This tool computes the densities of all SNPs, heterozygous SNPs, and homozygous SNPs over the genome sequence.
 
-Besides the mean snp density, it calculates a distribution and extracts the most relevant quantiles. It also calculates the same quantiles for the SNP distances.
+Besides the mean snp density, it calculates a distribution and extracts the most relevant quantiles.
 
-It then suggests `--min-snps` and `--snp-distance` parameters to be used in `jloh extract`. We suggest to use parameters close to the ones suggested by this tool when using **jloh extract** for the most refined results.
+These quantiles are useful to choose what value to set in the `--min-snps-kbp` parameter of `jloh extract`. 
+
+A detailed description on how to interpret these quantiles [can be found here](docs/QUANTILES.md).
+
+### JLOH junctions 
+
+This tool is used to extract intervals within a genome sequence where blocks from two different sources are found. These are the candidate junction regions between different haplotypes.
+
+This module is similar to `jloh chimeric`, with the difference that it's focus is not genes, but rather genome regions. 
+
+## Simulation tools 
 
 ### JLOH sim
 
@@ -140,3 +159,11 @@ The output is:
 - a tab-separated file with all the introduced SNPs, with positions annotated in 1-based format including reference and alternative allele
 - a BED file with all the introduced LOH blocks, hence in 0-based half-open format
 - another BED file with all the regions that are deemed as non-divergent based on the declared `--snp-distance`.
+
+## Visualization tools 
+
+### JLOH plot 
+
+This module is used to represent graphically the results obtained from `jloh extract`. We suggest to use it with multiple input data, as it will produce an individual plot for each chromosome with all the samples included within it. 
+
+The resulting plot is a heatmap which is easy to interpret and highlights the LOH tendency of each region of each chromome, be it the reference allele (REF) or the alternative allele (ALT). 
