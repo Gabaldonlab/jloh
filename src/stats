@@ -233,10 +233,6 @@ def calculate_chrom_snp_densities(Variants, Chrom_lengths, args):
 
 def main(args):
 
-    """
-    Last update: 03/11/2022
-    """
-
     # split
     sys.stderr.write(f"[{at()}] Reading SNPs\n")
     Hetero_lines, Homo_lines = hetero_and_homo_snps(args.vcf)
@@ -255,14 +251,9 @@ def main(args):
     sys.stderr.write(f"[{at()}] Combining to get general SNP densities\n")
     All, All_quant = calculate_chrom_snp_densities(All, Chrom_lengths, args)
 
-    # set minimum SNP density to at least 1 SNP/kbp
-    # below this, it won't be possible to work 
-    All_quant = All_quant.fillna(1)
-    All_quant["Snps"] = All_quant["Snps"].replace(0, 1)
-    Het_quant = Het_quant.fillna(1)
-    Het_quant["Snps"] = Het_quant["Snps"].replace(0, 1)
-    Homo_quant = Homo_quant.fillna(1)
-    Homo_quant["Snps"] = Homo_quant["Snps"].replace(0, 1)
+    All_quant = All_quant.fillna(0)
+    Het_quant = Het_quant.fillna(0)
+    Homo_quant = Homo_quant.fillna(0)
 
     # write to output
     sys.stderr.write(f"""

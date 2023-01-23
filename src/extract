@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 16/01/2023
+Last change: 23/01/2023
 Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
 ###
 """
@@ -499,12 +499,16 @@ def get_homo_ref_blocks(Het, Homo_ALT, genome_file):
 def snps_to_bed_blocks(args, het_snps_vcf, homo_snps_vcf, genome_file, min_snps_kbp):
 
     """
-    Last update: 09/12/2022
+    Last update: 23/01/2023
     """
 
     # define min snps and snp dist values
-    Min_snps = {"het":float(min_snps_kbp.split(",")[0]), "homo":float(min_snps_kbp.split(",")[1])}
-    Snp_dist = {"het":int(round(float(1000)/float(min_snps_kbp.split(",")[0]), 0)), "homo":int(round(float(1000)/float(min_snps_kbp.split(",")[1]), 0))}
+    min_snps_het = max(float(min_snps_kbp.split(",")[0]), float(1))
+    min_snps_homo = max(float(min_snps_kbp.split(",")[1]), float(1))
+    snp_dist_het = int(round(float(1000)/min_snps_het, 0))
+    snp_dist_homo = int(round(float(1000)/min_snps_homo, 0))
+    Min_snps = {"het":min_snps_het, "homo":min_snps_homo}
+    Snp_dist = {"het":snp_dist_het, "homo":snp_dist_homo}
 
     pool = multiprocessing.Pool(args.threads)
 
