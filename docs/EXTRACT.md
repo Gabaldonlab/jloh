@@ -8,15 +8,13 @@ If running in `--hybrid` mode, the homozygous SNPs are used to assign homozygous
 
 ### Extraction of heterozygous regions
 
-First, heterozygous SNPs are used to find heterozygous regions which are then masked as they cannot be LOH blocks. These are extracted based on clusters of heterozygous SNPs. The maximum SNP distance (`--snp-distance`) defines how far can the SNPs be while still being considered part of the same cluster, while the `--min-snps` parameter defines how many SNPs form a basic cluster.
-
-The produced list of heterozygous regions that will then be ignored in the downstream LOH block detection.
+First, heterozygous SNPs are used to find heterozygous regions which are then masked as they cannot be LOH blocks. These are extracted based on clusters of heterozygous SNPs, which in turn are identified based on the `--min-snps-kbp` parameter. This parameter accepts two comma-separated integer values (`<K>,<J>`) which represent heterozygous and homozygous SNPs/kbp. Only clusters of at least `<K>` heterozygous SNPs/kbp **or** of at least `<J>` homozygous SNPs/kbp are kept. The produced list of heterozygous regions that will then be ignored in the downstream LOH block detection.
 
 ### Extraction of candidate blocks
 
-Everything that did not include sufficient heterozygous SNPs is then screened as a potential LOH block. Blocks shorter than `--min-length` are filtered out at this point. The remaining ones are screened against the initial heterozygous regions, trimming any overlapping region. The default parameters (`--min-snps 2 --snp-distance 100 --min-length 1000`) are probably ok for most users.
+Everything that did not include sufficient heterozygous SNPs is then screened as a potential LOH block. Blocks shorter than `--min-length` are filtered out at this point. The remaining ones are screened against the initial heterozygous regions, trimming any overlapping region. 
 
-If running in `--hybrid` mode, clusters of **homozygous** SNPs are extracted the same way as for clusters of heterozygous SNPs. Blocks with sufficient SNPs in terms of `--min-snps` and `--snp-distance` will be considered as alternative allele blocks (i.e. `ALT`). Every region that is not a heterozygous SNP cluster or a homozygous SNP cluster is considered a reference allele homozygous block (`REF`).
+If running in `--hybrid` mode, clusters of **homozygous** SNPs are extracted the same way as for clusters of heterozygous SNPs. Blocks with a high amount of homozygous SNPs will be considered as alternative allele blocks (i.e. `ALT`). Every region that is not a heterozygous SNP cluster nor a homozygous SNP cluster is considered a reference allele homozygous block (`REF`).
 
 ### Coverage trimming
 
