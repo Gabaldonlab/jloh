@@ -1,0 +1,1 @@
+def get_chrom_sizes(fasta)

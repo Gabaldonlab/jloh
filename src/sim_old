@@ -1,0 +1,384 @@
+#!/usr/bin/env python3
+
+script_info = """
+###
+Author: Matteo Schiavinato
+Last change: 08/02/2023
+Based on the work of: Leszek Pryszcz (2014) and Veronica Mixao (2019)
+###
+"""
+
+import os, random, sys
+from time import asctime as at
+from Bio import SeqIO, Seq
+import argparse as ap
+from operator import itemgetter
+import numpy as np
+from pybedtools import BedTool
+import pybedtools
+import multiprocessing as mp
+
+# help section
+if len(sys.argv) == 1:
+    sys.argv.append("--help")
+
+if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
+    sys.stderr.write("""
+
+Simulate a divergent copy of a genome, introducing mutations and 
+loss-of-heterozygosity (LOH)
+
+Usage:
+jloh sim --fasta <FASTA> [options]
+
+[I/O/E]
+--threads               Number of parallel operations                           [4]
+--fasta                 Input FASTA file to generate mutations on               [!]
+--out                   Output filename                                         [mut.fa]
+--verbose               Print progress messages to standard error               [off]
+
+[parameters]
+--divergence            How much divergence in the mutated genome (0.0-1.0)     [0.01]
+--loh                   Apply this level of LOH (0.0-1.0)                       [0.0]
+--loh-mean-length       Mean length of an LOH block introduced                  [5000]
+--snp-distance          Max. SNP distance to create blocks of heterozygosity    [100]
+--chr-name-mod          Comma-separated old and new pattern to rename sequences [off]
+                        in the new FASTA file, e.g. "S_cere,S_dive"
+
+""")
+    sys.exit(0)
+
+
+p  = ap.ArgumentParser()
+p.add_argument("--threads", default=4, type=int)
+p.add_argument("--fasta")
+p.add_argument("--out", default="mut.fa")
+p.add_argument("--verbose", action="store_true")
+p.add_argument("--hybrid", action="store_true")
+p.add_argument("--divergence", default=0.01, type=float)
+p.add_argument("--loh", default=0.00, type=float)
+p.add_argument("--loh-mean-length", default=5000, type=int)
+p.add_argument("--snp-distance", default=100, type=int)
+p.add_argument("--chr-name-mod", type=str)
+args = p.parse_args()
+
+
+def dump_queue(queue):
+
+    out = []
+    while not queue.empty():
+        x = queue.get()
+        out.append(x)
+
+    return out
+
+
+def get_loh_level(het_positions, chrom, seq, snp_dist):
+
+    """
+    18/03/2022
+    Matteo Schiavinato
+    """
+
+    tmp = [[chrom, int(pos), int(pos)+1] for pos in het_positions if 0 <= pos < len(seq)]
+    tmp = sorted(tmp, key=itemgetter(0,1,2))
+
+    if len(tmp) > 0:
+        bt = BedTool(tmp)
+        bt = bt.merge(d=snp_dist, c=1, o="count")
+        bt = [[str(row[0]), max(int(row[1]), 0), min(int(row[2]), len(seq))] for row in bt]
+        het_ranges = sum([int(x[2])-int(x[1]) for x in bt])
+        het_ranges = min(len(seq), het_ranges)
+        mut_free_frac = (len(seq) - het_ranges) / len(seq)
+        return mut_free_frac, bt
+
+    else:
+        return float(100.0), []
+
+
+
+def process_chromosome(args, Lohs_q, Snps_q, Het_q, record, lohSizes):
+
+    """
+    18/03/2022
+    """
+
+    # define chromosome-related variables
+    chrom = record.id
+    seq = record.seq
+    seqlist = list(seq)
+    k = int(round(args.divergence * len(seqlist)))
+    het_positions = random.sample(range(len(seqlist)), k)
+
+    if args.loh > 1:
+        sys.stderr.write("ERROR: you should only use --loh between 0.0 and 1.0\n")
+        sys.exit()
+
+    # introduce LOH by removing chunks of variants
+    elif args.loh == 0:
+        nondiv_level, het_ranges = get_loh_level(het_positions, chrom, seq, args.snp_distance)
+
+        if args.verbose:
+            sys.stderr.write(f"[{at()}] Detected {round(nondiv_level*100, 2)}% non-heterozygous regions on sequence: {chrom}\n")
+            sys.stderr.write(f"[{at()}] These derive from the random SNP distribution of the simulation\n")
+
+        if len(het_ranges) > 0:
+            Het_q.put(het_ranges)
+
+    elif args.loh > 0 and args.loh <= 1:
+        # if 20% LOH --> this means that mut_free_frac must be ~ 20%
+        # note that at low divergences, this value can just be higher than 20%
+        # because the SNPs are too sparse
+        loh_level, het_ranges = get_loh_level(het_positions, chrom, seq, args.snp_distance)
+
+        if args.verbose:
+            sys.stderr.write(f"[{at()}] Detected {round(loh_level*100, 2)}% non-heterozygous regions on sequence: {chrom}\n")
+
+        # if we already have enough LOH due to scarce divergence selected
+        if loh_level >= args.loh:
+            if args.verbose:
+                sys.stderr.write(f"[{at()}] {chrom}: absence of heterozygosity ({round(loh_level*100, 1)}%) already > {round(args.loh*100, 1)}% LOH\n")
+            if len(het_ranges) > 0:
+                Het_q.put(het_ranges)
+
+        # if we need to increase the LOH levels
+        else:
+            while loh_level < args.loh:
+                if args.verbose:
+                    sys.stderr.write(f"[{at()}] {chrom}: increasing LOH from {round(loh_level*100, 2)}%...\n")
+
+                #get LOH random start
+                s = random.randint(0, len(seq)-1)
+                #and random LOH length from negative binomial distribution
+                lsize = 0
+                # LOH has to be at least 2x larger than average distance between SNPs
+                # which means 1 / divergence  --> distance = 1/div
+                while lsize <= 2.0 / args.divergence:
+                    lohSizes = list(lohSizes)
+                    lsize = int(round(random.sample(lohSizes, 1)[0]))
+                e = s + lsize
+                het_positions = list(filter(lambda p: p<s or p>e, het_positions))
+                if args.chr_name_mod:
+                    old = args.chr_name_mod.split(",")[0]
+                    new = args.chr_name_mod.split(",")[1]
+                    chrom = chrom.replace(old, new)
+
+                Lohs_q.put((chrom, s, e))
+
+                # recalculate
+                loh_level, het_ranges = get_loh_level(het_positions, chrom, seq, args.snp_distance)
+
+
+        # once LOH has been applied, save the remaining positions
+        Snps_q.put((chrom, list(het_positions)))
+
+    else:
+        Snps_q.put((chrom, list(het_positions)))
+
+
+
+def get_nondivergent_regions(args, Het_q, All_lohs):
+
+    """
+    20/04/2022
+    """
+
+    # create genome file
+    genome_file = f"{args.out}.genome_file.tsv"
+    OUT = open(genome_file, "w")
+    for record in SeqIO.parse(args.fasta, "fasta"):
+        OUT.write(f"{record.id}\t{len(record.seq)}\n")
+    OUT.close()
+
+    # get original LOH regions
+    All_het_ranges = dump_queue(Het_q)
+
+    tmp = []
+    for lst in All_het_ranges:
+        tmp = tmp + lst
+
+    All_het_ranges = [(str(x[0]), int(x[1]), int(x[2])) for x in tmp]
+    All_het_ranges = sorted(tmp, key=itemgetter(0,1,2))
+    if len(All_het_ranges) > 0:
+        bt = BedTool(All_het_ranges)
+        bt_comp = bt.sort(g=genome_file).complement(g=genome_file)
+        bt_comp = bt_comp.merge(d=args.snp_distance)
+
+        # if there are LOH events, chop new intervals to not include them
+        if len(All_lohs) > 0:
+            bt_loh = BedTool(All_lohs)
+            bt_comp = bt_comp.subtract(bt_loh)
+
+        out = [str(row).rstrip("\r\b\n").split("\t") for row in bt_comp]
+        if args.chr_name_mod:
+            old = args.chr_name_mod.split(",")[0]
+            new = args.chr_name_mod.split(",")[1]
+            out = [[str(x[0]).replace(old, new), int(x[1]), int(x[2])] for x in out]
+        else:
+            out = [[str(x[0]), int(x[1]), int(x[2])] for x in out]
+    else:
+        out = []
+
+    return out
+
+
+def obtain_divergent_positions(args):
+
+    """
+    29/03/2022
+    """
+
+    # multiprocessing stuff
+    pool = mp.Pool(args.threads)
+    Lohs_q = mp.Manager().Queue()
+    Snps_q = mp.Manager().Queue()
+    Het_q = mp.Manager().Queue()
+
+    #get LOH sizes distibution
+    lohSizes = np.random.lognormal(0, 1.2, 100000) * args.loh_mean_length
+
+    if args.verbose:
+        sys.stderr.write(f"[{at()}] Generating list of random SNPs to apply to sequence...\n")
+
+    for record in SeqIO.parse(args.fasta, "fasta"):
+        res = pool.apply_async(process_chromosome, args=(args, Lohs_q, Snps_q, Het_q, record, lohSizes))
+
+    pool.close()
+    pool.join()
+
+    if args.verbose:
+        sys.stderr.write(f"[{at()}] Reorganizing and sorting results...\n")
+
+    All_lohs = dump_queue(Lohs_q)
+    All_lohs = sorted(All_lohs, key=itemgetter(0,1,2))
+    Non_divergent = get_nondivergent_regions(args, Het_q, All_lohs)
+    All_snps = dump_queue(Snps_q)
+    All_snps = sorted(All_snps, key=itemgetter(0))
+
+    Snp_positions = { chrom:[] for chrom in list(set([x[0] for x in All_snps])) }
+    for snp_list in All_snps:
+        chrom = snp_list[0]
+        positions = snp_list[1]
+        Snp_positions[chrom] = [int(i) for i in positions]
+
+    return All_lohs, Snp_positions, Non_divergent
+
+
+def process_sequence_mutations(args, Seq_q, Mut_q, record, chrom, positions, alphabet):
+
+    """
+    18/03/2022
+    """
+
+    seq = record.seq
+    seqlist = list(seq)
+
+    for pos in positions:
+        ref = seqlist[pos]
+        alt = random.choice([i for i in alphabet if i != ref])
+        seqlist[pos] = alt
+        Mut_q.put((chrom, str(pos+1), ref, alt))
+
+    newseq = "".join(seqlist)
+    Seq_q.put((chrom, newseq))
+
+
+def mutate_reference(args, fasta, Snp_positions, alphabet):
+
+    """
+    18/03/2022
+    """
+
+    pool = mp.Pool(args.threads)
+    Seq_q = mp.Manager().Queue()
+    Mut_q = mp.Manager().Queue()
+
+    for record in SeqIO.parse(fasta, "fasta"):
+        chrom = record.id
+        if args.chr_name_mod:
+            old = args.chr_name_mod.split(",")[0]
+            new = args.chr_name_mod.split(",")[1]
+            chrom = chrom.replace(old, new)
+        try:
+            positions = Snp_positions[chrom]
+        except KeyError:
+            positions = []
+
+        pool.apply_async(process_sequence_mutations, args=(args, Seq_q, Mut_q, record, chrom, positions, alphabet))
+
+    pool.close()
+    pool.join()
+
+    Mut_fasta = dump_queue(Seq_q)
+    Mut_fasta = sorted(Mut_fasta, key=itemgetter(0))
+    Mutations = dump_queue(Mut_q)
+    Mutations = sorted(Mutations, key=itemgetter(0,1))
+
+    return Mut_fasta, Mutations
+
+
+def write_to_output(args, Mut_fasta, Lohs, Non_divergent, Mutations):
+
+    """
+    18/03/2022
+    """
+
+    # out fasta
+    OUT = open(args.out, "w")
+    for x in Mut_fasta:
+        chrom, seq = x[0], x[1]
+        OUT.write(">" + chrom + "\n")
+        OUT.write(seq + "\n")
+    OUT.close()
+
+    # out lohs
+    Lohs = sorted(Lohs, key=itemgetter(0,1,2))
+    OUT = open(f"{args.out}.lohs", "w")
+    for loh in Lohs:
+        OUT.write("\t".join([str(i) for i in loh]) + "\n")
+    OUT.close()
+
+    # out lohs
+    Non_divergent = sorted(Non_divergent, key=itemgetter(0,1,2))
+    OUT = open(f"{args.out}.non_divergent", "w")
+    for nd in Non_divergent:
+        OUT.write("\t".join([str(i) for i in nd]) + "\n")
+    OUT.close()
+
+    # out snps
+    Mutations = sorted(Mutations, key=itemgetter(0,1))
+    OUT = open(f"{args.out}.snps", "w")
+    for snp in Mutations:
+        OUT.write("\t".join([str(i) for i in snp]) + "\n")
+    OUT.close()
+
+
+def main(args):
+
+    """
+    16/03/2022
+    """
+
+    alphabet = "ACTG"
+
+    # get mutated copy of a reference
+    if args.verbose:
+        sys.stderr.write(f"[{at()}] Generating list of positions to mutate...\n")
+    Lohs, Snp_positions, Non_divergent = obtain_divergent_positions(args)
+
+    # if name change: change it
+    if args.chr_name_mod:
+        old = args.chr_name_mod.split(",")[0]
+        new = args.chr_name_mod.split(",")[1]
+        Snp_positions = { x.replace(old, new) : Snp_positions[x] for x in Snp_positions.keys() }
+
+    if args.verbose:
+        sys.stderr.write(f"[{at()}] Mutating reference...\n")
+    Mut_fasta, Mutations = mutate_reference(args, args.fasta, Snp_positions, alphabet)
+
+    if args.verbose:
+        sys.stderr.write(f"[{at()}] Writing to output...\n")
+    write_to_output(args, Mut_fasta, Lohs, Non_divergent, Mutations)
+
+if __name__=='__main__':
+    main(args)
