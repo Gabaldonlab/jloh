@@ -10,50 +10,55 @@ println """
 
   [input]
 
---help              Print this help section                                     [off]
---output_dir        Name of output directory                                    [JLOH_run]
---threads           Number of parallel threads                                  [4]
---input_data        Table containing input data paths and info (see github)     [!]
---reads_dir         Directory containing the reads (for double-checking)        [!]
+  --help              Print this help section                                     [off]
+  --output_dir        Name of output directory                                    [JLOH_run]
+  --threads           Number of parallel threads                                  [4]
+  --input_data        Table containing input data paths and info (see github)     [!]
+  --reads_dir         Directory containing the reads (for double-checking)        [!]
 
   [trimming]
 
---skip_trimming     Skip this step                                              [off]
---adapters          Path to the adapters file to pass to trimmomatic            [off]
---leading           Trimmomatic "LEADING" setting                               [20]
---trailing          Trimmomatic "TRAILING" setting                              [20]
---sliding_window    Trimmomatic "SLIDINGWINDOW" setting                         [4:25]
---avgqual           Trimmomatic "AVGQUAL" setting                               [20]
---minlen            Trimmomatic "MINLEN" setting                                [35]
+  --skip_trimming     Skip this step                                              [off]
+  --adapters          Path to the adapters file to pass to trimmomatic            [off]
+  --leading           Trimmomatic "LEADING" setting                               [20]
+  --trailing          Trimmomatic "TRAILING" setting                              [20]
+  --sliding_window    Trimmomatic "SLIDINGWINDOW" setting                         [4:25]
+  --avgqual           Trimmomatic "AVGQUAL" setting                               [20]
+  --minlen            Trimmomatic "MINLEN" setting                                [35]
 
   [mapping]
 
---scoring_fun       hisat2 scoring function                                     [L,0.0,-1.0]
---mm_penalties      hisat2 mismatch penalties                                   [6,2]
---gap_penalties     hisat2 gap penalties                                        [5,3]
---min_isize         hisat2 minimum insert size                                  [0]
---max_isize         hisat2 maximum insert size                                  [1000]
+  --scoring_fun       hisat2 scoring function                                     [L,0.0,-1.0]
+  --mm_penalties      hisat2 mismatch penalties                                   [6,2]
+  --gap_penalties     hisat2 gap penalties                                        [5,3]
+  --min_isize         hisat2 minimum insert size                                  [0]
+  --max_isize         hisat2 maximum insert size                                  [1000]
 
   [variant filtering]
 
---min_qual          Minimum variant quality (QUAL)                              [20]
---min_alt_frac      Minimum variant alternative allele fraction (AF)            [0.05]
---min_depth         Minimum variant coverage depth (DP)                         [10]
---mq0f              Maximum "mapping-quality-0" fraction of reads               [0.05]
+  --min_qual          Minimum variant quality (QUAL)                              [20]
+  --min_alt_frac      Minimum variant alternative allele fraction (AF)            [0.05]
+  --min_depth         Minimum variant coverage depth (DP)                         [10]
+  --mq0f              Maximum "mapping-quality-0" fraction of reads               [0.05]
 
   [genome divergence]
 
---min_mum_length    Minimum length to retain a genome alignment                 [1000]
---min_mum_id        Minimum sequence identity to retain a genome mapping        [95]
+  --min_mum_length    Minimum length to retain a genome alignment                 [1000]
+  --min_mum_id        Minimum sequence identity to retain a genome mapping        [95]
 
-  [JLOH]
+  [snp density estimation]
 
---min_snps_kbp      Min. SNPs/kbp to retain a het block (het/homo)              [3,1]
---min_loh_size      Min. size (bp) of the candidate LOH blocks                  [1000]
---min_af            Min. allele frequency to consider heterozygous              [0.2]
---max_af            Max. allele frequency to consider heterozygous              [0.8]
---min_frac_cov      Min. fraction of LOH block that has to be covered by reads  [0.5]
---hemizygous_cov    Frac. of the mean coverage under which LOH is hemizygous    [0.75]
+  --window_size       Genome windows to use for SNP/kbp calculation               [1000]
+  --step_size         Step increase in sliding window                             [500]
+  --quantile          SNP density quantile to separate true from false pos        [5]
+
+  [block extraction]
+
+  --min_loh_size      Min. size (bp) of the candidate LOH blocks                  [1000]
+  --min_af            Min. allele frequency to consider heterozygous              [0.2]
+  --max_af            Max. allele frequency to consider heterozygous              [0.8]
+  --min_frac_cov      Min. fraction of LOH block that has to be covered by reads  [0.5]
+  --hemizygous_cov    Frac. of the mean coverage under which LOH is hemizygous    [0.75]
 
 """
 exit 0
@@ -420,51 +425,212 @@ process filter_short_variants {
 }
 
 
+// extract appropriate snp density thresholds with jloh stats 
+
+process run_jloh_stats {
+
+  executor "local"
+  cpus 1
+  maxForks 48 
+
+  publishDir  "${params.output_dir}/variants/LOH/stats",
+  mode: "copy", 
+  pattern: "*.stats.txt"
+
+  input:
+  tuple \
+  val(sample_id), \
+  file(bam_A), file(bai_A), file(vcf_A), \
+  file(bam_B), file(bai_B), file(vcf_B), \
+  val(genome_A_name), file(genome_A), \
+  val(genome_B_name), file(genome_B) \
+  from Filt_vcfs
+
+  output:
+  tuple \
+  val(sample_id), \
+  file(bam_A), file(bai_A), file(vcf_A), \
+  file(bam_B), file(bai_B), file(vcf_B), \
+  val(genome_A_name), file(genome_A), \
+  val(genome_B_name), file(genome_B), \
+  file("${sample_id}.${genome_A_name}.stats.txt"), \
+  file("${sample_id}.${genome_B_name}.stats.txt") \
+  into Filt_vcfs_w_stats
+
+  file "${sample_id}.${genome_A_name}.stats.txt" into Stats_files_A
+  file "${sample_id}.${genome_B_name}.stats.txt" into Stats_files_B
+
+  script:
+  """
+  ${JLOH} stats \
+  --vcf ${vcf_A} \
+  --threads 1 \
+  --window-size ${params.window_size} \
+  --step-size ${params.step_size} \
+  &> ${sample_id}.${genome_A_name}.stats.txt &&
+  ${JLOH} stats \
+  --vcf ${vcf_B} \
+  --threads 1 \
+  --window-size ${params.window_size} \
+  --step-size ${params.step_size} \
+  &> ${sample_id}.${genome_B_name}.stats.txt
+  """
+}
+
+
+// extract SNP density suggested values for genome A
+
+process extract_snp_density_A {
+
+  executor "local"
+  cpus 1
+  maxForks 48 
+
+  input:
+  tuple \
+  val(sample_id), \
+  file(bam_A), file(bai_A), file(vcf_A), \
+  file(bam_B), file(bai_B), file(vcf_B), \
+  val(genome_A_name), file(genome_A), \
+  val(genome_B_name), file(genome_B), \
+  file(stats_A), file(stats_B) \
+  from Filt_vcfs_w_stats
+
+  output:
+  tuple \
+  val(sample_id), \
+  file(bam_A), file(bai_A), file(vcf_A), \
+  file(bam_B), file(bai_B), file(vcf_B), \
+  val(genome_A_name), file(genome_A), \
+  val(genome_B_name), file(genome_B), \
+  stdout, file(stats_B) \
+  into Filt_vcfs_w_stats_snpkbp_A
+
+  script:
+  """
+  cat ${stats_A} | grep " ${params.quantile}%" | \
+  sed -e 's/^ //' | \
+  ${AWK} '{printf "%.0f", \$3; printf ","; printf "%.0f", \$4}'
+  """
+}
+
+
+// extract SNP density suggested values for genome B
+
+process extract_snp_density_B {
+
+  executor "local"
+  cpus 1
+  maxForks 48 
+
+  input:
+  tuple \
+  val(sample_id), \
+  file(bam_A), file(bai_A), file(vcf_A), \
+  file(bam_B), file(bai_B), file(vcf_B), \
+  val(genome_A_name), file(genome_A), \
+  val(genome_B_name), file(genome_B), \
+  val(snpkbp_A), file(stats_B) \
+  from Filt_vcfs_w_stats_snpkbp_A
+
+  output:
+  tuple \
+  val(sample_id), \
+  file(bam_A), file(bai_A), file(vcf_A), \
+  file(bam_B), file(bai_B), file(vcf_B), \
+  val(genome_A_name), file(genome_A), \
+  val(genome_B_name), file(genome_B), \
+  val(snpkbp_A), stdout \
+  into Filt_vcfs_w_stats_snpkbp_AB
+
+  script:
+  """
+  cat ${stats_B} | grep " ${params.quantile}%" | \
+  sed -e 's/^ //' | \
+  ${AWK} '{printf "%.0f", \$3; printf ","; printf "%.0f", \$4}'
+  """
+}
+
+
+// make average of estimated snps/kbp
+
+process make_average_snpkbp_density {
+
+  input:
+  tuple \
+  val(sample_id), \
+  file(bam_A), file(bai_A), file(vcf_A), \
+  file(bam_B), file(bai_B), file(vcf_B), \
+  val(genome_A_name), file(genome_A), \
+  val(genome_B_name), file(genome_B), \
+  val(snpkbp_A), val(snpkbp_B) \
+  from Filt_vcfs_w_stats_snpkbp_AB
+
+  output:
+  tuple \
+  val(sample_id), \
+  file(bam_A), file(bai_A), file(vcf_A), \
+  file(bam_B), file(bai_B), file(vcf_B), \
+  val(genome_A_name), file(genome_A), \
+  val(genome_B_name), file(genome_B), \
+  stdout \
+  into Filt_vcfs_snpkbp
+
+  script:
+  """
+  echo -e "${snpkbp_A}\t${snpkbp_B}" | sed -e 's/,/\\t/' | ${AWK} '{printf "%.0f", (\$3+\$1)/2; printf ","; printf "%.0f", (\$4+\$2)/2}'
+  """
+}
+
+
 process call_LOH_blocks {
 
   executor = "local"
-  cpus = 16
-  maxForks = 3
+  cpus = 8
+  maxForks = 6
 
   publishDir "${params.output_dir}/LOH", mode: "copy", pattern: "*/*.{tsv,bed}"
 
   input:
-    tuple val(sample_id), \
-          file(par_A_fs_bam), file(par_A_fs_bam_index), file(par_A_vcf), \
-          file(par_B_fs_bam), file(par_B_fs_bam_index), file(par_B_vcf), \
-          val(genome_A_name), file(genome_A), val(genome_B_name), file(genome_B), \
-          file(bed_mask) \
-          from Filt_vcfs
+  tuple \
+  val(sample_id), \
+  file(bam_A), file(bai_A), file(vcf_A), \
+  file(bam_B), file(bai_B), file(vcf_B), \
+  val(genome_A_name), file(genome_A), \
+  val(genome_B_name), file(genome_B), \
+  val(snpkbp) \
+  from Filt_vcfs_snpkbp
 
   output:
-    tuple val(sample_id), val(genome_A_name), val(genome_B_name), file(bed_mask), \
-          file("${sample_id}/${sample_id}.LOH_blocks.A.tsv"), \
-          file("${sample_id}/${sample_id}.LOH_blocks.B.tsv"), \
-          file("${sample_id}/${sample_id}.LOH_blocks.A.bed"), \
-          file("${sample_id}/${sample_id}.LOH_blocks.B.bed"), \
-          file("${sample_id}/${sample_id}.exp_A.het_blocks.bed"), \
-          file("${sample_id}/${sample_id}.exp_B.het_blocks.bed"), \
-          file("${sample_id}/${sample_id}.exp_A.chrom_coverage.tsv"), \
-          file("${sample_id}/${sample_id}.exp_B.chrom_coverage.tsv") \
-          into Jloh_out
+  tuple \
+  val(sample_id), val(genome_A_name), val(genome_B_name), \
+  file("${sample_id}/${sample_id}.LOH_blocks.A.tsv"), \
+  file("${sample_id}/${sample_id}.LOH_blocks.B.tsv"), \
+  file("${sample_id}/${sample_id}.LOH_blocks.A.bed"), \
+  file("${sample_id}/${sample_id}.LOH_blocks.B.bed"), \
+  file("${sample_id}/${sample_id}.exp_A.het_blocks.A.bed"), \
+  file("${sample_id}/${sample_id}.exp_B.het_blocks.B.bed"), \
+  file("${sample_id}/${sample_id}.exp_A.chrom_coverage.tsv"), \
+  file("${sample_id}/${sample_id}.exp_B.chrom_coverage.tsv") \
+  into Jloh_out
 
   script:
-    """
-    ${JLOH} extract \
-    --threads ${params.threads} \
-    --vcfs ${par_A_vcf} ${par_B_vcf} \
-    --bams ${par_A_fs_bam} ${par_B_fs_bam} \
-    --refs ${genome_A} ${genome_B} \
-    --hybrid \
-    --sample ${sample_id} \
-    --output-dir ${sample_id} \
-    --filter-mode ${params.var_filter} \
-    --min-af ${params.min_af} \
-    --max-af ${params.max_af} \
-    --min-frac-cov ${params.min_frac_cov} \
-    --min-snps-knp ${params.min_snps_kbp} \
-    --min-length ${params.min_loh_size} \
-    --hemi ${params.hemizygous_cov} \
-    --merge-uncov ${params.min_uncovered}
-    """
+  """
+  ${JLOH} extract \
+  --threads ${params.threads} \
+  --vcfs ${vcf_A} ${vcf_B} \
+  --bams ${bam_A} ${bam_B} \
+  --refs ${genome_A} ${genome_B} \
+  --hybrid \
+  --sample ${sample_id} \
+  --output-dir ${sample_id} \
+  --filter-mode ${params.var_filter} \
+  --min-af ${params.min_af} \
+  --max-af ${params.max_af} \
+  --min-frac-cov ${params.min_frac_cov} \
+  --min-snps-kbp ${snpkbp} \
+  --min-length ${params.min_loh_size} \
+  --hemi ${params.hemizygous_cov} \
+  --merge-uncov ${params.min_uncovered}
+  """
 }

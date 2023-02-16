@@ -16,19 +16,19 @@
 # 8. if it crashes: submit it again (will restart from where it crashed)
 # 9. if it shows errors on the code side: open an issue on the github page and i will fix it!
 # 10. once completed:
-#    - remove ${OUTDIR}/nf/${SAMPLE_ID}.work directory (tmp files)
-#    - notify me for pipeline directory cleanup
+#    - remove ${OUTDIR}/nf/${RUN_ID}.work directory (tmp files)
+#    - if on MN4: notify me for pipeline directory cleanup
 
 ### EDIT FROM HERE ###
 
-SAMPLE_ID="<put here a sample ID (no whitespaces) to identify output files>"
+RUN_ID="<put here a run ID (no whitespaces) to identify output files>"
 OUTDIR="<put here an existing output directory where everything will be written>"
 INPUT_DATA="<path to the table with input data, see example in /workflows>"
 ADAPTERS="<path to the FASTA file with the adapter sequences to trim, see /workflows for a default>"
 CONFIG_FILE="<path to the config file, find template in /workflows>"
 THREADS="<number of parallel threads, max 48>"
-VAR_FILTER="<specify pass or all"
-MIN_SNPS_KBP="<result of jloh stats on your vcf>"
+VAR_FILTER="<specify pass or all>"
+JLOH_BASE="<home directory of the jloh installation, must contain 'workflows'>"
 
 ### STOP EDITING FROM HERE ###
 
@@ -44,16 +44,15 @@ if [ ! -d ${OUTDIR}/nf ]; then mkdir ${OUTDIR}/nf; fi
 nextflow \
 -C ${CONFIG_FILE} \
 run \
-/gpfs/projects/bsc40/project/pipelines/JLOH/workflows/reads_to_LOH_blocks.hybrid.nf \
+${JLOH_BASE}/workflows/reads_to_LOH_blocks.hybrid.nf \
 -resume \
--work-dir ${OUTDIR}/nf/${SAMPLE_ID}.work \
--with-dag ${OUTDIR}/nf/${SAMPLE_ID}.svg \
--with-report ${OUTDIR}/nf/${SAMPLE_ID}.report \
--with-timeline ${OUTDIR}/nf/${SAMPLE_ID}.timeline \
+-work-dir ${OUTDIR}/nf/${RUN_ID}.work \
+-with-dag ${OUTDIR}/nf/${RUN_ID}.svg \
+-with-report ${OUTDIR}/nf/${RUN_ID}.report \
+-with-timeline ${OUTDIR}/nf/${RUN_ID}.timeline \
 --input_data ${INPUT_DATA} \
 --adapters ${ADAPTERS} \
 --threads ${THREADS} \
---run_id ${SAMPLE_ID} \
+--run_id ${RUN_ID} \
 --output_dir ${OUTDIR} \
---var_filter ${VAR_FILTER} \
---min_snps_kbp ${MIN_SNPS_KBP}
+--var_filter ${VAR_FILTER} 

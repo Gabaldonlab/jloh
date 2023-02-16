@@ -10,50 +10,55 @@ println """
 
   [input]
 
---help              Print this help section                                     [off]
---output_dir        Name of output directory                                    [JLOH_run]
---threads           Number of parallel threads                                  [4]
---input_data        Table containing input data paths and info (see github)     [!]
---reads_dir         Directory containing the reads (for double-checking)        [!]
+  --help              Print this help section                                     [off]
+  --output_dir        Name of output directory                                    [JLOH_run]
+  --threads           Number of parallel threads                                  [4]
+  --input_data        Table containing input data paths and info (see github)     [!]
+  --reads_dir         Directory containing the reads (for double-checking)        [!]
 
   [trimming]
 
---skip_trimming     Skip this step                                              [off]
---adapters          Path to the adapters file to pass to trimmomatic            [off]
---leading           Trimmomatic "LEADING" setting                               [20]
---trailing          Trimmomatic "TRAILING" setting                              [20]
---sliding_window    Trimmomatic "SLIDINGWINDOW" setting                         [4:25]
---avgqual           Trimmomatic "AVGQUAL" setting                               [20]
---minlen            Trimmomatic "MINLEN" setting                                [35]
+  --skip_trimming     Skip this step                                              [off]
+  --adapters          Path to the adapters file to pass to trimmomatic            [off]
+  --leading           Trimmomatic "LEADING" setting                               [20]
+  --trailing          Trimmomatic "TRAILING" setting                              [20]
+  --sliding_window    Trimmomatic "SLIDINGWINDOW" setting                         [4:25]
+  --avgqual           Trimmomatic "AVGQUAL" setting                               [20]
+  --minlen            Trimmomatic "MINLEN" setting                                [35]
 
   [mapping]
 
---scoring_fun       hisat2 scoring function                                     [L,0.0,-1.0]
---mm_penalties      hisat2 mismatch penalties                                   [6,2]
---gap_penalties     hisat2 gap penalties                                        [5,3]
---min_isize         hisat2 minimum insert size                                  [0]
---max_isize         hisat2 maximum insert size                                  [1000]
+  --scoring_fun       hisat2 scoring function                                     [L,0.0,-1.0]
+  --mm_penalties      hisat2 mismatch penalties                                   [6,2]
+  --gap_penalties     hisat2 gap penalties                                        [5,3]
+  --min_isize         hisat2 minimum insert size                                  [0]
+  --max_isize         hisat2 maximum insert size                                  [1000]
 
   [variant filtering]
 
---min_qual          Minimum variant quality (QUAL)                              [20]
---min_alt_frac      Minimum variant alternative allele fraction (AF)            [0.05]
---min_depth         Minimum variant coverage depth (DP)                         [10]
---mq0f              Maximum "mapping-quality-0" fraction of reads               [0.05]
+  --min_qual          Minimum variant quality (QUAL)                              [20]
+  --min_alt_frac      Minimum variant alternative allele fraction (AF)            [0.05]
+  --min_depth         Minimum variant coverage depth (DP)                         [10]
+  --mq0f              Maximum "mapping-quality-0" fraction of reads               [0.05]
 
   [genome divergence]
 
---min_mum_length    Minimum length to retain a genome alignment                 [1000]
---min_mum_id        Minimum sequence identity to retain a genome mapping        [95]
+  --min_mum_length    Minimum length to retain a genome alignment                 [1000]
+  --min_mum_id        Minimum sequence identity to retain a genome mapping        [95]
 
-  [JLOH]
+  [snp density estimation]
 
---min_snps_kbp      Min. SNPs/kbp to retain a het block (het/homo)              [3,1]
---min_loh_size      Min. size (bp) of the candidate LOH blocks                  [1000]
---min_af            Min. allele frequency to consider heterozygous              [0.2]
---max_af            Max. allele frequency to consider heterozygous              [0.8]
---min_frac_cov      Min. fraction of LOH block that has to be covered by reads  [0.5]
---hemizygous_cov    Frac. of the mean coverage under which LOH is hemizygous    [0.75]
+  --window_size       Genome windows to use for SNP/kbp calculation               [1000]
+  --step_size         Step increase in sliding window                             [500]
+  --quantile          SNP density quantile to separate true from false pos        [5]
+
+  [block extraction]
+
+  --min_loh_size      Min. size (bp) of the candidate LOH blocks                  [1000]
+  --min_af            Min. allele frequency to consider heterozygous              [0.2]
+  --max_af            Max. allele frequency to consider heterozygous              [0.8]
+  --min_frac_cov      Min. fraction of LOH block that has to be covered by reads  [0.5]
+  --hemizygous_cov    Frac. of the mean coverage under which LOH is hemizygous    [0.75]
 
 """
 exit 0
@@ -356,44 +361,112 @@ process filter_short_variants {
 }
 
 
-process call_LOH_blocks {
+process run_jloh_stats {
 
-  executor = "local"
-  cpus = 16
-  maxForks = 3
+  executor "local"
+  cpus 1
+  maxForks 48 
 
-  publishDir "${params.output_dir}/LOH", mode: "copy", pattern: "*/*.{tsv,bed}"
+  publishDir  "${params.output_dir}/variants/LOH/stats",
+  mode: "copy", 
+  pattern: "*.stats.txt"
 
   input:
-    tuple \
-    val(sample_id), file(bam), file(bai), file(vcf), file(ref) \
-    from Filt_vcfs
+  tuple \
+  val(sample_id), file(bam), file(bai), \
+  file(vcf), file(ref) \
+  from Filt_vcfs
 
   output:
-    tuple \
-    val(sample_id), \
-    file("${sample_id}/${sample_id}.LOH_blocks.tsv"), \
-    file("${sample_id}/${sample_id}.LOH_blocks.bed"), \
-    file("${sample_id}/${sample_id}.exp.het_blocks.bed"), \
-    file("${sample_id}/${sample_id}.exp.chrom_coverage.tsv") \
-    into Jloh_out
+  tuple \
+  val(sample_id), file(bam), file(bai), \
+  file(vcf), file("${sample_id}.stats.txt"), file(ref) \
+  into Filt_vcfs_w_stats
+
+  file "${sample_id}.stats.txt" into Stats_files
 
   script:
-    """
-    ${JLOH} extract \
-    --threads ${params.threads} \
-    --vcf ${vcf} \
-    --bam ${bam} \
-    --ref ${ref} \
-    --sample ${sample_id} \
-    --output-dir ${sample_id} \
-    --filter-mode ${params.var_filter} \
-    --min-af ${params.min_af} \
-    --max-af ${params.max_af} \
-    --min-frac-cov ${params.min_frac_cov} \
-    --min-snps-kbp ${params.min_snps_kbp} \
-    --min-length ${params.min_loh_size} \
-    --hemi ${params.hemizygous_cov} \
-    --merge-uncov ${params.min_uncovered}
-    """
+  """
+  ${JLOH} stats \
+  --vcf ${vcf} \
+  --threads 1 \
+  --window-size ${params.window_size} \
+  --step-size ${params.step_size} \
+  &> ${sample_id}.stats.txt
+  """
+}
+
+
+// extract SNP density suggested values 
+
+process extract_snp_density {
+
+  executor "local"
+  cpus 1
+  maxForks 48 
+
+  input:
+  tuple \
+  val(sample_id), file(bam), file(bai), \
+  file(vcf), file(stats), file(ref) \
+  from Filt_vcfs_w_stats
+
+  output:
+  tuple \
+  val(sample_id), file(bam), file(bai), \
+  file(vcf), stdout, file(ref) \
+  into Filt_vcfs_w_stats_snpkbp
+
+  script:
+  """
+  cat ${stats} | grep " ${params.quantile}%" | \
+  sed -e 's/^ //' | \
+  ${AWK} '{printf "%.0f", \$3; printf ","; printf "%.0f", \$4}'
+  """
+}
+
+
+// run jloh extract to call LOH blocks 
+
+process call_LOH_blocks {
+
+  executor "local"
+  cpus 16
+  maxForks 3
+
+  publishDqir "${params.output_dir}/LOH", mode: "copy", pattern: "*/*.{tsv,bed}"
+
+  input:
+  tuple \
+  val(sample_id), file(bam), file(bai), \
+  file(vcf), val(snpkbp), file(ref) \
+  from Filt_vcfs_w_stats_snpkbp
+
+  output:
+  tuple \
+  val(sample_id), \
+  file("${sample_id}/${sample_id}.LOH_blocks.tsv"), \
+  file("${sample_id}/${sample_id}.LOH_blocks.bed"), \
+  file("${sample_id}/${sample_id}.exp.het_blocks.bed"), \
+  file("${sample_id}/${sample_id}.exp.chrom_coverage.tsv") \
+  into Jloh_out
+
+  script:
+  """
+  ${JLOH} extract \
+  --threads ${params.threads} \
+  --vcf ${vcf} \
+  --bam ${bam} \
+  --ref ${ref} \
+  --sample ${sample_id} \
+  --output-dir ${sample_id} \
+  --filter-mode ${params.var_filter} \
+  --min-af ${params.min_af} \
+  --max-af ${params.max_af} \
+  --min-frac-cov ${params.min_frac_cov} \
+  --min-snps-kbp ${snpkbp} \
+  --min-length ${params.min_loh_size} \
+  --hemi ${params.hemizygous_cov} \
+  --merge-uncov ${params.min_uncovered}
+  """
 }
