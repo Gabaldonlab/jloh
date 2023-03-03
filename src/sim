@@ -151,7 +151,7 @@ def get_chrom_random_intervals(mean_haplotype_size, min_haplotype_len, stdev_fac
 def get_chrom_interval_divergences(Chrom_intervals, divergence, stdev_factor):
 
     """
-    08/02/2023
+    03/03/2023
     """
 
     # beta distribution 
@@ -164,29 +164,44 @@ def get_chrom_interval_divergences(Chrom_intervals, divergence, stdev_factor):
     # alpha = ((1-mu)/var - 1/mu) * mu ** 2
     # beta = alpha * ((1 / mu) - 1)
 
-    # establish beta distribution parameters
-    mu = divergence 
-    stdev = mu * stdev_factor
-    var = stdev ** 2
-    alpha = ((1-mu)/var - 1/mu) * mu ** 2
-    beta = alpha * ((1 / mu) - 1)
-
     # assign a divergence to each interval 
     Chrom_intervals_w_div = []
 
-    for chrom in Chrom_intervals.keys():
-        num_intervals = len(Chrom_intervals[chrom])
-        Divs = list(np.random.beta(a=alpha, b=beta, size=num_intervals))
-        for i in range(0,num_intervals):
-            Chrom_intervals_w_div.append(
-                (
-                chrom, 
-                Chrom_intervals[chrom][i][0], 
-                Chrom_intervals[chrom][i][1], 
-                round(Divs[i], 3)
-                )
-                )
+    if divergence > 0:
+
+        # establish beta distribution parameters
+        mu = divergence 
+        stdev = mu * stdev_factor
+        var = stdev ** 2
+        alpha = ((1-mu)/var - 1/mu) * mu ** 2
+        beta = alpha * ((1 / mu) - 1)
+
+        for chrom in Chrom_intervals.keys():
+            num_intervals = len(Chrom_intervals[chrom])
+            Divs = list(np.random.beta(a=alpha, b=beta, size=num_intervals))
+            for i in range(0,num_intervals):
+                Chrom_intervals_w_div.append(
+                    (
+                    chrom, 
+                    Chrom_intervals[chrom][i][0], 
+                    Chrom_intervals[chrom][i][1], 
+                    round(Divs[i], 3)
+                    )
+                    )
     
+    else:
+        for chrom in Chrom_intervals.keys():
+            num_intervals = len(Chrom_intervals[chrom])
+            for i in range(0,num_intervals):
+                Chrom_intervals_w_div.append(
+                    (
+                    chrom, 
+                    Chrom_intervals[chrom][i][0], 
+                    Chrom_intervals[chrom][i][1], 
+                    0
+                    )
+                    )
+
     return Chrom_intervals_w_div
 
 
@@ -219,37 +234,42 @@ def nullify_fraction_of_intervals(Chrom_intervals_w_div, loh):
 def correct_divergences_after_loh(Int_w_loh, divergence):
 
     """
-    08/02/2023
+    03/03/2023
     """
 
-    # convert to list to edit 
-    Int_w_loh_corr = [list(x) for x in Int_w_loh]
+    if divergence > 0:
 
-    # calculate mean divergence 
-    mean_div = mean([x[3] for x in Int_w_loh_corr])
+        # convert to list to edit 
+        Int_w_loh_corr = [list(x) for x in Int_w_loh]
 
-    # while the new divergence with introduced LOH is not within 0.1% error from 
-    # the one that the user wants, adjust random intervals divergence by 5% increments
-    while ((mean_div < 0.999 * divergence) or (mean_div > 1.001 * divergence)):
-        
-        # pick random index 
-        idx = np.random.choice(len(Int_w_loh_corr))
-        
-        if (mean_div < 0.999 * divergence):
-            # increase divergence by 5% in that slot 
-            Int_w_loh_corr[idx][3] = round(min(1, Int_w_loh_corr[idx][3] + Int_w_loh_corr[idx][3] * 0.05), 3)
-
-        elif (mean_div > 1.001 * divergence):
-            # decrease divergence by 5% in that slot 
-            Int_w_loh_corr[idx][3] = round(max(0, Int_w_loh_corr[idx][3] - Int_w_loh_corr[idx][3] * 0.05), 3)
-
-        # re-calculate mean divergence 
+        # calculate mean divergence 
         mean_div = mean([x[3] for x in Int_w_loh_corr])
 
-    # re-convert to tuple 
-    Int_w_loh_corr = [tuple(x) for x in Int_w_loh_corr]
+        # while the new divergence with introduced LOH is not within 0.1% error from 
+        # the one that the user wants, adjust random intervals divergence by 5% increments
+        while ((mean_div < 0.999 * divergence) or (mean_div > 1.001 * divergence)):
+            
+            # pick random index 
+            idx = np.random.choice(len(Int_w_loh_corr))
+            
+            if (mean_div < 0.999 * divergence):
+                # increase divergence by 5% in that slot 
+                Int_w_loh_corr[idx][3] = round(min(1, Int_w_loh_corr[idx][3] + Int_w_loh_corr[idx][3] * 0.05), 3)
 
-    return Int_w_loh_corr
+            elif (mean_div > 1.001 * divergence):
+                # decrease divergence by 5% in that slot 
+                Int_w_loh_corr[idx][3] = round(max(0, Int_w_loh_corr[idx][3] - Int_w_loh_corr[idx][3] * 0.05), 3)
+
+            # re-calculate mean divergence 
+            mean_div = mean([x[3] for x in Int_w_loh_corr])
+
+        # re-convert to tuple 
+        Int_w_loh_corr = [tuple(x) for x in Int_w_loh_corr]
+
+        return Int_w_loh_corr
+
+    else:
+        return Int_w_loh 
 
 
 def get_chrom_subseqs(Int_w_loh_corr, Chrom_seqs):
@@ -364,7 +384,7 @@ def main(args):
     # introduce loh based on the --loh argument
     # turn to 0 the corresponding % of the sampled distribution
     Int_w_loh = nullify_fraction_of_intervals(Chrom_intervals_w_div, args.loh)
-
+    
     # recalculate the distribution mean 
     # randomly increase divergence in non-zero haplotypes to match --divergence 
     Int_w_loh_corr = correct_divergences_after_loh(Int_w_loh, args.divergence)
