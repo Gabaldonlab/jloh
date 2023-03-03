@@ -3,7 +3,7 @@
 script_info = """
 ###
 Author: Matteo Schiavinato
-Last change: 23/01/2023
+Last change: 03/03/2023
 ###
 """
 
@@ -276,10 +276,6 @@ def main(args):
  85%\t{round(All_quant["Snps"].loc[0.85], 1)}\t{round(Het_quant["Snps"].loc[0.85], 1)}\t{round(Homo_quant["Snps"].loc[0.85], 1)}
  90%\t{round(All_quant["Snps"].loc[0.90], 1)}\t{round(Het_quant["Snps"].loc[0.90], 1)}\t{round(Homo_quant["Snps"].loc[0.90], 1)}
  95%\t{round(All_quant["Snps"].loc[0.95], 1)}\t{round(Het_quant["Snps"].loc[0.95], 1)}\t{round(Homo_quant["Snps"].loc[0.95], 1)}
-
- -- Suggested JLOH extract parameters (het/homo) --
-
- --min-snps-kbp\t{int(round(Het_quant["Snps"].loc[0.5], 0))},{int(round(Homo_quant["Snps"].loc[0.5], 0))}
 
 """)
 
