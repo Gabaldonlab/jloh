@@ -44,7 +44,7 @@ if [ ! -d ${OUTDIR}/nf ]; then mkdir ${OUTDIR}/nf; fi
 nextflow \
 -C ${CONFIG_FILE} \
 run \
-${JLOH_BASE}/workflows/reads_to_LOH_blocks.hybrid.nf \
+${JLOH_BASE}/workflows/reads_to_LOH_blocks.assign_blocks.nf \
 -resume \
 -work-dir ${OUTDIR}/nf/${RUN_ID}.work \
 -with-dag ${OUTDIR}/nf/${RUN_ID}.svg \

@@ -621,7 +621,7 @@ process call_LOH_blocks {
   --vcfs ${vcf_A} ${vcf_B} \
   --bams ${bam_A} ${bam_B} \
   --refs ${genome_A} ${genome_B} \
-  --hybrid \
+  --assign-blocks \
   --sample ${sample_id} \
   --output-dir ${sample_id} \
   --filter-mode ${params.var_filter} \
