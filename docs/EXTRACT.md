@@ -4,7 +4,7 @@ The variants passed with `--vcf` are scanned, subdividing heterozygous and homoz
 
 Missing allele frequency? Try using [all2vcf](https://github.com/MatteoSchiavinato/all2vcf).
 
-If running in `--hybrid` mode, the homozygous SNPs are used to assign homozygous regions to either the alternative (ALT) or the reference (REF) allele. The selection of heterozygous SNPs is conducted based on their `FORMAT` (e.g. `GT 0/1` or `1/2` for heterozygous SNPs).
+If running in `--assign-blocks` mode, the homozygous SNPs are used to assign homozygous regions to either the alternative (ALT) or the reference (REF) allele. The selection of heterozygous SNPs is conducted based on their `FORMAT` (e.g. `GT 0/1` or `1/2` for heterozygous SNPs).
 
 ### Extraction of heterozygous regions
 
@@ -14,7 +14,7 @@ First, heterozygous SNPs are used to find heterozygous regions which are then ma
 
 Everything that did not include sufficient heterozygous SNPs is then screened as a potential LOH block. Blocks shorter than `--min-length` are filtered out at this point. The remaining ones are screened against the initial heterozygous regions, trimming any overlapping region. 
 
-If running in `--hybrid` mode, clusters of **homozygous** SNPs are extracted the same way as for clusters of heterozygous SNPs. Blocks with a high amount of homozygous SNPs will be considered as alternative allele blocks (i.e. `ALT`). Every region that is not a heterozygous SNP cluster nor a homozygous SNP cluster is considered a reference allele homozygous block (`REF`).
+If running in `--assign-blocks` mode, clusters of **homozygous** SNPs are extracted the same way as for clusters of heterozygous SNPs. Blocks with a high amount of homozygous SNPs will be considered as alternative allele blocks (i.e. `ALT`). Every region that is not a heterozygous SNP cluster nor a homozygous SNP cluster is considered a reference allele homozygous block (`REF`).
 
 ### Coverage trimming
 

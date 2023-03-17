@@ -1,10 +1,10 @@
-# Hybrid mode - step by step guide for data preparation
+# Assign blocks mode - step by step guide for data preparation
 
 *The following steps (apart from the installation) are automatically performed by the nextflow workflow described in the previous section. Maybe have a look at that before doing everything by hand!* ;)
 
 The first step is making sure that everything has been installed properly. Hence, follow the instructions in the [Install](#install) section prior to trying this guide.
 
-The hybrid mode is used to extract LOH blocks in hybrid genomes. Hybrid genomes have two subgenomes that carry substantial differences between each other, while still being somewhat close in terms of sequence identity. Single-nucleotide positional differences between two subgenomes can be identified as **heterozygous SNPs** if reads are mapped against one subgenome at a time, allowing reads from both subgenomes to map onto it. Regions where little heterozygous SNPs are found are good LOH block candidates.
+The `--assign-blocks` option is used to extract LOH blocks and assign them to respective subgenomes when analysing a hybrid species. Hybrid genomes have two subgenomes that carry substantial differences between each other, while still being somewhat close in terms of sequence identity. Single-nucleotide positional differences between two subgenomes can be identified as **heterozygous SNPs** if reads are mapped against one subgenome at a time, allowing reads from both subgenomes to map onto it. Regions where little heterozygous SNPs are found are good LOH block candidates.
 
 We start by mapping a set of quality-trimmed paired-end reads sequenced from a hybrid species against both of its parental genome sequences. We do it with **HISAT2** but you can use the tool you prefer. For the whole paragraph we will use four threads, represented here as `-p 4`.
 
@@ -102,10 +102,11 @@ Finally, we call LOH blocks using **JLOH extract**, limiting the output to regio
 ```
 jloh extract \
 --threads 4 \
+--assign-blocks \
 --vcfs A.ff.vcf B.ff.vcf \
---min-snps-kbp <Het>,<Homo> \
 --bams A.bam B.bam \
 --refs parent_A.fasta parent_B.fasta \
+--min-snps-kbp <Het>,<Homo> \
 --regions A_and_B.regions.bed \
 --sample <STRING> \
 --output-dir <PATH>

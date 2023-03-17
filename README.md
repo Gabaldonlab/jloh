@@ -15,7 +15,7 @@ JLOH only needs three file types as input:
 
 ### I have a hybrid, does it work with it?
 
-Yes, it does. The extraction module `jloh extract` has a `--hybrid` option. In that case, provide two reference genomes, two BAM/SAM files containing mapping results, and two VCF files containing SNPs. Each pair corresponds to the two parentals. See details [here](#jloh-extract).
+Yes, it does. The extraction module `jloh extract` can work with reads from a hybrid species mapped onto the hybrid's reference genome. It will produce LOH blocks although you won't know to which subgenome they belong to. If you have the parental genomes of the hybrid, however, `jloh extract` has an `--assign-blocks` option which allows to use them to assign LOH blocks to subgenomes. In that case, follow the instructions in [this guide](docs/ASSIGN_BLOCKS.md) to provide two reference genomes, two BAM/SAM files containing mapping results, and two VCF files containing SNPs. Each pair corresponds to the two parentals. See details [here](#jloh-extract).
 
 ![JLOH workflow](images/j_loh.png)
 
@@ -81,7 +81,7 @@ This is the most important module of JLOH. Its functions are well described in t
 
 **Output**
 
-`jloh extract` functions in two modes (default and hybrid). In default mode, it produces these output files:
+`jloh extract` functions in two modes (`--default` and `--assign-blocks`). In default mode, it produces these output files:
 
 | Output file                 | Description |
 |-----------------------------|-|
@@ -99,7 +99,7 @@ The output can be assessed in a genome viewer together with the input BAM files,
 
 ![Example](images/example.png)
 
-In `--hybrid` mode, it produces the same output files but repeated twice: once per each parent. More information on the `--hybrid` mode, and how to use it properly, [can be found here](docs/HYBRID.md).
+In `--assign-blocks` mode, it produces the same output files but repeated twice: once per each parent. More information on the `--assign-blocks` mode, and how to use it properly, [can be found here](docs/ASSIGN_BLOCKS.md).
 
 ### JLOH filter
 
@@ -113,7 +113,7 @@ This tool perform ensemble operations with two JLOH output files, namely interse
 
 This tool is a specific module to extract genes that overlap LOH blocks from two different origins (i.e. chimeric genes). It does not assume anything about the lists of LOH blocks that are passed. If a gene has two LOH blocks in its sequence (one from each list) it will be considered a candidate chimeric gene.
 
-The usage involves two sets of LOH blocks produced by `jloh extract`, plus the `*het_blocks.bed` file also produced by `jloh extract`. In case the "extract" module was run in `--hybrid` mode, the heterozygous blocks files are two (A and B). In that case, they must be concatenated into a single file using `cat` and provided as a single file to `jloh chimeric`.
+The usage involves two sets of LOH blocks produced by `jloh extract`, plus the `*het_blocks.bed` file also produced by `jloh extract`. In case the "extract" module was run in `--assign-blocks` mode, the heterozygous blocks files are two (A and B). In that case, they must be concatenated into a single file using `cat` and provided as a single file to `jloh chimeric`.
 
 **Output**
 
@@ -126,7 +126,7 @@ The usage involves two sets of LOH blocks produced by `jloh extract`, plus the `
 
 ### JLOH g2g
 
-This program finds diverging regions between two genomes in FASTA format. The input are the two sequences and an estimated divergence value, and the output is a bed file representing the regions that contain SNPs between the two genomes. This module is useful only when using the `--hybrid` mode in `jloh extract`, as the output BED file of `g2g` can be directly passed to the `--regions` parameter.
+This program finds diverging regions between two genomes in FASTA format. The input are the two sequences and an estimated divergence value, and the output is a bed file representing the regions that contain SNPs between the two genomes. This module is useful only when using the `--assign-blocks` mode in `jloh extract`, as the output BED file of `g2g` can be directly passed to the `--regions` parameter.
 
 `JLOH g2g` runs more than one tool from the MUMmer arsenal to map the two genomes, filter the results, extract the SNPs. Then, it uses `all2vcf mummer` to convert the MUMmer output to VCF format, and `bedtools merge` to generate BED intervals from SNPs. Intervals are expanded as long as there are overlaps.
 
