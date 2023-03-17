@@ -50,8 +50,10 @@ if len(sys.argv) == 1:
 if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
     sys.stderr.write("""
 
-Extract LOH blocks from a VCF file, a BAM file, and a reference FASTA genome sequence
-or from a set of those from a hybrid genome
+Extract LOH blocks:
+(i) from a VCF file, a BAM file, and a reference FASTA genome sequence
+(ii) from a set of those obtained by mapping hybrid reads on both parental genomes and 
+calling SNPs
 
 Usage:
 jloh extract --vcf <VCF> --ref <FASTA> --bam <BAM> [options]
@@ -61,11 +63,11 @@ jloh extract --vcf <VCF> --ref <FASTA> --bam <BAM> [options]
 --bam               BAM file used to call the --vcf variants                    [!]
 --ref               Reference FASTA genome                                      [!]
 
-[hybrid mode]
---hybrid            Activate hybrid mode                                        [off]
---vcfs              Input VCF files (A and B, space-separated)                  [!]
---bams              BAM files used to call the --vcfs (A and B, space-sep.)     [!]
---refs              Reference FASTA genomes (A and B, space-sep.)               [!]
+[block assignment mode]
+--assign-blocks     Activate block assignment mode                              [off]
+--vcfs              VCF files (space-separated) called on parentals             [!]
+--bams              BAM files used to call the --vcfs (space-separated)         [!]
+--refs              Parental FASTA genomes (space-separated)                    [!]
 
 [I/O/E]
 --sample            Sample name / Strain name for output files                  [jloh]
@@ -97,8 +99,8 @@ p = ap.ArgumentParser()
 p.add_argument("--vcf")
 p.add_argument("--bam")
 p.add_argument("--ref")
-# hybrid options
-p.add_argument("--hybrid", action="store_true")
+# block assignment options
+p.add_argument("--assign-blocks", action="store_true")
 p.add_argument("--vcfs", nargs="*")
 p.add_argument("--bams", nargs="*")
 p.add_argument("--refs", nargs="*")
@@ -131,13 +133,13 @@ def check_conditions(args):
     Last update: 07/03/2022
     """
 
-    if ((not args.vcf and not args.ref) and not args.hybrid):
+    if ((not args.vcf and not args.ref) and not args.assign_blocks):
         sys.stderr.write("ERROR: when using the default mode you must provide a VCF and a REF\n")
         sys.stderr.write("See --vcf, --ref options\n")
         sys.exit()
 
-    if (args.hybrid and (not args.vcfs and not args.refs)):
-        sys.stderr.write("ERROR: when using the --hybrid mode you must provide a VCF and a REF for both A and B subgenomes\n")
+    if (args.assign_blocks and (not args.vcfs and not args.refs)):
+        sys.stderr.write("ERROR: when using the --assign-blocks mode you must provide a VCF and a REF for both A and B subgenomes\n")
         sys.stderr.write("See --vcfs and --refs options\n")
         sys.exit()
 
@@ -1083,7 +1085,7 @@ def write_vcfs_to_output(args, Handles, mode, Hetero_lines_lst, Homo_lines_lst, 
         return { "hetero":[out_hetero_vcf],
                  "homo":[out_homo_vcf] }
 
-    elif mode == "hybrid":
+    elif mode == "assign_blocks":
 
         handle_A, handle_B = Handles[0], Handles[1]
         Header_A, Header_B = Headers[0], Headers[1]
@@ -1247,10 +1249,10 @@ def run_in_default_mode(args, tmp_bams):
     return True
 
 
-def run_in_hybrid_mode(args, tmp_bams):
+def run_in_block_assignment_mode(args, tmp_bams):
 
     """
-    Last update: 16/01/2023
+    Last update: 17/03/2023
     """
 
     handle_A = "exp_A"
@@ -1260,7 +1262,7 @@ def run_in_hybrid_mode(args, tmp_bams):
     sys.stderr.write(f"[{at()}] Extracting heterozygous and homozygous SNPs...\n")
     Hetero_lines_A, Homo_lines_A, Header_A = hetero_and_homo_snps(args.vcfs[0])
     Hetero_lines_B, Homo_lines_B, Header_B = hetero_and_homo_snps(args.vcfs[1])
-    Vcfs = write_vcfs_to_output(args, [handle_A, handle_B], "hybrid", [Hetero_lines_A, Hetero_lines_B], [Homo_lines_A, Homo_lines_B], [Header_A, Header_B])
+    Vcfs = write_vcfs_to_output(args, [handle_A, handle_B], "assign_blocks", [Hetero_lines_A, Hetero_lines_B], [Homo_lines_A, Homo_lines_B], [Header_A, Header_B])
     sys.stderr.write(f"[{at()}] Parent A: Found {len(Hetero_lines_A)} heterozygous SNPs and {len(Homo_lines_A)} homozygous SNPs\n")
     sys.stderr.write(f"[{at()}] Parent B: Found {len(Hetero_lines_B)} heterozygous SNPs and {len(Homo_lines_B)} homozygous SNPs\n")
 
@@ -1428,9 +1430,9 @@ def main(args, tmp_bams):
     tmp = organize_workspace(args)
 
     # run in the selected mode
-    if args.hybrid:
-        sys.stderr.write(f"[{at()}] Running in hybrid mode...\n")
-        tmp = run_in_hybrid_mode(args, tmp_bams)
+    if args.assign_blocks:
+        sys.stderr.write(f"[{at()}] Running in block assignment mode...\n")
+        tmp = run_in_block_assignment_mode(args, tmp_bams)
 
     else:
         sys.stderr.write(f"[{at()}] Running in default mode...\n")
