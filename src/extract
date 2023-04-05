@@ -43,6 +43,8 @@ import pandas as pd
 import numpy as np
 from sys import getsizeof
 
+ss = sys.exit
+
 # help section
 if len(sys.argv) == 1:
     sys.argv.append("--help")
@@ -1169,7 +1171,7 @@ def run_in_default_mode(args, tmp_bams):
     out = f"{args.output_dir}/{args.sample}.{handle}.het_blocks.bed"
     Het_blocks.saveas(out)
     sys.stderr.write(f"[{at()}] Found {len(Het_blocks)} het blocks, {len(Homo_blocks_REF)} homo REF blocks, {len(Homo_blocks_ALT)} homo ALT blocks\n")
-
+    
     # remove overlaps with heteroblocks from homoblocks
     sys.stderr.write(f"[{at()}] Trimming overlaps of homozygous blocks with any heterozygous block...\n")
     Homo_blocks = adjust_homo_coordinates_by_hetero_overlap(args, Het_blocks, Homo_blocks_REF, Homo_blocks_ALT)
