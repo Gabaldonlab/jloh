@@ -266,6 +266,39 @@ def main(args):
     sys.stderr.write(f"[{at()}] Combining to get general SNP densities\n")
     All, All_quant = calculate_chrom_snp_densities(All, Chrom_lengths, args)
 
+    if All.empty:
+        all_median = float(0)
+        all_mean = float(0)
+        all_min = float(0)
+        all_max = float(0)
+    else:
+        all_median = round(All["Snps"].median(), 1)
+        all_mean = round(All["Snps"].mean(), 1)
+        all_min = round(All["Snps"].min(), 1)
+        all_max = round(All["Snps"].max(), 1)
+
+    if Het.empty:
+        het_median = float(0)
+        het_mean = float(0)
+        het_min = float(0)
+        het_max = float(0)
+    else:
+        het_median = round(Het["Snps"].median(), 1)
+        het_mean = round(Het["Snps"].mean(), 1)
+        het_min = round(Het["Snps"].min(), 1)
+        het_max = round(Het["Snps"].max(), 1)
+
+    if Homo.empty:
+        homo_median = float(0)
+        homo_mean = float(0)
+        homo_min = float(0)
+        homo_max = float(0)
+    else:
+        homo_median = round(Homo["Snps"].median(), 1)
+        homo_mean = round(Homo["Snps"].mean(), 1)
+        homo_min = round(Homo["Snps"].min(), 1)
+        homo_max = round(Homo["Snps"].max(), 1)
+
     All_quant = All_quant.fillna(0)
     Het_quant = Het_quant.fillna(0)
     Homo_quant = Homo_quant.fillna(0)
@@ -276,10 +309,10 @@ def main(args):
  -- SNPs/Kbp Statistics --
 
  S\tGen\tHet\tHomo
- Median\t{round(All["Snps"].median(), 1)}\t{round(Het["Snps"].median(), 1)}\t{round(Homo["Snps"].median(), 1)}
- Mean\t{round(All["Snps"].mean(), 1)}\t{round(Het["Snps"].mean(), 1)}\t{round(Homo["Snps"].mean(), 1)}
- Max\t{All["Snps"].max()}\t{Het["Snps"].max()}\t{Homo["Snps"].max()}
- Min\t{All["Snps"].min()}\t{Het["Snps"].min()}\t{Homo["Snps"].min()}
+ Median\t{all_median}\t{het_median}\t{homo_median}
+ Mean\t{all_mean}\t{het_mean}\t{homo_mean}
+ Max\t{all_max}\t{het_max}\t{homo_max}
+ Min\t{all_min}\t{het_min}\t{homo_min}
 
  -- SNPs/Kbp Quantiles --
 
