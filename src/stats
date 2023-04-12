@@ -299,9 +299,9 @@ def main(args):
         homo_min = round(Homo["Snps"].min(), 1)
         homo_max = round(Homo["Snps"].max(), 1)
 
-    All_quant = All_quant.fillna(0)
-    Het_quant = Het_quant.fillna(0)
-    Homo_quant = Homo_quant.fillna(0)
+    All_quant = All_quant.fillna(1)
+    Het_quant = Het_quant.fillna(1)
+    Homo_quant = Homo_quant.fillna(1)
 
     # write to output
     sys.stderr.write(f"""
