@@ -26,22 +26,25 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from Bio import SeqIO
 import argparse as ap
 import os
-from os.path import getsize
 import sys
 import pysam
-import subprocess
 from time import asctime as at
-import time
 import pybedtools
 from pybedtools import BedTool
-from math import log10
 import multiprocessing
 from operator import itemgetter
 from statistics import median
 import shutil
 import pandas as pd
-import numpy as np
-from sys import getsizeof
+import random 
+import string 
+# from os.path import getsize
+# import subprocess
+# import time
+# from math import log10
+# import numpy as np
+# from sys import getsizeof
+
 
 ss = sys.exit
 
@@ -129,6 +132,20 @@ args = p.parse_args()
 
 # functions
 
+def generate_unique_key(output_dir):
+
+    """
+    Last update: 12/04/2023 
+    """
+
+    unique_key="BEGIN"
+    while (os.path.exists(f"{output_dir}/tmp_{unique_key}") == True) or (unique_key=="BEGIN"):
+        unique_key = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(5))
+
+    return unique_key     
+
+
+
 def check_conditions(args):
 
     """
@@ -145,8 +162,6 @@ def check_conditions(args):
         sys.stderr.write("See --vcfs and --refs options\n")
         sys.exit()
 
-    return True
-
 
 def organize_workspace(args):
 
@@ -159,8 +174,6 @@ def organize_workspace(args):
     if os.path.exists(args.output_dir) == False:
         os.makedirs(args.output_dir)
         sys.stderr.write(f"[{at()}] Created output directory {args.output_dir}\n")
-
-    return True
 
 
 def dump_queue(q):
@@ -1149,8 +1162,8 @@ def run_in_default_mode(args, tmp_bams):
     # divergence
     sys.stderr.write(f"[{at()}] Getting hetero- and homozygous SNP density...\n")
     hetero_div, homo_div = hetero_and_homo_snp_densities(Vcfs["hetero"][0], Vcfs["homo"][0], args.ref)
-    sys.stderr.write(f"[{at()}] Homozygous SNPs/kbp: {homo_div}\n")
-    sys.stderr.write(f"[{at()}] Heterozygous SNPs/kbp: {hetero_div}\n")
+    sys.stderr.write(f"[{at()}] Avg. homozygous SNPs/kbp: {homo_div}\n")
+    sys.stderr.write(f"[{at()}] Avg. heterozygous SNPs/kbp: {hetero_div}\n")
 
     # genome file
     sys.stderr.write(f"[{at()}] Creating a file with chromosome lengths...\n")
@@ -1171,7 +1184,7 @@ def run_in_default_mode(args, tmp_bams):
     out = f"{args.output_dir}/{args.sample}.{handle}.het_blocks.bed"
     Het_blocks.saveas(out)
     sys.stderr.write(f"[{at()}] Found {len(Het_blocks)} het blocks, {len(Homo_blocks_REF)} homo REF blocks, {len(Homo_blocks_ALT)} homo ALT blocks\n")
-    
+
     # remove overlaps with heteroblocks from homoblocks
     sys.stderr.write(f"[{at()}] Trimming overlaps of homozygous blocks with any heterozygous block...\n")
     Homo_blocks = adjust_homo_coordinates_by_hetero_overlap(args, Het_blocks, Homo_blocks_REF, Homo_blocks_ALT)
@@ -1248,8 +1261,6 @@ def run_in_default_mode(args, tmp_bams):
 
     sys.stderr.write(f"[{at()}] Done!\n")
 
-    return True
-
 
 def run_in_block_assignment_mode(args, tmp_bams):
 
@@ -1272,8 +1283,8 @@ def run_in_block_assignment_mode(args, tmp_bams):
     sys.stderr.write(f"[{at()}] Getting hetero- and homozygous SNP density in both parental genomes...\n")
     hetero_div_A, homo_div_A = hetero_and_homo_snp_densities(Vcfs["hetero"][0], Vcfs["homo"][0], args.refs[0])
     hetero_div_B, homo_div_B = hetero_and_homo_snp_densities(Vcfs["hetero"][1], Vcfs["homo"][1], args.refs[1])
-    sys.stderr.write(f"[{at()}] Parent A: homozygous SNPs/kbp: {homo_div_A}, heterozygous SNPs/kbp: {hetero_div_A}\n")
-    sys.stderr.write(f"[{at()}] Parent B: homozygous SNPs/kbp: {homo_div_B}, heterozygous SNPs/kbp: {hetero_div_B}\n")
+    sys.stderr.write(f"[{at()}] Parent A: Avg. homo. SNPs/kbp: {homo_div_A}, avg. het. SNPs/kbp: {hetero_div_A}\n")
+    sys.stderr.write(f"[{at()}] Parent B: Avg. homo. SNPs/kbp: {homo_div_B}, avg. het. SNPs/kbp: {hetero_div_B}\n")
 
     # genome file
     sys.stderr.write(f"[{at()}] Creating files with chromosome lengths for all genomes...\n")
@@ -1417,8 +1428,6 @@ def run_in_block_assignment_mode(args, tmp_bams):
 
     sys.stderr.write(f"[{at()}] Done!\n")
 
-    return True
-
 
 def main(args, tmp_bams):
 
@@ -1428,31 +1437,31 @@ def main(args, tmp_bams):
 
     # check conditions before starting
     sys.stderr.write(f"[{at()}] Preparing workspace...\n")
-    tmp = check_conditions(args)
-    tmp = organize_workspace(args)
+    check_conditions(args)
+    organize_workspace(args)
 
     # run in the selected mode
     if args.assign_blocks:
         sys.stderr.write(f"[{at()}] Running in block assignment mode...\n")
-        tmp = run_in_block_assignment_mode(args, tmp_bams)
+        run_in_block_assignment_mode(args, tmp_bams)
 
     else:
         sys.stderr.write(f"[{at()}] Running in default mode...\n")
-        tmp = run_in_default_mode(args, tmp_bams)
+        run_in_default_mode(args, tmp_bams)
 
 
 if __name__ == "__main__":
 
-    tmpdir = f"{args.output_dir}/tmp"
+    unique_key = generate_unique_key(args.output_dir)
+    tmpdir = f"{args.output_dir}/tmp_{unique_key}"
     os.makedirs(tmpdir, exist_ok=True)
     os.chmod(tmpdir, 0o777)
     pybedtools.helpers.set_tempdir(tmpdir)
 
-    tmp_bams = f"{args.output_dir}/tmp_bams"
+    tmp_bams = f"{tmpdir}/tmp_bams"
     os.makedirs(tmp_bams, exist_ok=True)
 
     main(args, tmp_bams)
 
     # remove tmp folder
     shutil.rmtree(tmpdir)
-    shutil.rmtree(tmp_bams)
