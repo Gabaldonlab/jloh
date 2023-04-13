@@ -1,5 +1,7 @@
 #!/usr/bin/env nextflow 
 
+maxcpus = Runtime.runtime.availableProcessors()
+
 // simulate genome at 10% divergence 
 // ---------------------------------
 // only divergence 
@@ -9,7 +11,7 @@
 process simulate_div_genome {
 
     executor "local"
-    cpus 48
+    cpus "${maxcpus}"
     maxForks 1
     maxRetries 3
 
@@ -19,7 +21,7 @@ process simulate_div_genome {
     script:
     """
     ${JLOH} sim \
-    --threads 48 \
+    --threads ${maxcpus} \
     --fasta ${params.fasta} \
     --out-fasta sim.fa \
     --out-haplotypes sim.haplotypes.tsv \
@@ -41,7 +43,7 @@ process simulate_div_genome {
 process introduce_LOH {
 
     executor "local"
-    cpus 48
+    cpus "${maxcpus}"
     maxForks 1
     maxRetries 3
 
@@ -84,7 +86,7 @@ process introduce_LOH {
 process simulate_reads {
 
     executor "local"
-    maxForks 48
+    maxForks "${maxcpus}"
     cpus 1
     maxRetries 3
 
@@ -127,7 +129,7 @@ process map_reads {
 
     executor "local"
     maxForks 1
-    cpus 48
+    cpus "${maxcpus}"
     maxRetries 3
 
     input:
@@ -145,22 +147,22 @@ process map_reads {
     script:
     """
     ${HISAT2_BUILD} \
-    -p 48 \
+    -p ${maxcpus} \
     ${genome_A} \
     A_index &&
     ${HISAT2_BUILD} \
-    -p 48 \
+    -p ${maxcpus} \
     ${genome_B} \
     B_index &&
     ${HISAT2} \
-    -p 48 \
+    -p ${maxcpus} \
     --ignore-quals --no-spliced-alignment \
     --score-min L,0.0,-2.0 \
     -I 800 -X 1200 \
     -x A_index -1 ${R1} -2 ${R2} \
     -S hybrid.onto_A.sam &&
     ${HISAT2} \
-    -p 48 \
+    -p ${maxcpus} \
     --ignore-quals --no-spliced-alignment \
     --score-min L,0.0,-2.0 \
     -I 800 -X 1200 \
@@ -179,7 +181,7 @@ process filter_and_sort_bams {
 
     executor "local"
     maxForks 1
-    cpus 48
+    cpus "${maxcpus}"
     maxRetries 3
 
     publishDir "${params.output_dir}",
@@ -201,13 +203,13 @@ process filter_and_sort_bams {
 
     script:
     """
-    ${SAMTOOLS} view -@ 48 -h -b -F 0x0100 -F 0x4 \
+    ${SAMTOOLS} view -@ ${maxcpus} -h -b -F 0x0100 -F 0x4 \
     --output hybrid.onto_A.f.bam ${genome_A_sam} &&
-    ${SAMTOOLS} view -@ 48 -h -b -F 0x0100 -F 0x4 \
+    ${SAMTOOLS} view -@ ${maxcpus} -h -b -F 0x0100 -F 0x4 \
     --output hybrid.onto_B.f.bam ${genome_B_sam} &&
-    ${SAMTOOLS} sort -@ 48 -T A -O bam -o hybrid.onto_A.fs.bam \
+    ${SAMTOOLS} sort -@ ${maxcpus} -T A -O bam -o hybrid.onto_A.fs.bam \
     hybrid.onto_A.f.bam &&
-    ${SAMTOOLS} sort -@ 48 -T B -O bam -o hybrid.onto_B.fs.bam \
+    ${SAMTOOLS} sort -@ ${maxcpus} -T B -O bam -o hybrid.onto_B.fs.bam \
     hybrid.onto_B.f.bam &&
     ${SAMTOOLS} index hybrid.onto_A.fs.bam &&
     ${SAMTOOLS} index hybrid.onto_B.fs.bam
@@ -222,8 +224,8 @@ process filter_and_sort_bams {
 process perform_pileup {
 
     executor "local"
-    maxForks 1
-    cpus 48
+    maxForks "${maxcpus}"
+    cpus 1
     maxRetries 3
 
     input:
@@ -265,8 +267,8 @@ process perform_pileup {
 process perform_snp_calling {
 
     executor "local"
-    maxForks 1
-    cpus 48
+    maxForks "${maxcpus}"
+    cpus 1
     maxRetries 3
 
     input:
@@ -303,8 +305,8 @@ process perform_snp_calling {
 process filter_variants {
 
     executor "local"
-    maxForks 1
-    cpus 48
+    maxForks "${maxcpus}"
+    cpus 1
     maxRetries 3
 
     publishDir "${params.output_dir}",
