@@ -41,7 +41,7 @@ if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
     Barcelona Supercomputing Center (BSC) 
     2023 
 
-    v0.20.0
+    v0.21.0
 
     ####
 
