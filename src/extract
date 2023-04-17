@@ -68,11 +68,19 @@ jloh extract --vcf <VCF> --ref <FASTA> --bam <BAM> [options]
 --bam               BAM file used to call the --vcf variants                    [!]
 --ref               Reference FASTA genome                                      [!]
 
-[block assignment mode]
---assign-blocks     Activate block assignment mode                              [off]
+[assign blocks]
+--assign-blocks     JLOH will use both references to assign blocks to REF/ALT   [off]
 --vcfs              VCF files (space-separated) called on parentals             [!]
 --bams              BAM files used to call the --vcfs (space-separated)         [!]
 --refs              Parental FASTA genomes (space-separated)                    [!]
+
+[one parent]
+--vcf               Input VCF file                                              [!]
+--bam               BAM file used to call the --vcf variants                    [!]
+--ref               Reference FASTA genome                                      [!]
+--one-parent        Works like "assign blocks", but with only one reference     [off]
+                    The SNPs are from a hybrid and the reference from a parent
+                    JLOH will use it to assign blocks to REF/ALT
 
 [I/O/E]
 --sample            Sample name / Strain name for output files                  [jloh]
@@ -109,6 +117,8 @@ p.add_argument("--assign-blocks", action="store_true")
 p.add_argument("--vcfs", nargs="*")
 p.add_argument("--bams", nargs="*")
 p.add_argument("--refs", nargs="*")
+# one parent
+p.add_argument("--one-parent", action="store_true")
 # I/O/E
 p.add_argument("--sample", default="jloh")
 p.add_argument("--output-dir", default="jloh_out")
@@ -1067,6 +1077,21 @@ def sort_bed_intervals(bt):
     return bt_sort
 
 
+def assign_empty_allele_annotation(lst):
+
+    """
+    Last update: 17/04/2023 
+    """
+
+    newlst = []
+    for x in lst:
+        x[9] = "-"
+        newlst.append(x)
+
+    return newlst 
+    
+
+
 def write_vcfs_to_output(args, Handles, mode, Hetero_lines_lst, Homo_lines_lst, Headers):
 
     """
@@ -1215,6 +1240,13 @@ def run_in_default_mode(args, tmp_bams):
     # sort
     LOH = sort_bed_intervals(LOH)
 
+    # assign arbitrary "-" allele 
+    # if the reference passed is a hybrid reference 
+    if args.one_parent == False:
+        LOH = assign_empty_allele_annotation(LOH)
+    else:
+        pass 
+    
     # write candidates to output, pre filtering
     out = open(f"{args.output_dir}/{args.sample}.LOH_candidates.tsv", "w")
 
