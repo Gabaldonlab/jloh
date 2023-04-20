@@ -1,3 +1,44 @@
+## Input files and settings 
+
+`jloh extract` is the centerpiece of the jloh toolkit. Depending on what data you're analysing, you must be careful on what settings you use. 
+
+### Reads and reference from same organism 
+
+This is the default setting of the program. It assumes that the reads you used to call the variants are from the same organism of the reference genome you provide. No further adjustment is needed, just pass the input files.
+
+```
+jloh extract --vcf <VCF> --bam <BAM> --ref <REF> [options]
+```
+
+### Reads from a hybrid and parental reference genomes 
+
+This mode is activated by passing the `--assign-blocks` flag. This turns on a different workflow within the module, which besides inferring candidate LOH blocks will also assign them to either one of the two parental genotypes that can be inferred from the two provided parental genomes. 
+
+In order to use this mode, you have to provide two reference genomes (one per parent). Moreover, you must have mapped your reads from the hybrid onto each of the two parental genomes *independently*, and called variants from each obtained BAM file (see input, there are two BAMs and two VCFs).
+
+More information on how to do this can be found [here](../docs/ASSIGN_BLOCKS.md).
+
+```
+jloh extract \
+--assign-blocks \
+--vcfs <VCF_A> <VCF_B> \
+--bams <BAM_A> <BAM_B> \
+--refs <REF_A> <REF_B> \
+[options]
+```
+
+### Reads from a hybrid and only one parental available
+
+This mode is activated by passing the `--one-parent` flag. This turns on a third workflow within the module, which follows the default workflow but also attempts to annotate inferred LOH blocks by using the only provided parental progenitor genome. Blocks that resemble the parental genome are labelled "REF", and those that don't are labelled "ALT". 
+
+```
+jloh extract --one-parent --vcf <VCF> --bam <BAM> --ref <REF> [options]
+```
+
+## Algorithm description 
+
+In the following part of this document the algorithm's functions are described in more detail. 
+
 ### Sorting of SNPs by zygosity
 
 The variants passed with `--vcf` are scanned, subdividing heterozygous and homozygous SNPs into two separate files: `<sample>.het_snps.vcf` and `<sample>.homo_snps.vcf`. Indels and other types of variation are discarded. The heterozygous SNPs are used to extract regions containing heterozygosity. Selected SNPs should also have an allele frequency (`AF`) annotation, and are retained if their `AF` is larger than `--min-af` and lower than `--max-af`. The default parameters (`--min-af 0.2 --max-af 0.8`) are probably ok for most users.
@@ -5,6 +46,8 @@ The variants passed with `--vcf` are scanned, subdividing heterozygous and homoz
 Missing allele frequency? Try using [all2vcf](https://github.com/MatteoSchiavinato/all2vcf).
 
 If running in `--assign-blocks` mode, the homozygous SNPs are used to assign homozygous regions to either the alternative (ALT) or the reference (REF) allele. The selection of heterozygous SNPs is conducted based on their `FORMAT` (e.g. `GT 0/1` or `1/2` for heterozygous SNPs).
+
+The same is done when using the `--one-parent` mode, although with only one reference available instead of two. 
 
 ### Extraction of heterozygous regions
 
@@ -14,7 +57,7 @@ First, heterozygous SNPs are used to find heterozygous regions which are then ma
 
 Everything that did not include sufficient heterozygous SNPs is then screened as a potential LOH block. Blocks shorter than `--min-length` are filtered out at this point. The remaining ones are screened against the initial heterozygous regions, trimming any overlapping region. 
 
-If running in `--assign-blocks` mode, clusters of **homozygous** SNPs are extracted the same way as for clusters of heterozygous SNPs. Blocks with a high amount of homozygous SNPs will be considered as alternative allele blocks (i.e. `ALT`). Every region that is not a heterozygous SNP cluster nor a homozygous SNP cluster is considered a reference allele homozygous block (`REF`).
+If running in `--assign-blocks` or `--one-parent` modes, clusters of **homozygous** SNPs are extracted the same way as for clusters of heterozygous SNPs. Blocks with a high amount of homozygous SNPs will be considered as alternative allele blocks (i.e. `ALT`). Every region that is not a heterozygous SNP cluster nor a homozygous SNP cluster is considered a reference allele homozygous block (`REF`).
 
 ### Coverage trimming
 
