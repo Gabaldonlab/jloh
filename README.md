@@ -79,9 +79,19 @@ Detailed information [can be found here](docs/INSTALL.md).
 
 This is the most important module of JLOH. Its functions are well described in the figure on the top. It is used to extract LOH blocks starting from VCF, BAM, and FASTA file(s). Detailed information on how this algorithm works [can be found here](docs/EXTRACT.md).
 
+This module has three ways of operating: 
+
+| Parameter setting    | Input reference(s)     |
+|----------------------|------------------------|
+| default (no setting) | same organism as reads | 
+| `--assign-blocks`    | parentals of a hybrid  |
+| `--one-parent`       | one parental only      |
+
 **Output**
 
-`jloh extract` functions in two modes (`--default` and `--assign-blocks`). In default mode, it produces these output files:
+`jloh extract` functions in three modes (default, `--assign-blocks` and `--one-parent`). 
+
+In default mode, it produces these output files:
 
 | Output file                 | Description |
 |-----------------------------|-|
@@ -100,6 +110,8 @@ The output can be assessed in a genome viewer together with the input BAM files,
 ![Example](images/example.png)
 
 In `--assign-blocks` mode, it produces the same output files but repeated twice: once per each parent. More information on the `--assign-blocks` mode, and how to use it properly, [can be found here](docs/ASSIGN_BLOCKS.md).
+
+In `--one-parent` mode, it produces the same output of the default mode. However, it will imply that the provided reference genome is from one of the two parental progenitors, and use it to annotate blocks towards the REF or the ALT allele as in the `--assign-blocks` mode. The difference from the latter is that only one parental genome is provided. The difference from the default mode is that the provided genome is not from the hybrid itself but from one of the parents. 
 
 ### JLOH filter
 
