@@ -41,22 +41,33 @@ if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
 Plot LOH propensity over all or specific chromosomes from multiple JLOH extract 
 TSV output files  
 
-Usage:
+Usage (one ref):
+jloh plot --loh <TSV> [options]
+
+Usage (two ref):
 jloh plot --loh <TSV_1> ... <TSV_n> --names <STR_1> ... <STR_n> [options]
 
-[I/O]
---loh               Input TSV file(s) containing LOH blocks from JLOH extract   [!]
+[one reference]
+--one-ref           Activate "one reference" mode                               [off]
+--loh               Input TSV file containing LOH blocks from JLOH extract      [!]
+--name              Name to use in plot                                         [!]
+--het               Input BED file containing het regions from JLOH extract     [!]
+--output-dir        Output directory, created if not existitng                  [JLOH_plot_out]
+
+[two references]
+--two-ref           Activate "two references" mode                              [off]
+--loh               Input TSV files containing LOH blocks from JLOH extract     [!]
 --names             Names to use in plot for each of the files (same order)     [!]
+--ref-name          Name to use in plot for REF allele                          [REF]
+--alt-name          Name to use in plot for ALT allele                          [ALT]
 --output-dir        Output directory, created if not existitng                  [JLOH_plot_out]
 
 [parameters]
 --threads           Number of parallel threads                                  [12]
---ref-name          Name to use in plot for REF allele                          [REF]
---alt-name          Name to use in plot for ALT allele                          [ALT]
 --chr               Restrict the analysis to this specific chromosome           [off]
 --window-size       Size of window for plotting, the shorter the slower         [10000]
 
-[ggplot2]
+[ggplot2 options]
 --aspect-ratio      Ratio between y / x for the output plot                     [0.35]
 --width             Width (px) of the output plot                               [2000]
 --height            Height (px) of the output plot                              [750]
@@ -68,7 +79,11 @@ jloh plot --loh <TSV_1> ... <TSV_n> --names <STR_1> ... <STR_n> [options]
 
 # parser 
 p = ap.ArgumentParser()
+p.add_argument("--one-ref", action="store_true")
+p.add_argument("--two-ref", action="store_true")
 p.add_argument("--loh", nargs="+")
+p.add_argument("--het", type=str)
+p.add_argument("--name", nargs="+")
 p.add_argument("--names", nargs="+")
 p.add_argument("--ref-name", default="REF")
 p.add_argument("--alt-name", default="ALT")
@@ -87,6 +102,32 @@ ss = sys.exit
 pandarallel.initialize(progress_bar=False, nb_workers=args.threads, use_memory_fs=False)
 
 # functions 
+def check_conditions(args):
+
+    if (args.one_ref and args.two_ref) or \
+        (not args.one_ref and not args.two_ref):
+        sys.exit("""
+
+ERROR: you should use either --one-ref or --two-ref 
+
+""")
+
+    if args.one_ref and not args.name:
+        sys.exit("""
+        
+ERROR: you should specify a --name for the --loh file when using --one-ref
+
+""")
+
+    if args.two_ref and not (args.loh and args.names):
+        sys.exit("""
+
+ERROR: when using --two-ref you should pass both the --loh files and the 
+--names you want to use with them in the plots 
+
+""")
+
+
 def organize_input(loh, names):
 
     """
@@ -117,10 +158,10 @@ def organize_input(loh, names):
     return df
 
 
-def split_into_windows(df_sub, w_size, q):
+def split_into_windows(df_sub, w_size, q, args):
 
     """
-    Last update: 16/01/2023
+    Last update: 18/04/2023
     """
 
     start, end = df_sub["Start"], df_sub["End"]
@@ -161,10 +202,97 @@ def split_into_windows(df_sub, w_size, q):
         sys.exit()
 
 
-def count_ratios(df_sub, w_size):
+def split_into_windows_het(df_het, w_size, q, args):
 
     """
-    16/01/2023
+    Last update: 18/04/2023
+    """
+
+    start, end = df_het["Start"], df_het["End"]
+    w_start = start - (start % w_size)
+    w_end = w_start + w_size
+
+    if (w_start <= start <= w_end) and (w_start <= end <= w_end):
+        df_het["Window"] = (w_start, w_end)
+        df_het["LOH_pos"] = df_het["End"] - df_het["Start"]
+        q.put(df_het)
+
+    elif (w_start <= start <= w_end) and (end > w_end):
+        out = []
+        df_tmp = df_het.copy()
+        df_tmp.End = w_end
+        df_tmp["Window"] = (w_start, w_end)
+        df_tmp["LOH_pos"] = df_tmp["End"] - df_tmp["Start"]
+        out.append(df_tmp.copy())
+
+        while (end > w_end):
+            w_start += w_size
+            w_end += w_size
+            df_tmp.Start = max(start, w_start)
+            df_tmp.End = min(end, w_end)
+            df_tmp["Window"] = (w_start, w_end)
+            df_tmp["LOH_pos"] = df_tmp["End"] - df_tmp["Start"]
+            out.append(df_tmp.copy())
+
+        for x in out:
+            q.put(x)
+
+    elif (start < w_start) and (start <= end <= w_end):
+        sys.stderr.write("ERROR: debug!\n")
+        sys.exit()
+
+    elif (start < w_start) and (end > w_end):
+        sys.stderr.write("ERROR: debug!\n")
+        sys.exit()
+
+
+def count_ratios_oneref(df_sub, w_size, df_het):
+
+    """
+    18/04/2023
+    """
+
+    sample = df_sub.loc[:,"Sample"].tolist()[0]
+    chrom = df_sub.loc[:,"Chromosome"].tolist()[0]
+    window = df_sub.loc[:,"Window"].tolist()[0]
+    
+    df_sub_het = df_het.loc[(df_het["Sample"]==sample) &
+                            (df_het["Chromosome"]==chrom) &
+                            (df_het["Window"]==window), :]
+    
+    
+    if df_sub_het.shape[0] > 0:
+        df_sub_het = df_sub_het.loc[:,["Het_pos"]].sum()
+        het_pos = df_sub_het["Het_pos"]
+        het_ratio = het_pos / w_size 
+
+    else:
+        het_pos = 0
+        het_ratio = 0
+        
+    if df_sub.shape[0] > 0:
+        df_sub = df_sub.loc[:,["LOH_pos"]].sum()
+        loh_pos = df_sub["LOH_pos"]
+        loh_ratio = loh_pos / w_size 
+        
+    else:
+        loh_pos = 0
+        loh_ratio = 0
+
+    s = pd.Series(
+    {
+    "Het_pos":het_pos, "Het_ratio":het_ratio, 
+    "LOH_pos":loh_pos, "LOH_ratio":loh_ratio
+        }
+    )
+
+    return s
+
+
+def count_ratios_tworef(df_sub, w_size):
+
+    """
+    18/04/2023
     """
 
     window = df_sub.loc[:,"Window"].tolist()[0]
@@ -174,7 +302,7 @@ def count_ratios(df_sub, w_size):
     df_sub["LOH_ratio"] = df_sub["LOH_pos"] / w_size
     df_sub["W_start"] = window[0]
     df_sub["W_end"] = window[1]
-    
+
     for loh_type in ["REF", "ALT"]:
         if loh_type not in df_sub["Allele"].tolist():
             df_sub = df_sub.append({"Allele":loh_type, "LOH_pos":0, "LOH_ratio":0, "W_start":window[0], "W_end":window[1]}, ignore_index=True)
@@ -187,21 +315,21 @@ def count_ratios(df_sub, w_size):
             "LOH_ratio_ALT" : [df_sub.loc["ALT", "LOH_ratio"]] }
 
     df_sub = pd.DataFrame.from_dict(d)
-
     return df_sub
 
 
-def quantize_intervals(df, window_size, threads):
+def quantize_intervals(df, window_size, threads, args):
 
     """
-    Last update: 16/01/2023 
+    Last update: 18/04/2023 
     """
 
+    # quantize windows 
     pool = mp.Pool(processes=threads)
     q = mp.Manager().Queue()
 
     for index, row in df.iterrows():
-        pool.apply_async(split_into_windows, args=(row, window_size, q))
+        pool.apply_async(split_into_windows, args=(row, window_size, q, args))
 
     pool.close()
     pool.join()
@@ -212,58 +340,99 @@ def quantize_intervals(df, window_size, threads):
 
     df = pd.DataFrame(out).sort_values(by=["Sample", "Chromosome", "Window"])
 
-    df = df.groupby(["Sample", "Chromosome", "Window"]).parallel_apply(count_ratios, (window_size))
+    # read heterozygosity and quantize it 
+    if args.one_ref:
 
+        pool = mp.Pool(processes=threads)
+        q = mp.Manager().Queue()
+
+        df_het = pd.read_csv(args.het, sep="\t", usecols=[0,1,2])
+        df_het.columns = ["Chromosome", "Start", "End"]
+        df_het.insert(loc=0, column="Sample", value=args.name[0])
+        
+        for index, row in df_het.iterrows():
+            pool.apply_async(split_into_windows_het, args=(row, window_size, q, args))
+
+        pool.close()
+        pool.join()
+
+        out = []
+        while q.empty() == False:
+            out.append(q.get())
+
+        df_het = pd.DataFrame(out).sort_values(by=["Sample", "Chromosome", "Window"])
+        df_het = df_het.rename({"LOH_pos":"Het_pos"}, axis=1)
+        df_het = df_het.loc[:,["Sample", "Chromosome", "Window", "Het_pos"]]
+
+        df = df.loc[:,["Sample", "Chromosome", "Window", "LOH_pos"]]
+        
+    # quantize ratios 
+    if args.one_ref:
+        df = df.groupby(["Sample", "Chromosome", "Window"]).parallel_apply(lambda df_sub : count_ratios_oneref(df_sub, window_size, df_het))
+
+    elif args.two_ref:
+        df = df.groupby(["Sample", "Chromosome", "Window"]).parallel_apply(lambda df_sub : count_ratios_tworef(df_sub, window_size))
+    
     return df
 
 
-def reorganise_output_dataframe(df):
+def reorganise_output_dataframe(df, args):
 
     """
-    Last update: 16/01/2023
+    Last update: 18/04/2023
     """
 
-    df = df.reset_index(drop=False)
-    df["W_start"] = df["Window"].str[0]
-    df["W_end"] = df["Window"].str[1]
-    df = df.loc[:,[ "Sample", "Chromosome", "W_start", "W_end", 
-                    "LOH_pos_REF", "LOH_ratio_REF", "LOH_pos_ALT", "LOH_ratio_ALT"]]
+    if args.one_ref:
+        df = df.reset_index(drop=False)
+        df["W_start"] = df["Window"].str[0]
+        df["W_end"] = df["Window"].str[1]
+        df = df.loc[:,[ "Sample", "Chromosome", "W_start", "W_end", 
+                        "Het_pos", "Het_ratio", "LOH_pos", "LOH_ratio"]]
+
+    elif args.two_ref:
+        df = df.reset_index(drop=False)
+        df["W_start"] = df["Window"].str[0]
+        df["W_end"] = df["Window"].str[1]
+        df = df.loc[:,[ "Sample", "Chromosome", "W_start", "W_end", 
+                        "LOH_pos_REF", "LOH_ratio_REF", "LOH_pos_ALT", "LOH_ratio_ALT"]]
 
     return df 
 
 
-def main(args):
+def run_one_ref_script(args):
 
-    # organise workspace
-    os.makedirs(args.output_dir, exist_ok=True)
+    """
+    18/04/2023
+    """
 
-    # create input table
-    sys.stderr.write(f"[{at()}] Reading input information\n") 
-    df = organize_input(args.loh, args.names)
-
-    # select specific chromosome if user wants 
-    if args.chr != "ALL":
-        sys.stderr.write(f"[{at()}] Selecting only chromosome {args.chr}\n")
-        df = df.loc[df["Chromosome"]==args.chr, :]
-
-    if df.shape[0] == 0:
-        sys.stderr.write(f"ERROR: dataframe is empty after selecting only chromosome {args.chr}\n")
-        ss()
+    # plot 
+    sys.stderr.write(f"[{at()}] Plotting\n")
+    src_dir = "/".join(sys.argv[0].split("/")[0:-1]) + "/" + "scripts"
+    cmd = " ".join([
+        "Rscript", f"{src_dir}/loh-bin-plots_one-ref.Rscript", 
+        f"{args.output_dir}/LOH_rate_by_window.tsv", 
+        f"{args.output_dir}/plots",
+        str(args.aspect_ratio), 
+        str(args.width),
+        str(args.height),
+        str(args.res),
+        str(args.name[0]) ])
     
-    # quantize in windows 
-    sys.stderr.write(f"[{at()}] Quantizing in windows of {args.window_size} bp\n") 
-    df = quantize_intervals(df, args.window_size, args.threads)
-    df = reorganise_output_dataframe(df)
+    sys.stderr.write(f"\nPlot command that was run:\n{cmd}\n\n")
+    os.system(cmd)
 
-    # write table to output
-    sys.stderr.write(f"[{at()}] Writing table to output\n") 
-    df.to_csv(f"{args.output_dir}/LOH_rate_by_window.tsv", sep="\t", header=True, index=False)
+
+def run_two_ref_script(args):
+
+    """
+    18/04/2023
+    """
 
     # plot 
     sys.stderr.write(f"[{at()}] Plotting\n") 
     src_dir = "/".join(sys.argv[0].split("/")[0:-1]) + "/" + "scripts"
     cmd = " ".join([
-        "Rscript", f"{src_dir}/loh-bin-plots.Rscript", 
+        "Rscript", f"{src_dir}/loh-bin-plots_two-ref.Rscript", 
         f"{args.output_dir}/LOH_rate_by_window.tsv", 
         f"{args.output_dir}/plots",
         str(args.aspect_ratio), 
@@ -274,6 +443,51 @@ def main(args):
     
     sys.stderr.write(f"\nPlot command that was run:\n{cmd}\n\n")
     os.system(cmd)
+
+
+def main(args):
+
+    # check conditions
+    check_conditions(args)
+
+    # organise workspace
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    # create input table
+    sys.stderr.write(f"[{at()}] Reading input information\n")
+    if args.one_ref:
+        df = organize_input(args.loh, args.name)
+    
+    elif args.two_ref:
+        df = organize_input(args.loh, args.names)
+
+    # select specific chromosome if user wants 
+    if args.chr != "ALL":
+        sys.stderr.write(f"[{at()}] Selecting only chromosome {args.chr}\n")
+        df = df.loc[df["Chromosome"]==args.chr, :]
+
+    if df.shape[0] == 0:
+        sys.stderr.write(f"""
+        
+ERROR: dataframe is empty after selecting only chromosome {args.chr}\n
+
+""")
+        ss()
+    
+    # quantize in windows 
+    sys.stderr.write(f"[{at()}] Quantizing in windows of {args.window_size} bp\n") 
+    df = quantize_intervals(df, args.window_size, args.threads, args)
+    df = reorganise_output_dataframe(df, args)
+    
+    # write table to output
+    sys.stderr.write(f"[{at()}] Writing table to output\n") 
+    df.to_csv(f"{args.output_dir}/LOH_rate_by_window.tsv", sep="\t", header=True, index=False)
+
+    if args.one_ref:
+        run_one_ref_script(args)
+
+    elif args.two_ref:
+        run_two_ref_script(args)
 
 
 # main 

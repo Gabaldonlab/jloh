@@ -1,0 +1,53 @@
+#!/usr/bin/env Rscript
+
+# libraries
+library(ggplot2)
+library(reshape2)
+library(hash)
+library(scales)
+
+args <- commandArgs(trailingOnly=T)
+infile <- args[1]
+outdir <- args[2]
+myRatio <- as.numeric(args[3])
+myWidth <- as.numeric(args[4])
+myHeight <- as.numeric(args[5])
+myRes <- as.numeric(args[6])
+myName <- args[7]
+
+# read input file
+dir.create(outdir, showWarnings = FALSE)
+df <- read.table(infile, header=T)
+
+# fix positions and names 
+df$W_start <- df$W_start / 1000000
+df$W_end <- df$W_end / 1000000
+df$Sample <- gsub("_.*", "", df$Sample)
+df$Sample <- factor(as.character(df$Sample), levels=unique(as.character(df$Sample)))
+df$LOH_propensity <- df$LOH_ratio - df$Het_ratio 
+
+df$Chromosome <- factor(df$Chromosome, levels=unique(df$Chromosome))
+
+x <- df[ , c("Chromosome", "W_end", "LOH_propensity")]
+
+P1 <- ggplot(data=x, aes(x=W_end, y=Chromosome, fill=LOH_propensity)) +
+theme_bw() +
+theme(aspect.ratio=myRatio,
+    axis.text=element_text(family="Helvetica", face="plain", size=8),
+    axis.title=element_text(family="Helvetica", face="plain", size=9),
+    legend.text=element_text(family="Helvetica", face="italic", size=7),
+    legend.title=element_text(family="Helvetica", face="plain", size=9),
+    plot.title=element_text(family="Helvetica", face="plain", size=9)) +
+geom_tile() +
+xlab("Position [Mbp]") +
+scale_fill_gradient2(low="#f7c35c", mid="white", high="#EF6F6C", midpoint=0,
+                    na.value = "grey50", breaks=c(-1,1), limits=c(-1,1),
+                    labels=c("Het", "LOH"), 
+                    name="") +
+ylab("")
+
+outfile <- paste(myName, "LOH", "png", sep=".")
+out <- paste(outdir, outfile, sep="/")
+png(out, height=myHeight, width=myWidth, res=myRes, units="px")
+plot(P1)
+dev.off()

@@ -50,7 +50,7 @@ for (chrom in Chroms) {
         legend.text=element_text(family="Helvetica", face="italic", size=7),
         legend.title=element_text(family="Helvetica", face="plain", size=9),
         plot.title=element_text(family="Helvetica", face="plain", size=9)) +
-  geom_raster() +
+  geom_tile() +
   xlab("Position [Mbp]") +
   scale_fill_gradient2(low="#EF6F6C", mid="white", high="#64B6AC", midpoint=0,
                         na.value = "grey50", breaks=c(-1,0,1), limits=c(-1,1),
