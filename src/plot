@@ -41,17 +41,17 @@ if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
 Plot LOH propensity over all or specific chromosomes from multiple JLOH extract 
 TSV output files  
 
-Usage (one ref):
-jloh plot --loh <TSV> [options]
-
-Usage (two ref):
+Usage:
 jloh plot --loh <TSV_1> ... <TSV_n> --names <STR_1> ... <STR_n> [options]
+
 
 [one reference]
 --one-ref           Activate "one reference" mode                               [off]
 --loh               Input TSV file containing LOH blocks from JLOH extract      [!]
---name              Name to use in plot                                         [!]
+--names             Name to use in plot                                         [!]
 --het               Input BED file containing het regions from JLOH extract     [!]
+--ref-name          Name to use in plot for REF allele                          [REF]
+--alt-name          Name to use in plot for ALT allele                          [ALT]
 --output-dir        Output directory, created if not existitng                  [JLOH_plot_out]
 
 [two references]
@@ -61,6 +61,10 @@ jloh plot --loh <TSV_1> ... <TSV_n> --names <STR_1> ... <STR_n> [options]
 --ref-name          Name to use in plot for REF allele                          [REF]
 --alt-name          Name to use in plot for ALT allele                          [ALT]
 --output-dir        Output directory, created if not existitng                  [JLOH_plot_out]
+
+[by sample]
+--by-sample         Use "by sample" mode (each plot is a different sample)      [off]
+                    Plots will be organised by sample rather than by chromosome
 
 [parameters]
 --threads           Number of parallel threads                                  [12]
@@ -81,8 +85,9 @@ jloh plot --loh <TSV_1> ... <TSV_n> --names <STR_1> ... <STR_n> [options]
 p = ap.ArgumentParser()
 p.add_argument("--one-ref", action="store_true")
 p.add_argument("--two-ref", action="store_true")
+p.add_argument("--by-sample", action="store_true")
 p.add_argument("--loh", nargs="+")
-p.add_argument("--het", type=str)
+p.add_argument("--het", nargs="+")
 p.add_argument("--name", nargs="+")
 p.add_argument("--names", nargs="+")
 p.add_argument("--ref-name", default="REF")
@@ -104,7 +109,7 @@ pandarallel.initialize(progress_bar=False, nb_workers=args.threads, use_memory_f
 # functions 
 def check_conditions(args):
 
-    if (args.one_ref and args.two_ref) or \
+    if  (args.one_ref and args.two_ref) or \
         (not args.one_ref and not args.two_ref):
         sys.exit("""
 
@@ -112,14 +117,7 @@ ERROR: you should use either --one-ref or --two-ref
 
 """)
 
-    if args.one_ref and not args.name:
-        sys.exit("""
-        
-ERROR: you should specify a --name for the --loh file when using --one-ref
-
-""")
-
-    if args.two_ref and not (args.loh and args.names):
+    if (args.one_ref or args.two_ref) and not (args.loh and args.names):
         sys.exit("""
 
 ERROR: when using --two-ref you should pass both the --loh files and the 
@@ -128,34 +126,119 @@ ERROR: when using --two-ref you should pass both the --loh files and the
 """)
 
 
-def organize_input(loh, names):
+def organise_input(loh, names, het, run_mode):
 
     """
-    Last update: 16/01/2023 
+    Last update: 12/05/2023 
     """
 
-    if (len(loh) != len(names)):
-        sys.stderr.write("ERROR: number of LOH files (--loh) doesn't match number of names (--names)\n")
-        ss()
+    if run_mode == "one_ref":
 
-    Files = []
-    i = 0
-    while (i < len(loh)):
-        Files.append([names[i], loh[i]])
-        i+=1
+        if (len(loh) != len(names)):
+            sys.stderr.write("ERROR: number of LOH files (--loh) doesn't match number of names (--names)\n")
+            ss()
 
-    for x in Files:
-        sample_id = x[0]
-        infile = x[1]
-        df_sub = pd.read_csv(infile, sep="\t")
-        df_sub.insert(loc=0, column="Sample", value=sample_id)
-        df_sub = df_sub.rename({"#Chrom":"Chromosome"}, axis=1)
-        try:
-            df = pd.concat([df, df_sub])
-        except NameError:
-            df = df_sub.copy()
+        if (len(loh) != len(het)):
+            sys.stderr.write("ERROR: number of LOH files (--loh) doesn't match number of heterozygosity files (--het)\n")
+            ss()
 
-    return df
+        Files = []
+        i = 0
+        while (i < len(loh)):
+            Files.append([names[i], loh[i], het[i]])
+            i+=1
+
+        for x in Files:
+            sample_id = x[0]
+            infile = x[1]
+            hetfile = x[2]
+
+            df_sub = pd.read_csv(infile, sep="\t")
+            df_sub.insert(loc=0, column="Sample", value=sample_id)
+            df_sub = df_sub.rename({"#Chrom":"Chromosome"}, axis=1)
+
+            df_sub_het = pd.read_csv(hetfile, sep="\t", header=None, usecols=[0,1,2])
+            df_sub_het.columns = ["Chromosome", "Start", "End"]
+            df_sub_het.insert(loc=0, column="Sample", value=sample_id)            
+
+            try:
+                # if dfs exist, append to them 
+                df = pd.concat([df, df_sub])
+                df_het = pd.concat([df_het, df_sub_het])
+            except NameError:
+                # if these two don't exist yet, create them 
+                df = df_sub.copy()
+                df_het = df_sub_het.copy()
+
+
+    elif run_mode == "two_ref":
+
+        if (len(loh) != len(names)):
+            sys.stderr.write("ERROR: number of LOH files (--loh) doesn't match number of names (--names)\n")
+            ss()
+
+        df_het = None
+
+        Files = []
+        i = 0
+        while (i < len(loh)):
+            Files.append([names[i], loh[i]])
+            i+=1
+
+        for x in Files:
+            sample_id = x[0]
+            infile = x[1]
+
+            df_sub = pd.read_csv(infile, sep="\t")
+            df_sub.insert(loc=0, column="Sample", value=sample_id)
+            df_sub = df_sub.rename({"#Chrom":"Chromosome"}, axis=1)
+
+            try:
+                # if dfs exist, append to them 
+                df = pd.concat([df, df_sub])
+            except NameError:
+                # if these two don't exist yet, create them 
+                df = df_sub.copy()
+
+    return df, df_het 
+
+
+def select_specific_chromosomes(df, df_het, args, run_mode):
+
+    """
+    12/05/2023
+    """
+
+    if run_mode == "one_ref":
+
+        if args.chr != "ALL":
+            sys.stderr.write(f"[{at()}] Selecting only chromosome {args.chr}\n")
+            df = df.loc[df["Chromosome"]==args.chr, :]
+            df_het = df_het.loc[df_het["Chromosome"]==args.chr, :]
+
+        if df.shape[0] == 0:
+            sys.stderr.write(f"""
+            
+    ERROR: dataframe is empty after selecting only chromosome {args.chr}\n
+
+    """)
+            ss()
+
+    elif run_mode == "two_ref":
+
+        if args.chr != "ALL":
+            sys.stderr.write(f"[{at()}] Selecting only chromosome {args.chr}\n")
+            df = df.loc[df["Chromosome"]==args.chr, :]
+
+        if df.shape[0] == 0:
+            sys.stderr.write(f"""
+            
+    ERROR: dataframe is empty after selecting only chromosome {args.chr}\n
+
+    """)
+            ss()
+    
+    return df, df_het
 
 
 def split_into_windows(df_sub, w_size, q, args):
@@ -205,7 +288,7 @@ def split_into_windows(df_sub, w_size, q, args):
 def split_into_windows_het(df_het, w_size, q, args):
 
     """
-    Last update: 18/04/2023
+    Last update: 12/05/2023
     """
 
     start, end = df_het["Start"], df_het["End"]
@@ -214,7 +297,7 @@ def split_into_windows_het(df_het, w_size, q, args):
 
     if (w_start <= start <= w_end) and (w_start <= end <= w_end):
         df_het["Window"] = (w_start, w_end)
-        df_het["LOH_pos"] = df_het["End"] - df_het["Start"]
+        df_het["Het_pos"] = df_het["End"] - df_het["Start"]
         q.put(df_het)
 
     elif (w_start <= start <= w_end) and (end > w_end):
@@ -222,7 +305,7 @@ def split_into_windows_het(df_het, w_size, q, args):
         df_tmp = df_het.copy()
         df_tmp.End = w_end
         df_tmp["Window"] = (w_start, w_end)
-        df_tmp["LOH_pos"] = df_tmp["End"] - df_tmp["Start"]
+        df_tmp["Het_pos"] = df_tmp["End"] - df_tmp["Start"]
         out.append(df_tmp.copy())
 
         while (end > w_end):
@@ -231,7 +314,7 @@ def split_into_windows_het(df_het, w_size, q, args):
             df_tmp.Start = max(start, w_start)
             df_tmp.End = min(end, w_end)
             df_tmp["Window"] = (w_start, w_end)
-            df_tmp["LOH_pos"] = df_tmp["End"] - df_tmp["Start"]
+            df_tmp["Het_pos"] = df_tmp["End"] - df_tmp["Start"]
             out.append(df_tmp.copy())
 
         for x in out:
@@ -318,18 +401,18 @@ def count_ratios_tworef(df_sub, w_size):
     return df_sub
 
 
-def quantize_intervals(df, window_size, threads, args):
+def quantize_heterozygosity(df_het, window_size, threads, args):
 
     """
-    Last update: 18/04/2023 
+    12/05/2023
     """
 
-    # quantize windows 
+    # read heterozygosity and quantize it 
     pool = mp.Pool(processes=threads)
     q = mp.Manager().Queue()
-
-    for index, row in df.iterrows():
-        pool.apply_async(split_into_windows, args=(row, window_size, q, args))
+    
+    for index, row in df_het.iterrows():
+        pool.apply_async(split_into_windows_het, args=(row, window_size, q, args))
 
     pool.close()
     pool.join()
@@ -338,20 +421,27 @@ def quantize_intervals(df, window_size, threads, args):
     while q.empty() == False:
         out.append(q.get())
 
-    df = pd.DataFrame(out).sort_values(by=["Sample", "Chromosome", "Window"])
+    df_het = pd.DataFrame(out).sort_values(by=["Sample", "Chromosome", "Window"])
+    df_het = df_het.rename({"LOH_pos":"Het_pos"}, axis=1)
+    df_het = df_het.loc[:,["Sample", "Chromosome", "Window", "Het_pos"]]
 
-    # read heterozygosity and quantize it 
-    if args.one_ref:
+    return df_het 
 
+
+def quantize_intervals(df, df_het, window_size, threads, run_mode, args):
+
+    """
+    Last update: 12/05/2023 
+    """
+
+    if run_mode == "one_ref":
+
+        # quantize windows 
         pool = mp.Pool(processes=threads)
         q = mp.Manager().Queue()
 
-        df_het = pd.read_csv(args.het, sep="\t", usecols=[0,1,2])
-        df_het.columns = ["Chromosome", "Start", "End"]
-        df_het.insert(loc=0, column="Sample", value=args.name[0])
-        
-        for index, row in df_het.iterrows():
-            pool.apply_async(split_into_windows_het, args=(row, window_size, q, args))
+        for index, row in df.iterrows():
+            pool.apply_async(split_into_windows, args=(row, window_size, q, args))
 
         pool.close()
         pool.join()
@@ -360,36 +450,51 @@ def quantize_intervals(df, window_size, threads, args):
         while q.empty() == False:
             out.append(q.get())
 
-        df_het = pd.DataFrame(out).sort_values(by=["Sample", "Chromosome", "Window"])
-        df_het = df_het.rename({"LOH_pos":"Het_pos"}, axis=1)
-        df_het = df_het.loc[:,["Sample", "Chromosome", "Window", "Het_pos"]]
-
-        df = df.loc[:,["Sample", "Chromosome", "Window", "LOH_pos"]]
+        df = pd.DataFrame(out).sort_values(by=["Sample", "Chromosome", "Window"])
         
-    # quantize ratios 
-    if args.one_ref:
+        df = df.loc[:,["Sample", "Chromosome", "Window", "LOH_pos"]]
         df = df.groupby(["Sample", "Chromosome", "Window"]).parallel_apply(lambda df_sub : count_ratios_oneref(df_sub, window_size, df_het))
 
-    elif args.two_ref:
+    elif run_mode == "two_ref":
+        
+        # quantize windows 
+        pool = mp.Pool(processes=threads)
+        q = mp.Manager().Queue()
+
+        for index, row in df.iterrows():
+            pool.apply_async(split_into_windows, args=(row, window_size, q, args))
+
+        pool.close()
+        pool.join()
+
+        out = []
+        while q.empty() == False:
+            out.append(q.get())
+
+        df = pd.DataFrame(out).sort_values(by=["Sample", "Chromosome", "Window"])
+        
         df = df.groupby(["Sample", "Chromosome", "Window"]).parallel_apply(lambda df_sub : count_ratios_tworef(df_sub, window_size))
-    
+        df = df.reset_index(drop=False)
+        
     return df
 
 
-def reorganise_output_dataframe(df, args):
+def reorganise_output_dataframe(df, run_mode, args):
 
     """
-    Last update: 18/04/2023
+    Last update: 12/05/2023
     """
 
-    if args.one_ref:
+    if run_mode == "one_ref":
+
         df = df.reset_index(drop=False)
         df["W_start"] = df["Window"].str[0]
         df["W_end"] = df["Window"].str[1]
         df = df.loc[:,[ "Sample", "Chromosome", "W_start", "W_end", 
                         "Het_pos", "Het_ratio", "LOH_pos", "LOH_ratio"]]
 
-    elif args.two_ref:
+    elif run_mode == "two_ref":
+
         df = df.reset_index(drop=False)
         df["W_start"] = df["Window"].str[0]
         df["W_end"] = df["Window"].str[1]
@@ -399,42 +504,231 @@ def reorganise_output_dataframe(df, args):
     return df 
 
 
-def run_one_ref_script(args):
+def fill_missing_windows(df, run_mode, args):
 
     """
-    18/04/2023
+    12/05/2023
     """
+
+    if run_mode == "one_ref":
+
+        w_start = 0
+        w_end = w_start + args.window_size 
+        chrom_old = "BEGIN"
+        sample_old = "BEGIN"
+
+        Rows_to_add = []
+
+        for index, row in df.iterrows():
+
+            # set initial variables 
+            if (chrom_old == "BEGIN") and (sample_old == "BEGIN"):
+                chrom_old = row["Chromosome"]
+                sample_old = row["Sample"]
+
+            # if chrom and sample are the same
+            # iterate while loop until reaching first window 
+            if (row["Chromosome"] == chrom_old) and \
+               (row["Sample"] == sample_old):
+                
+                if w_end <= row["W_start"]:
+
+                    while w_end <= row["W_start"]:
+                        New = [row["Sample"], row["Chromosome"], 
+                            w_start, w_end, 
+                            args.window_size, float(1), 
+                            0, float(0) ]
+
+                        s = pd.Series(New)
+                        Rows_to_add.append(s)
+
+                        w_start += args.window_size 
+                        w_end += args.window_size 
+
+                w_start += args.window_size 
+                w_end += args.window_size 
+            
+            # if chrom is different but sample is the same 
+            # simply restart count for chromosome windows 
+            elif    (row["Chromosome"] != chrom_old) and \
+                    (row["Sample"] == sample_old):
+            
+                w_start = 0 
+                w_end = w_start + args.window_size 
+
+                if w_end <= row["W_start"]:
+
+                    while w_end <= row["W_start"]:
+                        New = [row["Sample"], row["Chromosome"], 
+                            w_start, w_end, 
+                            args.window_size, float(1), 
+                            0, float(0) ]
+
+                        s = pd.Series(New)
+                        Rows_to_add.append(s)
+
+                        w_start += args.window_size 
+                        w_end += args.window_size 
+
+                w_start += args.window_size 
+                w_end += args.window_size 
+                            
+            # if sample is different 
+            # chromosome can be the same or different but it doesn't matter 
+            # the count must be restarted 
+            elif    (row["Sample"] != sample_old):
+                
+                w_start = 0
+                w_end = w_start + args.window_size 
+                
+                if w_end <= row["W_start"]:
+
+                    while w_end <= row["W_start"]:
+                        New = [row["Sample"], row["Chromosome"], 
+                            w_start, w_end, 
+                            args.window_size, float(1), 
+                            0, float(0) ]
+
+                        s = pd.Series(New)
+                        Rows_to_add.append(s)
+
+                        w_start += args.window_size 
+                        w_end += args.window_size 
+
+                w_start += args.window_size 
+                w_end += args.window_size 
+                
+
+            # reset variables 
+            chrom_old = row["Chromosome"]
+            sample_old = row["Sample"]
+
+
+        df_new = pd.DataFrame(Rows_to_add)
+        df_new.columns = ["Sample", "Chromosome", "W_start", "W_end", "Het_pos", "Het_ratio", "LOH_pos", "LOH_ratio"]
+
+        df = pd.concat([df, df_new]).sort_values(by=["Sample", "Chromosome", "W_start", "W_end"])
+
+
+    elif run_mode == "two_ref":
+        
+        w_start = 0
+        w_end = w_start + args.window_size 
+        chrom_old = "BEGIN"
+        sample_old = "BEGIN"
+
+        Rows_to_add = []
+
+        for index, row in df.iterrows():
+
+            # set initial variables 
+            if (chrom_old == "BEGIN") and (sample_old == "BEGIN"):
+                chrom_old = row["Chromosome"]
+                sample_old = row["Sample"]
+
+            # if chrom and sample are the same
+            # iterate while loop until reaching first window 
+            if (row["Chromosome"] == chrom_old) and \
+               (row["Sample"] == sample_old):
+
+                if w_end <= row["W_start"]:
+
+                    while w_end <= row["W_start"]:
+                        New = [row["Sample"], row["Chromosome"], 
+                            w_start, w_end, 
+                            0, float(0), 0, float(0) ]
+                        
+                        s = pd.Series(New)
+                        Rows_to_add.append(s)
+
+                        w_start += args.window_size 
+                        w_end += args.window_size 
+
+                w_start += args.window_size 
+                w_end += args.window_size 
+            
+            # if chrom is different but sample is the same 
+            # simply restart count for chromosome windows 
+            elif    (row["Chromosome"] != chrom_old) and \
+                    (row["Sample"] == sample_old):
+            
+                w_start = 0 
+                w_end = w_start + args.window_size 
+
+                if w_end <= row["W_start"]:
+
+                    while w_end <= row["W_start"]:
+                        New = [row["Sample"], row["Chromosome"], 
+                            w_start, w_end, 
+                            0, float(0), 0, float(0) ]
+                        
+                        s = pd.Series(New)
+                        Rows_to_add.append(s)
+
+                        w_start += args.window_size 
+                        w_end += args.window_size 
+
+                w_start += args.window_size 
+                w_end += args.window_size 
+                            
+            # if sample is different 
+            # chromosome can be the same or different but it doesn't matter 
+            # the count must be restarted 
+            elif    (row["Sample"] != sample_old):
+                
+                w_start = 0
+                w_end = w_start + args.window_size 
+                
+                if w_end <= row["W_start"]:
+
+                    while w_end <= row["W_start"]:
+                        New = [row["Sample"], row["Chromosome"], 
+                            w_start, w_end, 
+                            0, float(0), 0, float(0) ]
+                        
+                        s = pd.Series(New)
+                        Rows_to_add.append(s)
+
+                        w_start += args.window_size 
+                        w_end += args.window_size 
+
+                w_start += args.window_size 
+                w_end += args.window_size 
+                
+            # reset variables 
+            chrom_old = row["Chromosome"]
+            sample_old = row["Sample"]
+
+
+        df_new = pd.DataFrame(Rows_to_add)
+        df_new.columns = ["Sample", "Chromosome", "W_start", "W_end", "LOH_pos_REF", "LOH_ratio_REF", "LOH_pos_ALT", "LOH_ratio_ALT"]
+
+        df = pd.concat([df, df_new]).sort_values(by=["Sample", "Chromosome", "W_start", "W_end"])
+
+    return df 
+
+
+
+def run_one_ref_script(loh_table, args):
+
+    """
+    12/05/2023
+    """
+
+    if args.by_sample:
+        plot_type = "by_sample"
+    else:
+        plot_type = "by_chromosome"
 
     # plot 
     sys.stderr.write(f"[{at()}] Plotting\n")
     src_dir = "/".join(sys.argv[0].split("/")[0:-1]) + "/" + "scripts"
     cmd = " ".join([
-        "Rscript", f"{src_dir}/loh-bin-plots_one-ref.Rscript", 
-        f"{args.output_dir}/LOH_rate_by_window.tsv", 
+        "Rscript", 
+        f"{src_dir}/loh-bin-plots_one-ref.Rscript", 
+        str(loh_table), 
         f"{args.output_dir}/plots",
-        str(args.aspect_ratio), 
-        str(args.width),
-        str(args.height),
-        str(args.res),
-        str(args.name[0]) ])
-    
-    sys.stderr.write(f"\nPlot command that was run:\n{cmd}\n\n")
-    os.system(cmd)
-
-
-def run_two_ref_script(args):
-
-    """
-    18/04/2023
-    """
-
-    # plot 
-    sys.stderr.write(f"[{at()}] Plotting\n") 
-    src_dir = "/".join(sys.argv[0].split("/")[0:-1]) + "/" + "scripts"
-    cmd = " ".join([
-        "Rscript", f"{src_dir}/loh-bin-plots_two-ref.Rscript", 
-        f"{args.output_dir}/LOH_rate_by_window.tsv", 
-        f"{args.output_dir}/plots",
+        str(plot_type), 
         str(args.aspect_ratio), 
         str(args.width),
         str(args.height),
@@ -445,6 +739,105 @@ def run_two_ref_script(args):
     os.system(cmd)
 
 
+def run_two_ref_script(loh_table, args):
+
+    """
+    12/05/2023
+    """
+
+    if args.by_sample:
+        plot_type = "by_sample"
+    else:
+        plot_type = "by_chromosome"
+
+    # plot 
+    sys.stderr.write(f"[{at()}] Plotting\n") 
+    src_dir = "/".join(sys.argv[0].split("/")[0:-1]) + "/" + "scripts"
+    cmd = " ".join([
+        "Rscript", f"{src_dir}/loh-bin-plots_two-ref.Rscript", 
+        str(loh_table), 
+        f"{args.output_dir}/plots",
+        str(plot_type),
+        str(args.aspect_ratio), 
+        str(args.width),
+        str(args.height),
+        str(args.res),
+        args.ref_name, args.alt_name ])
+    
+    sys.stderr.write(f"\nPlot command that was run:\n{cmd}\n\n")
+    os.system(cmd)
+
+
+def run_oneref_mode(args):
+
+    """
+    12/05/2023
+    """
+
+    # read input information and put it into a single dataframe 
+    # create another one for heterozygosity files 
+    sys.stderr.write(f"[{at()}] Reading input information\n")
+    df, df_het = organise_input(args.loh, args.names, args.het, "one_ref")
+
+    # select specific chromosome if user wants 
+    if args.chr:
+        df, df_het = select_specific_chromosomes(df, df_het, args, "one_ref")
+    
+    # quantize in windows 
+    sys.stderr.write(f"[{at()}] Quantizing in windows of {args.window_size} bp\n") 
+    df_het = quantize_heterozygosity(df_het, args.window_size, args.threads, args)
+    df = quantize_intervals(df, df_het, args.window_size, args.threads, "one_ref", args)
+    
+    # reorganise output 
+    df = reorganise_output_dataframe(df, "one_ref", args)
+
+    # fill the gaps
+    df = fill_missing_windows(df, "one_ref", args)
+
+    # write table to output
+    sys.stderr.write(f"[{at()}] Writing table to output\n") 
+
+    loh_table = f"{args.output_dir}/LOH_rate.tsv"
+    df.to_csv(loh_table, sep="\t", header=True, index=False)
+
+    run_one_ref_script(loh_table, args)
+
+
+def run_tworef_mode(args):
+
+    """
+    12/05/2023
+    """
+
+    # read input information and put it into a single dataframe 
+    # ignore heterozygosity 
+    sys.stderr.write(f"[{at()}] Reading input information\n")
+    df, df_het = organise_input(args.loh, args.names, None, "two_ref")
+    
+    # select specific chromosome if user wants 
+    if args.chr:
+        df, df_het = select_specific_chromosomes(df, df_het, args, "two_ref")
+
+    # quantize in windows 
+    sys.stderr.write(f"[{at()}] Quantizing in windows of {args.window_size} bp\n") 
+    df = quantize_intervals(df, df_het, args.window_size, args.threads, "two_ref", args)
+
+    # reorganise output 
+    df = reorganise_output_dataframe(df, "two_ref", args)
+    
+    # fill the gaps
+    df = fill_missing_windows(df, "two_ref", args)
+
+    # write table to output
+    sys.stderr.write(f"[{at()}] Writing table to output\n") 
+
+    loh_table = f"{args.output_dir}/LOH_rate.tsv"
+    df.to_csv(loh_table, sep="\t", header=True, index=False)
+
+    run_two_ref_script(loh_table, args)
+
+
+
 def main(args):
 
     # check conditions
@@ -453,42 +846,14 @@ def main(args):
     # organise workspace
     os.makedirs(args.output_dir, exist_ok=True)
 
-    # create input table
-    sys.stderr.write(f"[{at()}] Reading input information\n")
     if args.one_ref:
-        df = organize_input(args.loh, args.name)
-    
-    elif args.two_ref:
-        df = organize_input(args.loh, args.names)
-
-    # select specific chromosome if user wants 
-    if args.chr != "ALL":
-        sys.stderr.write(f"[{at()}] Selecting only chromosome {args.chr}\n")
-        df = df.loc[df["Chromosome"]==args.chr, :]
-
-    if df.shape[0] == 0:
-        sys.stderr.write(f"""
-        
-ERROR: dataframe is empty after selecting only chromosome {args.chr}\n
-
-""")
-        ss()
-    
-    # quantize in windows 
-    sys.stderr.write(f"[{at()}] Quantizing in windows of {args.window_size} bp\n") 
-    df = quantize_intervals(df, args.window_size, args.threads, args)
-    df = reorganise_output_dataframe(df, args)
-    
-    # write table to output
-    sys.stderr.write(f"[{at()}] Writing table to output\n") 
-    df.to_csv(f"{args.output_dir}/LOH_rate_by_window.tsv", sep="\t", header=True, index=False)
-
-    if args.one_ref:
-        run_one_ref_script(args)
+        run_oneref_mode(args)
 
     elif args.two_ref:
-        run_two_ref_script(args)
+        run_tworef_mode(args)
 
+    else:
+        pass
 
 # main 
 if __name__ == "__main__":

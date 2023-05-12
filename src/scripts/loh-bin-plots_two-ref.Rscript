@@ -1,20 +1,26 @@
 #!/usr/bin/env Rscript
 
 # libraries
+
+suppressWarnings({
+
 library(ggplot2)
 library(reshape2)
 library(hash)
 library(scales)
 
+})
+
 args <- commandArgs(trailingOnly=T)
 infile <- args[1]
 outdir <- args[2]
-myRatio <- as.numeric(args[3])
-myWidth <- as.numeric(args[4])
-myHeight <- as.numeric(args[5])
-myRes <- as.numeric(args[6])
-myRef <- args[7]
-myAlt <- args[8]
+plotType <- args[3]
+myRatio <- as.numeric(args[4])
+myWidth <- as.numeric(args[5])
+myHeight <- as.numeric(args[6])
+myRes <- as.numeric(args[7])
+myRef <- args[8]
+myAlt <- args[9]
 
 # read input file
 dir.create(outdir, showWarnings = FALSE)
@@ -27,40 +33,85 @@ df$Sample <- gsub("_.*", "", df$Sample)
 df$Sample <- factor(as.character(df$Sample), levels=unique(as.character(df$Sample)))
 df$LOH_ratio <- df$LOH_ratio_ALT - df$LOH_ratio_REF
 
-Chroms <- unique(as.character(df$Chromosome))
+if (plotType == "by_chromosome") {
 
-chrom_counter = 0
+  # identify chromosomes 
+  Chroms <- unique(as.character(df$Chromosome))
+  chrom_counter = 0
 
-for (chrom in Chroms) {
+  # iterate by chromosome
+  for (chrom in Chroms) {
 
-  chrom_counter = chrom_counter + 1
-  print(paste("Working on chromosome ", chrom_counter, " out of ", length(Chroms), sep=""))
+    chrom_counter = chrom_counter + 1
+    print(paste("Working on chromosome ", chrom_counter, " out of ", length(Chroms), sep=""))
 
-  df_chr <- df[df$Chromosome==chrom, ]
-  df_chr$Sample <- factor(df_chr$Sample, levels=unique(df_chr$Sample))
-  df_chr$Chromosome <- factor(df_chr$Chromosome, levels=unique(df_chr$Chromosome))
+    df_chr <- df[df$Chromosome==chrom, ]
+    df_chr$Sample <- factor(df_chr$Sample, levels=unique(df_chr$Sample))
+    df_chr$Chromosome <- factor(df_chr$Chromosome, levels=unique(df_chr$Chromosome))
 
-  x <- df_chr[ , c("Sample", "W_end", "LOH_ratio")]
+    x <- df_chr[ , c("Sample", "W_end", "LOH_ratio")]
 
-  P1 <- ggplot(data=x, aes(x=W_end, y=Sample, fill=LOH_ratio)) +
-  theme_bw() +
-  theme(aspect.ratio=myRatio,
-        axis.text=element_text(family="Helvetica", face="plain", size=8),
-        axis.title=element_text(family="Helvetica", face="plain", size=9),
-        legend.text=element_text(family="Helvetica", face="italic", size=7),
-        legend.title=element_text(family="Helvetica", face="plain", size=9),
-        plot.title=element_text(family="Helvetica", face="plain", size=9)) +
-  geom_tile() +
-  xlab("Position [Mbp]") +
-  scale_fill_gradient2(low="#EF6F6C", mid="white", high="#64B6AC", midpoint=0,
-                        na.value = "grey50", breaks=c(-1,0,1), limits=c(-1,1),
-                        labels=c(myRef, "Undefined", myAlt), 
-                        name="") +
-  ylab("")
+    P1 <- ggplot(data=x, aes(x=W_end, y=Sample, fill=LOH_ratio)) +
+    theme_bw() +
+    theme(aspect.ratio=myRatio,
+          axis.text=element_text(family="Helvetica", face="plain", size=8),
+          axis.title=element_text(family="Helvetica", face="plain", size=9),
+          legend.text=element_text(family="Helvetica", face="italic", size=7),
+          legend.title=element_text(family="Helvetica", face="plain", size=9),
+          plot.title=element_text(family="Helvetica", face="plain", size=9)) +
+    geom_tile() +
+    xlab("Position [Mbp]") +
+    scale_fill_gradient2(low="#EF6F6C", mid="white", high="#64B6AC", midpoint=0,
+                          na.value = "grey50", breaks=c(-1,0,1), limits=c(-1,1),
+                          labels=c(myRef, "Undefined", myAlt), 
+                          name="") +
+    ylab("")
 
-  outfile <- paste(chrom, "LOH", "png", sep=".")
-  out <- paste(outdir, outfile, sep="/")
-  png(out, height=myHeight, width=myWidth, res=myRes, units="px")
-  plot(P1)
-  dev.off()
+    outfile <- paste(chrom, "LOH", "png", sep=".")
+    out <- paste(outdir, outfile, sep="/")
+    png(out, height=myHeight, width=myWidth, res=myRes, units="px")
+    plot(P1)
+    dev.off()
+  }
+
+} else if (plotType == "by_sample") {
+   
+  # identify chromosomes 
+  Samples <- unique(as.character(df$Sample))
+  sample_counter = 0
+
+  # iterate by chromosome
+  for (sample in Samples) {
+
+    sample_counter = sample_counter + 1
+    print(paste("Working on sample ", sample_counter, " out of ", length(Samples), sep=""))
+
+    df_smp <- df[df$Sample==sample, ]
+    df_smp$Sample <- factor(df_smp$Sample, levels=unique(df_smp$Sample))
+    df_smp$Chromosome <- factor(df_smp$Chromosome, levels=unique(df_smp$Chromosome))
+
+    x <- df_smp[ , c("Chromosome", "W_end", "LOH_ratio")]
+
+    P1 <- ggplot(data=x, aes(x=W_end, y=Chromosome, fill=LOH_ratio)) +
+    theme_bw() +
+    theme(aspect.ratio=myRatio,
+          axis.text=element_text(family="Helvetica", face="plain", size=8),
+          axis.title=element_text(family="Helvetica", face="plain", size=9),
+          legend.text=element_text(family="Helvetica", face="italic", size=7),
+          legend.title=element_text(family="Helvetica", face="plain", size=9),
+          plot.title=element_text(family="Helvetica", face="plain", size=9)) +
+    geom_tile() +
+    xlab("Position [Mbp]") +
+    scale_fill_gradient2(low="#EF6F6C", mid="white", high="#64B6AC", midpoint=0,
+                          na.value = "grey50", breaks=c(-1,0,1), limits=c(-1,1),
+                          labels=c(myRef, "Undefined", myAlt), 
+                          name="") +
+    ylab("")
+
+    outfile <- paste(sample, "LOH", "png", sep=".")
+    out <- paste(outdir, outfile, sep="/")
+    png(out, height=myHeight, width=myWidth, res=myRes, units="px")
+    plot(P1)
+    dev.off()
+  }  
 }
