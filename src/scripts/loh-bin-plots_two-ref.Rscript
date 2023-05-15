@@ -15,22 +15,26 @@ args <- commandArgs(trailingOnly=T)
 infile <- args[1]
 outdir <- args[2]
 plotType <- args[3]
-myRatio <- as.numeric(args[4])
-myWidth <- as.numeric(args[5])
-myHeight <- as.numeric(args[6])
-myRes <- as.numeric(args[7])
-myRef <- args[8]
-myAlt <- args[9]
+plotOrder <- args[4]
+myRatio <- as.numeric(args[5])
+myWidth <- as.numeric(args[6])
+myHeight <- as.numeric(args[7])
+myRes <- as.numeric(args[8])
+myRef <- args[9]
+myAlt <- args[10]
 
 # read input file
 dir.create(outdir, showWarnings = FALSE)
 df <- read.table(infile, header=T)
 
+# read plot order 
+plotOrder <- rev(unlist(strsplit(plotOrder, ",", fixed=T)))
+
 # fix positions and names 
 df$W_start <- df$W_start / 1000000
 df$W_end <- df$W_end / 1000000
 df$Sample <- gsub("_.*", "", df$Sample)
-df$Sample <- factor(as.character(df$Sample), levels=unique(as.character(df$Sample)))
+df$Sample <- factor(as.character(df$Sample), levels=plotOrder)
 df$LOH_ratio <- df$LOH_ratio_ALT - df$LOH_ratio_REF
 
 if (plotType == "by_chromosome") {
@@ -46,7 +50,6 @@ if (plotType == "by_chromosome") {
     print(paste("Working on chromosome ", chrom_counter, " out of ", length(Chroms), sep=""))
 
     df_chr <- df[df$Chromosome==chrom, ]
-    df_chr$Sample <- factor(df_chr$Sample, levels=unique(df_chr$Sample))
     df_chr$Chromosome <- factor(df_chr$Chromosome, levels=unique(df_chr$Chromosome))
 
     x <- df_chr[ , c("Sample", "W_end", "LOH_ratio")]
