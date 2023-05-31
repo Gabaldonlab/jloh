@@ -41,26 +41,28 @@ if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
     Barcelona Supercomputing Center (BSC) 
     2023 
 
-    v0.22.1
+    v0.23.0
 
     ####
 
  -- Extraction
+    stats               Estimate heterozygous and homozygous SNP statistics
     g2g                 Align two genomes to find regions that should carry SNPs
     extract             Extract LOH blocks from VCF, BAM and FASTA files
+
+ -- Operations
     filter              Filter extracted LOH blocks
     intersect           Perform intersection/removal operations with output files
+    cluster             Cluster different runs by overlap 
     chimeric            Extract genes featuring LOH blocks from different haplotypes
-
- -- Calculations
-    stats               Estimate heterozygous and homozygous SNP statistics
     junctions           Calculate number of block-to-block junctions over the genome
+
+ -- Visualization
+    plot                Make an LOH propensity plot from "extract" output file(s)
 
  -- Simulation
     sim                 Simulate a divergent copy of a genome
 
- -- Visualization
-    plot                Make an LOH propensity plot from "extract" output file(s)
 
 """)
 else:

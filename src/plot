@@ -45,33 +45,22 @@ Usage:
 jloh plot --loh <TSV_1> ... <TSV_n> --names <STR_1> ... <STR_n> [options]
 
 
-[one reference]
---one-ref           Activate "one reference" mode                               [off]
---loh               Input TSV file containing LOH blocks from JLOH extract      [!]
---names             Name to use in plot                                         [!]
---het               Input BED file containing het regions from JLOH extract     [!]
---ref-name          Name to use in plot for REF allele                          [REF]
---alt-name          Name to use in plot for ALT allele                          [ALT]
---output-dir        Output directory, created if not existitng                  [JLOH_plot_out]
-
-[two references]
---two-ref           Activate "two references" mode                              [off]
---loh               Input TSV files containing LOH blocks from JLOH extract     [!]
---names             Names to use in plot for each of the files (same order)     [!]
---ref-name          Name to use in plot for REF allele                          [REF]
---alt-name          Name to use in plot for ALT allele                          [ALT]
---output-dir        Output directory, created if not existitng                  [JLOH_plot_out]
-
-[by sample]
---by-sample         Use "by sample" mode (each plot is a different sample)      [off]
-                    Plots will be organised by sample rather than by chromosome
+[modes]
+--one-ref           Plot LOH vs Het propensity (use --het in combination)       [off]
+--two-ref           Plot LOH towards genome A vs B                              [off]
 
 [parameters]
+--het               Input BED file containing het regions from JLOH extract     [!]
+                    For "--one-ref" mode only 
+--by-sample         Use "by sample" mode (each plot is a different sample)      [off]
+                    Plots will be organised by sample rather than by chromosome
+--clusters          "clust" file from jloh cluster to define plotting order     [off]
 --threads           Number of parallel threads                                  [12]
 --chr               Restrict the analysis to this specific chromosome           [off]
 --window-size       Size of window for plotting, the shorter the slower         [10000]
 
-[ggplot2 options]
+[R/ggplot2 options]
+--r-exec            R executable name to run plotting scripts                   [Rscript] 
 --aspect-ratio      Ratio between y / x for the output plot                     [0.35]
 --width             Width (px) of the output plot                               [2000]
 --height            Height (px) of the output plot                              [750]
@@ -87,6 +76,7 @@ p.add_argument("--one-ref", action="store_true")
 p.add_argument("--two-ref", action="store_true")
 p.add_argument("--by-sample", action="store_true")
 p.add_argument("--loh", nargs="+")
+p.add_argument("--clusters")
 p.add_argument("--het", nargs="+")
 p.add_argument("--name", nargs="+")
 p.add_argument("--names", nargs="+")
@@ -96,6 +86,7 @@ p.add_argument("--chr", default="ALL")
 p.add_argument("--window-size", default=10000, type=int)
 p.add_argument("--threads", type=int, default=12)
 p.add_argument("--output-dir", default="JLOH_plot_out")
+p.add_argument("--r-exec", default="Rscript", type=str)
 p.add_argument("--aspect-ratio", default=0.35, type=float)
 p.add_argument("--width", default=2000, type=int)
 p.add_argument("--height", default=750, type=int)
@@ -117,11 +108,10 @@ ERROR: you should use either --one-ref or --two-ref
 
 """)
 
-    if (args.one_ref or args.two_ref) and not (args.loh and args.names):
+    if (args.one_ref or args.two_ref) and not (args.loh):
         sys.exit("""
 
-ERROR: when using --two-ref you should pass both the --loh files and the 
---names you want to use with them in the plots 
+ERROR: No --loh files were passed 
 
 """)
 
@@ -201,6 +191,79 @@ def organise_input(loh, names, het, run_mode):
                 df = df_sub.copy()
 
     return df, df_het 
+
+
+def sort_input_files(args):
+
+    """
+    31/05/2023
+    """
+
+    if args.one_ref:
+
+        if args.clusters:
+
+            df_clusters = pd.read_csv(args.clusters, header="infer", sep="\t")
+            sorting_order = df_clusters["Sample"].tolist()
+
+            if args.names:
+                Loh = []
+                Names = []
+                Het = []
+                for x in sorting_order:
+                    Loh.append(x)
+                    idx = args.loh.index(x)
+                    Names.append(args.names[idx])
+                    Het.append(args.het[idx])
+            else:
+                Loh = sorting_order
+                Names = sorting_order
+                Het = []
+                for x in sorting_order:
+                    idx = args.loh.index(x)
+                    Het.append(args.het[idx])
+
+        else:
+            if args.names:
+                Loh = args.loh
+                Names = args.names
+                Het = args.het
+            else:
+                Loh = args.loh 
+                Names = args.loh
+                Het = args.het 
+    
+    elif args.two_ref:
+
+        Het = None
+
+        if args.clusters:
+
+            df_clusters = pd.read_csv(args.clusters, header="infer", sep="\t")
+            sorting_order = df_clusters["Sample"].tolist()
+
+            if args.names:
+                Loh = []
+                Names = []
+                for x in sorting_order:
+                    Loh.append(x)
+                    idx = args.loh.index(x)
+                    Names.append(args.names[idx])
+            else:
+                Loh = sorting_order
+                Names = sorting_order
+                for x in sorting_order:
+                    idx = args.loh.index(x)
+
+        else:
+            if args.names:
+                Loh = args.loh
+                Names = args.names
+            else:
+                Loh = args.loh 
+                Names = args.loh
+
+    return Loh, Names, Het
 
 
 def select_specific_chromosomes(df, df_het, args, run_mode):
@@ -709,7 +772,7 @@ def fill_missing_windows(df, run_mode, args):
 
 
 
-def run_one_ref_script(loh_table, args):
+def run_one_ref_script(loh_table, Names, args):
 
     """
     12/05/2023
@@ -724,12 +787,12 @@ def run_one_ref_script(loh_table, args):
     sys.stderr.write(f"[{at()}] Plotting\n")
     src_dir = "/".join(sys.argv[0].split("/")[0:-1]) + "/" + "scripts"
     cmd = " ".join([
-        "Rscript", 
+        str(args.r_exec), 
         f"{src_dir}/loh-bin-plots_one-ref.Rscript", 
         str(loh_table), 
         f"{args.output_dir}/plots",
         str(plot_type), 
-        str(",".join(args.names)),
+        str(",".join(Names)),
         str(args.aspect_ratio), 
         str(args.width),
         str(args.height),
@@ -740,7 +803,7 @@ def run_one_ref_script(loh_table, args):
     os.system(cmd)
 
 
-def run_two_ref_script(loh_table, args):
+def run_two_ref_script(loh_table, Names, args):
 
     """
     12/05/2023
@@ -755,11 +818,11 @@ def run_two_ref_script(loh_table, args):
     sys.stderr.write(f"[{at()}] Plotting\n") 
     src_dir = "/".join(sys.argv[0].split("/")[0:-1]) + "/" + "scripts"
     cmd = " ".join([
-        "Rscript", f"{src_dir}/loh-bin-plots_two-ref.Rscript", 
+        str(args.r_exec), f"{src_dir}/loh-bin-plots_two-ref.Rscript", 
         str(loh_table), 
         f"{args.output_dir}/plots",
         str(plot_type),
-        str(",".join(args.names)),
+        str(",".join(Names)),
         str(args.aspect_ratio), 
         str(args.width),
         str(args.height),
@@ -773,13 +836,16 @@ def run_two_ref_script(loh_table, args):
 def run_oneref_mode(args):
 
     """
-    12/05/2023
+    31/05/2023
     """
 
-    # read input information and put it into a single dataframe 
+    # read input files and names and sort them by cluster if provided 
+    Loh, Names, Het = sort_input_files(args)
+
+    # put information into a single dataframe 
     # create another one for heterozygosity files 
     sys.stderr.write(f"[{at()}] Reading input information\n")
-    df, df_het = organise_input(args.loh, args.names, args.het, "one_ref")
+    df, df_het = organise_input(Loh, Names, Het, "one_ref")
 
     # select specific chromosome if user wants 
     if args.chr:
@@ -795,26 +861,30 @@ def run_oneref_mode(args):
 
     # fill the gaps
     df = fill_missing_windows(df, "one_ref", args)
-
+    
     # write table to output
     sys.stderr.write(f"[{at()}] Writing table to output\n") 
 
     loh_table = f"{args.output_dir}/LOH_rate.tsv"
     df.to_csv(loh_table, sep="\t", header=True, index=False)
 
-    run_one_ref_script(loh_table, args)
+    run_one_ref_script(loh_table, Names, args)
 
 
 def run_tworef_mode(args):
 
     """
-    12/05/2023
+    31/05/2023
     """
+
+    # read input files and names and sort them by cluster if provided 
+    # het is useless, and in fact assigned to "None" by the function in two_ref mode
+    Loh, Names, Het = sort_input_files(args)
 
     # read input information and put it into a single dataframe 
     # ignore heterozygosity 
     sys.stderr.write(f"[{at()}] Reading input information\n")
-    df, df_het = organise_input(args.loh, args.names, None, "two_ref")
+    df, df_het = organise_input(Loh, Names, Het, "two_ref")
     
     # select specific chromosome if user wants 
     if args.chr:
@@ -836,7 +906,7 @@ def run_tworef_mode(args):
     loh_table = f"{args.output_dir}/LOH_rate.tsv"
     df.to_csv(loh_table, sep="\t", header=True, index=False)
 
-    run_two_ref_script(loh_table, args)
+    run_two_ref_script(loh_table, Names, args)
 
 
 

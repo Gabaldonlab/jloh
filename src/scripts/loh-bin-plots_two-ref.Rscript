@@ -33,7 +33,6 @@ plotOrder <- rev(unlist(strsplit(plotOrder, ",", fixed=T)))
 # fix positions and names 
 df$W_start <- df$W_start / 1000000
 df$W_end <- df$W_end / 1000000
-df$Sample <- gsub("_.*", "", df$Sample)
 df$Sample <- factor(as.character(df$Sample), levels=plotOrder)
 df$LOH_ratio <- df$LOH_ratio_ALT - df$LOH_ratio_REF
 
