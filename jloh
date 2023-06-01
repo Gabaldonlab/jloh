@@ -65,6 +65,7 @@ if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
 
 
 """)
+
 else:
     args = " ".join(sys.argv[1:])
     PROGRAMDIR = os.path.dirname(os.path.realpath(__file__))
