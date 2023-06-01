@@ -50,8 +50,11 @@ jloh plot --loh <TSV_1> ... <TSV_n> --names <STR_1> ... <STR_n> [options]
 --two-ref           Plot LOH towards genome A vs B                              [off]
 
 [parameters]
+--output-dir        Output directory (created if non-existent)                  [JLOH_plot_out]
 --het               Input BED file containing het regions from JLOH extract     [!]
                     For "--one-ref" mode only 
+--ref-name          Name to label the reference allele                          [REF]
+--alt-name          Name to label the alternative allele                        [ALT]
 --by-sample         Use "by sample" mode (each plot is a different sample)      [off]
                     Plots will be organised by sample rather than by chromosome
 --clusters          "clust" file from jloh cluster to define plotting order     [off]
@@ -78,7 +81,6 @@ p.add_argument("--by-sample", action="store_true")
 p.add_argument("--loh", nargs="+")
 p.add_argument("--clusters")
 p.add_argument("--het", nargs="+")
-p.add_argument("--name", nargs="+")
 p.add_argument("--names", nargs="+")
 p.add_argument("--ref-name", default="REF")
 p.add_argument("--alt-name", default="ALT")
