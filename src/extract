@@ -38,12 +38,6 @@ import shutil
 import pandas as pd
 import random 
 import string 
-# from os.path import getsize
-# import subprocess
-# import time
-# from math import log10
-# import numpy as np
-# from sys import getsizeof
 
 
 ss = sys.exit
