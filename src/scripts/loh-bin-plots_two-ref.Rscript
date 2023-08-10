@@ -26,98 +26,143 @@ het_color <- unlist(strsplit(args[7], split=","))[1]
 ref_color <- unlist(strsplit(args[7], split=","))[2]
 alt_color <- unlist(strsplit(args[7], split=","))[3]
 midpoint_color <- unlist(strsplit(args[7], split=","))[4]
+do_we_merge <- args[8]
+prefix <- args[9]
 
 # read input file
 dir.create(outdir, showWarnings = FALSE)
 df <- read.table(infile, header=T)
 
-# read plot order 
-plotOrder <- rev(unlist(strsplit(plotOrder, ",", fixed=T)))
+if (do_we_merge == "yes") {
 
-# fix positions and names 
-df$W_start <- df$W_start / 1000000
-df$W_end <- df$W_end / 1000000
-df$Sample <- factor(as.character(df$Sample), levels=plotOrder)
-df$LOH_ratio <- df$LOH_ratio_ALT - df$LOH_ratio_REF
+  # merging combination 
+  df["Merged_key"] <- paste(df$Chromosome, df$W_start, sep="__")
+  df$Merged_key <- as.factor(df$Merged_key)
 
-if (plotType == "by_chromosome") {
+  # read plot order 
+  plotOrder <- rev(unlist(strsplit(plotOrder, ",", fixed=T)))
 
-  # identify chromosomes 
-  Chroms <- unique(as.character(df$Chromosome))
-  chrom_counter = 0
+  # fix positions and names 
+  df$W_start <- df$W_start / 1000000
+  df$W_end <- df$W_end / 1000000
+  df$Sample <- factor(as.character(df$Sample), levels=plotOrder)
+  df$LOH_ratio <- df$LOH_ratio_ALT - df$LOH_ratio_REF
 
-  # iterate by chromosome
-  for (chrom in Chroms) {
+  # plotting the merged version 
+  x <- df[ , c("Merged_key", "Sample", "LOH_propensity")]
 
-    chrom_counter = chrom_counter + 1
-    print(paste("Working on chromosome ", chrom_counter, " out of ", length(Chroms), sep=""))
+  P1 <- ggplot(data=x, aes(x=Merged_key, y=Sample, fill=LOH_propensity)) +
+  theme_bw() +
+  theme(aspect.ratio=myRatio,
+      axis.text=element_text(family="Helvetica", face="plain", size=9),
+      axis.title=element_text(family="Helvetica", face="plain", size=11),
+      legend.text=element_text(family="Helvetica", face="italic", size=9),
+      legend.title=element_text(family="Helvetica", face="plain", size=9),
+      plot.title=element_text(family="Helvetica", face="plain", size=9)) +
+  geom_tile() +
+  scale_x_discrete(name="Concatenated chromosomes [Mbp]", labels=NULL) +
+  scale_fill_gradient2(low=het_color, mid=midpoint_color, high=ref_color, midpoint=0,
+                      na.value = "grey50", breaks=c(-1,1), limits=c(-1,1),
+                      labels=c("Het", "LOH"), 
+                      name="") +
+  ylab("")
 
-    df_chr <- df[df$Chromosome==chrom, ]
-    df_chr$Chromosome <- factor(df_chr$Chromosome, levels=unique(df_chr$Chromosome))
+  outfile <- paste(prefix, "merged.loh.png", sep=".")
+  out <- paste(outdir, outfile, sep="/")
+  png(out, height=myHeight, width=myWidth, res=myRes, units="px")
+  plot(P1)
+  dev.off()
 
-    x <- df_chr[ , c("Sample", "W_end", "LOH_ratio")]
+} else {
 
-    P1 <- ggplot(data=x, aes(x=W_end, y=Sample, fill=LOH_ratio)) +
-    theme_bw() +
-    theme(aspect.ratio=myRatio,
-          axis.text=element_text(family="Helvetica", face="plain", size=8),
-          axis.title=element_text(family="Helvetica", face="plain", size=9),
-          legend.text=element_text(family="Helvetica", face="italic", size=7),
-          legend.title=element_text(family="Helvetica", face="plain", size=9),
-          plot.title=element_text(family="Helvetica", face="plain", size=9)) +
-    geom_tile() +
-    xlab("Position [Mbp]") +
-    scale_fill_gradient2(low=ref_color, mid=midpoint_color, high=alt_color, midpoint=0,
-                          na.value = "grey50", breaks=c(-1,0,1), limits=c(-1,1),
-                          labels=c(myRef, "Undefined", myAlt), 
-                          name="") +
-    ylab("")
+  # read plot order 
+  plotOrder <- rev(unlist(strsplit(plotOrder, ",", fixed=T)))
 
-    outfile <- paste(chrom, "LOH", "png", sep=".")
-    out <- paste(outdir, outfile, sep="/")
-    png(out, height=myHeight, width=myWidth, res=myRes, units="px")
-    plot(P1)
-    dev.off()
+  # fix positions and names 
+  df$W_start <- df$W_start / 1000000
+  df$W_end <- df$W_end / 1000000
+  df$Sample <- factor(as.character(df$Sample), levels=plotOrder)
+  df$LOH_ratio <- df$LOH_ratio_ALT - df$LOH_ratio_REF
+
+  if (plotType == "by_chromosome") {
+
+    # identify chromosomes 
+    Chroms <- unique(as.character(df$Chromosome))
+    chrom_counter = 0
+
+    # iterate by chromosome
+    for (chrom in Chroms) {
+
+      chrom_counter = chrom_counter + 1
+      print(paste("Working on chromosome ", chrom_counter, " out of ", length(Chroms), sep=""))
+
+      df_chr <- df[df$Chromosome==chrom, ]
+      df_chr$Chromosome <- factor(df_chr$Chromosome, levels=unique(df_chr$Chromosome))
+
+      x <- df_chr[ , c("Sample", "W_end", "LOH_ratio")]
+
+      P1 <- ggplot(data=x, aes(x=W_end, y=Sample, fill=LOH_ratio)) +
+      theme_bw() +
+      theme(aspect.ratio=myRatio,
+            axis.text=element_text(family="Helvetica", face="plain", size=8),
+            axis.title=element_text(family="Helvetica", face="plain", size=9),
+            legend.text=element_text(family="Helvetica", face="italic", size=7),
+            legend.title=element_text(family="Helvetica", face="plain", size=9),
+            plot.title=element_text(family="Helvetica", face="plain", size=9)) +
+      geom_tile() +
+      xlab("Position [Mbp]") +
+      scale_fill_gradient2(low=ref_color, mid=midpoint_color, high=alt_color, midpoint=0,
+                            na.value = "grey50", breaks=c(-1,0,1), limits=c(-1,1),
+                            labels=c(myRef, "Undefined", myAlt), 
+                            name="") +
+      ylab("")
+
+      outfile <- paste(prefix, chrom, "LOH", "png", sep=".")
+      out <- paste(outdir, outfile, sep="/")
+      png(out, height=myHeight, width=myWidth, res=myRes, units="px")
+      plot(P1)
+      dev.off()
+    }
+
+  } else if (plotType == "by_sample") {
+    
+    # identify chromosomes 
+    Samples <- unique(as.character(df$Sample))
+    sample_counter = 0
+
+    # iterate by chromosome
+    for (sample in Samples) {
+
+      sample_counter = sample_counter + 1
+      print(paste("Working on sample ", sample_counter, " out of ", length(Samples), sep=""))
+
+      df_smp <- df[df$Sample==sample, ]
+      df_smp$Sample <- factor(df_smp$Sample, levels=unique(df_smp$Sample))
+      df_smp$Chromosome <- factor(df_smp$Chromosome, levels=unique(df_smp$Chromosome))
+
+      x <- df_smp[ , c("Chromosome", "W_end", "LOH_ratio")]
+
+      P1 <- ggplot(data=x, aes(x=W_end, y=Chromosome, fill=LOH_ratio)) +
+      theme_bw() +
+      theme(aspect.ratio=myRatio,
+            axis.text=element_text(family="Helvetica", face="plain", size=8),
+            axis.title=element_text(family="Helvetica", face="plain", size=9),
+            legend.text=element_text(family="Helvetica", face="italic", size=7),
+            legend.title=element_text(family="Helvetica", face="plain", size=9),
+            plot.title=element_text(family="Helvetica", face="plain", size=9)) +
+      geom_tile() +
+      xlab("Position [Mbp]") +
+      scale_fill_gradient2(low=ref_color, mid=midpoint_color, high=alt_color, midpoint=0,
+                            na.value = "grey50", breaks=c(-1,0,1), limits=c(-1,1),
+                            labels=c(myRef, "Undefined", myAlt), 
+                            name="") +
+      ylab("")
+
+      outfile <- paste(prefix, sample, "LOH", "png", sep=".")
+      out <- paste(outdir, outfile, sep="/")
+      png(out, height=myHeight, width=myWidth, res=myRes, units="px")
+      plot(P1)
+      dev.off()
+    }  
   }
-
-} else if (plotType == "by_sample") {
-   
-  # identify chromosomes 
-  Samples <- unique(as.character(df$Sample))
-  sample_counter = 0
-
-  # iterate by chromosome
-  for (sample in Samples) {
-
-    sample_counter = sample_counter + 1
-    print(paste("Working on sample ", sample_counter, " out of ", length(Samples), sep=""))
-
-    df_smp <- df[df$Sample==sample, ]
-    df_smp$Sample <- factor(df_smp$Sample, levels=unique(df_smp$Sample))
-    df_smp$Chromosome <- factor(df_smp$Chromosome, levels=unique(df_smp$Chromosome))
-
-    x <- df_smp[ , c("Chromosome", "W_end", "LOH_ratio")]
-
-    P1 <- ggplot(data=x, aes(x=W_end, y=Chromosome, fill=LOH_ratio)) +
-    theme_bw() +
-    theme(aspect.ratio=myRatio,
-          axis.text=element_text(family="Helvetica", face="plain", size=8),
-          axis.title=element_text(family="Helvetica", face="plain", size=9),
-          legend.text=element_text(family="Helvetica", face="italic", size=7),
-          legend.title=element_text(family="Helvetica", face="plain", size=9),
-          plot.title=element_text(family="Helvetica", face="plain", size=9)) +
-    geom_tile() +
-    xlab("Position [Mbp]") +
-    scale_fill_gradient2(low=ref_color, mid=midpoint_color, high=alt_color, midpoint=0,
-                          na.value = "grey50", breaks=c(-1,0,1), limits=c(-1,1),
-                          labels=c(myRef, "Undefined", myAlt), 
-                          name="") +
-    ylab("")
-
-    outfile <- paste(sample, "LOH", "png", sep=".")
-    out <- paste(outdir, outfile, sep="/")
-    png(out, height=myHeight, width=myWidth, res=myRes, units="px")
-    plot(P1)
-    dev.off()
-  }  
 }

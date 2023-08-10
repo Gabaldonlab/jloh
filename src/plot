@@ -29,7 +29,6 @@ import os
 import multiprocessing as mp
 from time import asctime as at 
 from pandarallel import pandarallel
-# import swifter
 
 # help section
 if len(sys.argv) == 1:
@@ -50,13 +49,20 @@ jloh plot --loh <TSV_1> ... <TSV_n> --names <STR_1> ... <STR_n> [options]
 --two-ref           Plot LOH towards genome A vs B                              [off]
 
 [parameters]
+--loh               Files to plot (ending in *LOH_blocks.tsv)                   [!]
+--loh-files         File with input LOH files (one per row)                     [off]
+--names-file        File with names to assign to samples, one per row           [off]
+                    tab-separated, with input filename  
+                    (e.g. MyInputLOHFile.tsv      MySampleName)
 --output-dir        Output directory (created if non-existent)                  [JLOH_plot_out]
+--prefix            Output files prefix                                         [plot]
 --het               Input BED file containing het regions from JLOH extract     [!]
                     For "--one-ref" mode only 
 --ref-name          Name to label the reference allele                          [REF]
 --alt-name          Name to label the alternative allele                        [ALT]
 --by-sample         Use "by sample" mode (each plot is a different sample)      [off]
                     Plots will be organised by sample rather than by chromosome
+--merge             The output plot combines all chromosomes into one           [off]
 --clusters          "clust" file from jloh cluster to define plotting order     [off]
 --threads           Number of parallel threads                                  [12]
 --chr               Restrict the analysis to this specific chromosome           [off]
@@ -68,6 +74,11 @@ jloh plot --loh <TSV_1> ... <TSV_n> --names <STR_1> ... <STR_n> [options]
 --width             Width (px) of the output plot                               [2000]
 --height            Height (px) of the output plot                              [750]
 --res               Resolution of the output plot                               [250]
+--het-color         Color to use to represent heterozygous blocks               [#F7C35C]
+--ref-color         Color to use to represent REF blocks                        [#EF6F6C]
+                    This color is also used to show LOH in --one-ref mode
+--alt-color         Color to use to represent ALT blocks                        [#64B6AC]
+--midpoint-color    Color to use when undecided between het/REF/ALT             [#ffffff]
 
 """)
     sys.exit(0)
@@ -79,20 +90,27 @@ p.add_argument("--one-ref", action="store_true")
 p.add_argument("--two-ref", action="store_true")
 p.add_argument("--by-sample", action="store_true")
 p.add_argument("--loh", nargs="+")
+p.add_argument("--loh-files")
 p.add_argument("--clusters")
+p.add_argument("--merge", action="store_true")
 p.add_argument("--het", nargs="+")
-p.add_argument("--names", nargs="+")
+p.add_argument("--names-file")
 p.add_argument("--ref-name", default="REF")
 p.add_argument("--alt-name", default="ALT")
 p.add_argument("--chr", default="ALL")
 p.add_argument("--window-size", default=10000, type=int)
 p.add_argument("--threads", type=int, default=12)
 p.add_argument("--output-dir", default="JLOH_plot_out")
+p.add_argument("--prefix", default="plot")
 p.add_argument("--r-exec", default="Rscript", type=str)
 p.add_argument("--aspect-ratio", default=0.35, type=float)
 p.add_argument("--width", default=2000, type=int)
 p.add_argument("--height", default=750, type=int)
 p.add_argument("--res", default=250, type=int)
+p.add_argument("--het-color", default="#F7C35C", type=str)
+p.add_argument("--ref-color", default="#EF6F6C", type=str)
+p.add_argument("--alt-color", default="#64B6AC", type=str)
+p.add_argument("--midpoint-color", default="#ffffff", type=str)
 args = p.parse_args()
 
 # env 
@@ -110,7 +128,7 @@ ERROR: you should use either --one-ref or --two-ref
 
 """)
 
-    if (args.one_ref or args.two_ref) and not (args.loh):
+    if (args.one_ref or args.two_ref) and not (args.loh or args.loh_files):
         sys.exit("""
 
 ERROR: No --loh files were passed 
@@ -198,72 +216,56 @@ def organise_input(loh, names, het, run_mode):
 def sort_input_files(args):
 
     """
-    31/05/2023
+    10/08/2023
     """
 
+    # read input LOH files 
+    # --------------------
+    # define sorting order 
+    # if there are clusters, use that 
+    if args.clusters:
+        df_clusters = pd.read_csv(args.clusters, header="infer", sep="\t")
+        sorting_order = df_clusters["Sample"].tolist()
+        Loh = []
+        for x in sorting_order:
+            if args.loh:
+                match = [y for y in args.loh if y.split("/")[-1] == x][0]
+            elif args.loh_files:
+                match = [y.rstrip("\b\r\n") for y in open(args.loh_files, "r") if y.rstrip("\b\r\n").split("/")[-1] == x][0]
+
+            Loh.append(match)
+
+    # if not, use input files as provided 
+    else:
+        Loh = [x for x in args.loh]
+
+    # reading names 
+    # -------------
+    # creating dictionary with filename without path 
+    # so it matches the way args.clusters represents the filename 
+    # N.B. also without args.clusters files are represented without path 
+    if args.names_file:
+        Lst = [row.rstrip("\b\r\n").split("\t") for row in open(args.names_file, "r")]
+        Names_dict = { x[0].split("/")[-1]:x[1] for x in Lst }
+        Names = []
+        for x in Loh:
+            Names.append(Names_dict[x.split("/")[-1]])
+
+    # if not provided, use file names 
+    else:
+        Names = Loh
+
+    # read heterozygous blocks 
+    # ------------------------
+    # read heterozygous blocks from --het argument 
+    # input files should be in the same order of the --loh files 
+    # it's on the user to make sure this is the case 
     if args.one_ref:
-
-        if args.clusters:
-
-            df_clusters = pd.read_csv(args.clusters, header="infer", sep="\t")
-            sorting_order = df_clusters["Sample"].tolist()
-
-            if args.names:
-                Loh = []
-                Names = []
-                Het = []
-                for x in sorting_order:
-                    Loh.append(x)
-                    idx = args.loh.index(x)
-                    Names.append(args.names[idx])
-                    Het.append(args.het[idx])
-            else:
-                Loh = sorting_order
-                Names = sorting_order
-                Het = []
-                for x in sorting_order:
-                    idx = args.loh.index(x)
-                    Het.append(args.het[idx])
-
-        else:
-            if args.names:
-                Loh = args.loh
-                Names = args.names
-                Het = args.het
-            else:
-                Loh = args.loh 
-                Names = args.loh
-                Het = args.het 
+        Het = args.het 
     
+    # with --two-ref we don't use heterozygous blocks 
     elif args.two_ref:
-
         Het = None
-
-        if args.clusters:
-
-            df_clusters = pd.read_csv(args.clusters, header="infer", sep="\t")
-            sorting_order = df_clusters["Sample"].tolist()
-
-            if args.names:
-                Loh = []
-                Names = []
-                for x in sorting_order:
-                    Loh.append(x)
-                    idx = args.loh.index(x)
-                    Names.append(args.names[idx])
-            else:
-                Loh = sorting_order
-                Names = sorting_order
-                for x in sorting_order:
-                    idx = args.loh.index(x)
-
-        else:
-            if args.names:
-                Loh = args.loh
-                Names = args.names
-            else:
-                Loh = args.loh 
-                Names = args.loh
 
     return Loh, Names, Het
 
@@ -475,18 +477,27 @@ def quantize_heterozygosity(df_het, window_size, threads, args):
     # read heterozygosity and quantize it 
     pool = mp.Pool(processes=threads)
     q = mp.Manager().Queue()
+
+    num_rows = df_het.shape[0]
+    k=0
     
     for index, row in df_het.iterrows():
+        k+=1
+        completion = round(k/num_rows*100, 2)
+        sys.stderr.write(f"Parsing rows: {completion}%        \r")
         pool.apply_async(split_into_windows_het, args=(row, window_size, q, args))
 
     pool.close()
     pool.join()
+    sys.stderr.write("\n")
 
     out = []
     while q.empty() == False:
         out.append(q.get())
 
+    sys.stderr.write(f"[{at()}] Sorting by genome coordinate\n")
     df_het = pd.DataFrame(out).sort_values(by=["Sample", "Chromosome", "Window"])
+
     df_het = df_het.rename({"LOH_pos":"Het_pos"}, axis=1)
     df_het = df_het.loc[:,["Sample", "Chromosome", "Window", "Het_pos"]]
 
@@ -499,47 +510,37 @@ def quantize_intervals(df, df_het, window_size, threads, run_mode, args):
     Last update: 12/05/2023 
     """
 
+    # quantize windows 
+    pool = mp.Pool(processes=threads)
+    q = mp.Manager().Queue()
+
+    num_rows = df.shape[0]
+    k=0
+
+    for index, row in df.iterrows():
+        k+=1
+        completion = round(k/num_rows*100, 2)
+        sys.stderr.write(f"Parsing rows: {completion}%        \r")
+        pool.apply_async(split_into_windows, args=(row, window_size, q, args))
+
+    pool.close()
+    pool.join()
+    sys.stderr.write("\n")
+
+    out = []
+    while q.empty() == False:
+        out.append(q.get())
+
+    sys.stderr.write(f"[{at()}] Sorting by genome coordinate\n")
+    df = pd.DataFrame(out).sort_values(by=["Sample", "Chromosome", "Window"])
+
     if run_mode == "one_ref":
-
-        # quantize windows 
-        pool = mp.Pool(processes=threads)
-        q = mp.Manager().Queue()
-
-        for index, row in df.iterrows():
-            pool.apply_async(split_into_windows, args=(row, window_size, q, args))
-
-        pool.close()
-        pool.join()
-
-        out = []
-        while q.empty() == False:
-            out.append(q.get())
-
-        df = pd.DataFrame(out).sort_values(by=["Sample", "Chromosome", "Window"])
-        
         df = df.loc[:,["Sample", "Chromosome", "Window", "LOH_pos"]]
         df = df.groupby(["Sample", "Chromosome", "Window"]).parallel_apply(lambda df_sub : count_ratios_oneref(df_sub, window_size, df_het))
 
     elif run_mode == "two_ref":
-        
-        # quantize windows 
-        pool = mp.Pool(processes=threads)
-        q = mp.Manager().Queue()
-
-        for index, row in df.iterrows():
-            pool.apply_async(split_into_windows, args=(row, window_size, q, args))
-
-        pool.close()
-        pool.join()
-
-        out = []
-        while q.empty() == False:
-            out.append(q.get())
-
-        df = pd.DataFrame(out).sort_values(by=["Sample", "Chromosome", "Window"])
-        
         df = df.groupby(["Sample", "Chromosome", "Window"]).parallel_apply(lambda df_sub : count_ratios_tworef(df_sub, window_size))
-        df = df.reset_index(drop=False)
+        df = df.reset_index(drop=False)        
         
     return df
 
@@ -785,6 +786,11 @@ def run_one_ref_script(loh_table, Names, args):
     else:
         plot_type = "by_chromosome"
 
+    if args.merge:
+        do_we_merge = "yes"
+    else:
+        do_we_merge = "no"
+
     # plot 
     sys.stderr.write(f"[{at()}] Plotting\n")
     src_dir = "/".join(sys.argv[0].split("/")[0:-1]) + "/" + "scripts"
@@ -795,11 +801,11 @@ def run_one_ref_script(loh_table, Names, args):
         f"{args.output_dir}/plots",
         str(plot_type), 
         str(",".join(Names)),
-        str(args.aspect_ratio), 
-        str(args.width),
-        str(args.height),
-        str(args.res),
-        args.ref_name, args.alt_name ])
+        f"{str(args.aspect_ratio)},{str(args.width)},{str(args.height)},{str(args.res)}",
+        f"{args.ref_name},{args.alt_name}", 
+        f"\{args.het_color},\{args.ref_color},\{args.alt_color},\{args.midpoint_color}",
+        f"{do_we_merge}",
+        args.prefix ])
     
     sys.stderr.write(f"\nPlot command that was run:\n{cmd}\n\n")
     os.system(cmd)
@@ -816,6 +822,11 @@ def run_two_ref_script(loh_table, Names, args):
     else:
         plot_type = "by_chromosome"
 
+    if args.merge:
+        do_we_merge = "yes"
+    else:
+        do_we_merge = "no"
+
     # plot 
     sys.stderr.write(f"[{at()}] Plotting\n") 
     src_dir = "/".join(sys.argv[0].split("/")[0:-1]) + "/" + "scripts"
@@ -825,11 +836,11 @@ def run_two_ref_script(loh_table, Names, args):
         f"{args.output_dir}/plots",
         str(plot_type),
         str(",".join(Names)),
-        str(args.aspect_ratio), 
-        str(args.width),
-        str(args.height),
-        str(args.res),
-        args.ref_name, args.alt_name ])
+        f"{str(args.aspect_ratio)},{str(args.width)},{str(args.height)},{str(args.res)}",
+        f"{args.ref_name},{args.alt_name}", 
+        f"\{args.het_color},\{args.ref_color},\{args.alt_color},\{args.midpoint_color}",
+        f"{do_we_merge}",
+        args.prefix ])
     
     sys.stderr.write(f"\nPlot command that was run:\n{cmd}\n\n")
     os.system(cmd)
@@ -838,7 +849,7 @@ def run_two_ref_script(loh_table, Names, args):
 def run_oneref_mode(args):
 
     """
-    31/05/2023
+    10/08/2023
     """
 
     # read input files and names and sort them by cluster if provided 
@@ -854,8 +865,10 @@ def run_oneref_mode(args):
         df, df_het = select_specific_chromosomes(df, df_het, args, "one_ref")
     
     # quantize in windows 
-    sys.stderr.write(f"[{at()}] Quantizing in windows of {args.window_size} bp\n") 
+    sys.stderr.write(f"[{at()}] Quantizing heterozygosity in windows of {args.window_size} bp\n") 
     df_het = quantize_heterozygosity(df_het, args.window_size, args.threads, args)
+
+    sys.stderr.write(f"[{at()}] Quantizing intervals in windows of {args.window_size} bp\n") 
     df = quantize_intervals(df, df_het, args.window_size, args.threads, "one_ref", args)
     
     # reorganise output 
@@ -867,7 +880,7 @@ def run_oneref_mode(args):
     # write table to output
     sys.stderr.write(f"[{at()}] Writing table to output\n") 
 
-    loh_table = f"{args.output_dir}/LOH_rate.tsv"
+    loh_table = f"{args.output_dir}/{args.prefix}.LOH_rate.tsv"
     df.to_csv(loh_table, sep="\t", header=True, index=False)
 
     run_one_ref_script(loh_table, Names, args)
