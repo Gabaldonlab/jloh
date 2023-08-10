@@ -66,6 +66,7 @@ jloh plot --loh <TSV_1> ... <TSV_n> --names <STR_1> ... <STR_n> [options]
 --clusters          "clust" file from jloh cluster to define plotting order     [off]
 --threads           Number of parallel threads                                  [12]
 --chr               Restrict the analysis to this specific chromosome           [off]
+--chr-file          Indicate multiple chromosomes, one per row                  [off]
 --window-size       Size of window for plotting, the shorter the slower         [10000]
 
 [R/ggplot2 options]
@@ -98,6 +99,7 @@ p.add_argument("--names-file")
 p.add_argument("--ref-name", default="REF")
 p.add_argument("--alt-name", default="ALT")
 p.add_argument("--chr", default="ALL")
+p.add_argument("--chr-file")
 p.add_argument("--window-size", default=10000, type=int)
 p.add_argument("--threads", type=int, default=12)
 p.add_argument("--output-dir", default="JLOH_plot_out")
@@ -134,6 +136,9 @@ ERROR: you should use either --one-ref or --two-ref
 ERROR: No --loh files were passed 
 
 """)
+                 
+    if (args.chr_file):
+        args.chr = None 
 
 
 def organise_input(loh, names, het, run_mode):
@@ -237,7 +242,10 @@ def sort_input_files(args):
 
     # if not, use input files as provided 
     else:
-        Loh = [x for x in args.loh]
+        if args.loh:
+            Loh = [x for x in args.loh]
+        elif args.loh_files:
+            Loh = [y.rstrip("\n\r\b") for y in open(args.loh_files, "r")]
 
     # reading names 
     # -------------
@@ -273,12 +281,18 @@ def sort_input_files(args):
 def select_specific_chromosomes(df, df_het, args, run_mode):
 
     """
-    12/05/2023
+    10/08/2023
     """
 
     if run_mode == "one_ref":
 
-        if args.chr != "ALL":
+        if args.chr_file:
+            sys.stderr.write(f"[{at()}] Selecting chromosomes from file {args.chr_file}\n")
+            Chroms = [x.rstrip("\n\b\r") for x in open(args.chr_file, "r")]
+            df = df.loc[df["Chromosome"].isin(Chroms), :]
+            df_het = df_het.loc[df_het["Chromosome"].isin(Chroms), :]
+
+        elif (args.chr) and (args.chr != "ALL"):
             sys.stderr.write(f"[{at()}] Selecting only chromosome {args.chr}\n")
             df = df.loc[df["Chromosome"]==args.chr, :]
             df_het = df_het.loc[df_het["Chromosome"]==args.chr, :]
@@ -293,17 +307,22 @@ def select_specific_chromosomes(df, df_het, args, run_mode):
 
     elif run_mode == "two_ref":
 
-        if args.chr != "ALL":
+        if args.chr_file:
+            sys.stderr.write(f"[{at()}] Selecting chromosomes from file {args.chr_file}\n")
+            Chroms = [x.rstrip("\n\b\r") for x in open(args.chr_file, "r")]
+            df = df.loc[df["Chromosome"].isin(Chroms), :]
+
+            if df.shape[0] == 0:
+                sys.stderr.write(f"\n\nERROR: dataframe is empty after selecting only chromosomes in {args.chr_file}\n\n")
+                ss()
+
+        elif (args.chr) and (args.chr != "ALL"):
             sys.stderr.write(f"[{at()}] Selecting only chromosome {args.chr}\n")
             df = df.loc[df["Chromosome"]==args.chr, :]
 
-        if df.shape[0] == 0:
-            sys.stderr.write(f"""
-            
-    ERROR: dataframe is empty after selecting only chromosome {args.chr}\n
-
-    """)
-            ss()
+            if df.shape[0] == 0:
+                sys.stderr.write(f"\n\nERROR: dataframe is empty after selecting only chromosome {args.chr}\n\n")
+                ss()
     
     return df, df_het
 
@@ -778,7 +797,7 @@ def fill_missing_windows(df, run_mode, args):
 def run_one_ref_script(loh_table, Names, args):
 
     """
-    12/05/2023
+    10/08/2023
     """
 
     if args.by_sample:
@@ -814,7 +833,7 @@ def run_one_ref_script(loh_table, Names, args):
 def run_two_ref_script(loh_table, Names, args):
 
     """
-    12/05/2023
+    10/08/2023
     """
 
     if args.by_sample:
@@ -861,7 +880,7 @@ def run_oneref_mode(args):
     df, df_het = organise_input(Loh, Names, Het, "one_ref")
 
     # select specific chromosome if user wants 
-    if args.chr:
+    if args.chr != "ALL":
         df, df_het = select_specific_chromosomes(df, df_het, args, "one_ref")
     
     # quantize in windows 
@@ -902,7 +921,7 @@ def run_tworef_mode(args):
     df, df_het = organise_input(Loh, Names, Het, "two_ref")
     
     # select specific chromosome if user wants 
-    if args.chr:
+    if args.chr != "ALL":
         df, df_het = select_specific_chromosomes(df, df_het, args, "two_ref")
 
     # quantize in windows 
