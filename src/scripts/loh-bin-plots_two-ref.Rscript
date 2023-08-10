@@ -29,8 +29,6 @@ midpoint_color <- unlist(strsplit(args[7], split=","))[4]
 do_we_merge <- args[8]
 prefix <- args[9]
 
-print(alt_color)
-
 
 # read input file
 dir.create(outdir, showWarnings = FALSE)
