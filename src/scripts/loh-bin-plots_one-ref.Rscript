@@ -16,16 +16,17 @@ infile <- args[1]
 outdir <- args[2]
 plotType <- args[3]
 plotOrder <- args[4]
-myRatio <- as.numeric(args[5])
-myWidth <- as.numeric(args[6])
-myHeight <- as.numeric(args[7])
-myRes <- as.numeric(args[8])
-myRef <- args[9]
-myAlt <- args[10]
-het_color <- args[11]
-ref_color <- args[12]
-alt_color <- args[13]
-midpoint_color <- args[14]
+myRatio <- as.numeric(unlist(strsplit(args[5], split=","))[1])
+myWidth <- as.numeric(unlist(strsplit(args[5], split=","))[2])
+myHeight <- as.numeric(unlist(strsplit(args[5], split=","))[3])
+myRes <- as.numeric(unlist(strsplit(args[5], split=","))[4])
+myRef <- unlist(strsplit(args[6], split=","))[1]
+myAlt <- unlist(strsplit(args[6], split=","))[2]
+het_color <- unlist(strsplit(args[7], split=","))[1]
+ref_color <- unlist(strsplit(args[7], split=","))[2]
+alt_color <- unlist(strsplit(args[7], split=","))[3]
+midpoint_color <- unlist(strsplit(args[7], split=","))[4]
+
 
 # read input file
 dir.create(outdir, showWarnings = FALSE)
