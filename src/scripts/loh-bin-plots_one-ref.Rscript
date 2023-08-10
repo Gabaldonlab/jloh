@@ -22,6 +22,10 @@ myHeight <- as.numeric(args[7])
 myRes <- as.numeric(args[8])
 myRef <- args[9]
 myAlt <- args[10]
+het_color <- args[11]
+ref_color <- args[12]
+alt_color <- args[13]
+midpoint_color <- args[14]
 
 # read input file
 dir.create(outdir, showWarnings = FALSE)
@@ -63,7 +67,7 @@ if (plotType == "by_chromosome") {
               plot.title=element_text(family="Helvetica", face="plain", size=9)) +
         geom_tile() +
         xlab("Position [Mbp]") +
-        scale_fill_gradient2(low="#f7c35c", mid="white", high="#EF6F6C", midpoint=0,
+        scale_fill_gradient2(low=het_color, mid=midpoint_color, high=ref_color, midpoint=0,
                             na.value = "grey50", breaks=c(-1,1), limits=c(-1,1),
                             labels=c("Het", "LOH"), 
                             name="") +
@@ -104,7 +108,7 @@ if (plotType == "by_chromosome") {
             plot.title=element_text(family="Helvetica", face="plain", size=9)) +
         geom_tile() +
         xlab("Position [Mbp]") +
-        scale_fill_gradient2(low="#f7c35c", mid="white", high="#EF6F6C", midpoint=0,
+        scale_fill_gradient2(low=het_color, mid=midpoint_color, high=ref_color, midpoint=0,
                             na.value = "grey50", breaks=c(-1,1), limits=c(-1,1),
                             labels=c("Het", "LOH"), 
                             name="") +
