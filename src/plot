@@ -937,7 +937,7 @@ def run_tworef_mode(args):
     # write table to output
     sys.stderr.write(f"[{at()}] Writing table to output\n") 
 
-    loh_table = f"{args.output_dir}/LOH_rate.tsv"
+    loh_table = f"{args.output_dir}/{args.prefix}.LOH_rate.tsv"
     df.to_csv(loh_table, sep="\t", header=True, index=False)
 
     run_two_ref_script(loh_table, Names, args)

@@ -61,7 +61,7 @@ if (do_we_merge == "yes") {
         legend.title=element_text(family="Helvetica", face="plain", size=9),
         plot.title=element_text(family="Helvetica", face="plain", size=9)) +
   geom_tile() +
-  xlab("Position [Mbp]") +
+  scale_x_discrete(name="Concatenated chromosomes [Mbp]", labels=NULL) +
   scale_fill_gradient2(low=ref_color, mid=midpoint_color, high=alt_color, midpoint=0,
                         na.value = "grey50", breaks=c(-1,0,1), limits=c(-1,1),
                         labels=c(myRef, "Undefined", myAlt), 
