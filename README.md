@@ -20,7 +20,7 @@ JLOH only needs three file types as input:
 
 ### I have a hybrid, does it work with it?
 
-Yes, it does. The extraction module `jloh extract` can work with reads from a hybrid species mapped onto the hybrid's reference genome. It will produce LOH blocks although you won't know to which subgenome they belong to. If you have the parental genomes of the hybrid, however, `jloh extract` has an `--assign-blocks` option which allows to use them to assign LOH blocks to subgenomes. In that case, follow the instructions in [this guide](docs/ASSIGN_BLOCKS.md) to provide two reference genomes, two BAM/SAM files containing mapping results, and two VCF files containing SNPs. Each pair corresponds to the two parentals. See details [here](#jloh-extract).
+Yes, it does. The extraction module `jloh extract` can work with reads from a hybrid species mapped onto the hybrid's reference genome. It will produce LOH blocks although you won't know to which subgenome they belong to. If you have the parental genomes of the hybrid, however, `jloh extract` has an `--assign-blocks` option which allows to use them to assign LOH blocks to subgenomes. In that case, follow the instructions in [this guide](readme_pages/ASSIGN_BLOCKS.md) to provide two reference genomes, two BAM/SAM files containing mapping results, and two VCF files containing SNPs. Each pair corresponds to the two parentals. See details [here](#jloh-extract).
 
 ![JLOH workflow](images/j_loh.png)
 
@@ -50,7 +50,7 @@ Schematic of the "jloh extract" module workflow.
 
 ## Install and run
 
-Detailed information [can be found here](docs/INSTALL.md).
+Detailed information [can be found here](readme_pages/INSTALL.md).
 
 ## Basic usage
 
@@ -82,7 +82,7 @@ Detailed information [can be found here](docs/INSTALL.md).
 
 ### JLOH extract
 
-This is the most important module of JLOH. Its functions are well described in the figure on the top. It is used to extract LOH blocks starting from VCF, BAM, and FASTA file(s). Detailed information on how this algorithm works [can be found here](docs/EXTRACT.md).
+This is the most important module of JLOH. Its functions are well described in the figure on the top. It is used to extract LOH blocks starting from VCF, BAM, and FASTA file(s). Detailed information on how this algorithm works [can be found here](readme_pages/EXTRACT.md).
 
 This module has three ways of operating: 
 
@@ -114,7 +114,7 @@ The output can be assessed in a genome viewer together with the input BAM files,
 
 ![Example](images/example.png)
 
-In `--assign-blocks` mode, it produces the same output files but repeated twice: once per each parent. More information on the `--assign-blocks` mode, and how to use it properly, [can be found here](docs/ASSIGN_BLOCKS.md).
+In `--assign-blocks` mode, it produces the same output files but repeated twice: once per each parent. More information on the `--assign-blocks` mode, and how to use it properly, [can be found here](readme_pages/ASSIGN_BLOCKS.md).
 
 In `--one-parent` mode, it produces the same output of the default mode. However, it will imply that the provided reference genome is from one of the two parental progenitors, and use it to annotate blocks towards the REF or the ALT allele as in the `--assign-blocks` mode. The difference from the latter is that only one parental genome is provided. The difference from the default mode is that the provided genome is not from the hybrid itself but from one of the parents. 
 
@@ -157,7 +157,7 @@ Besides the mean snp density, it calculates a distribution and extracts the most
 
 These quantiles are useful to choose what value to set in the `--min-snps-kbp` parameter of `jloh extract`. 
 
-A detailed description on how to interpret these quantiles [can be found here](docs/QUANTILES.md).
+A detailed description on how to interpret these quantiles [can be found here](readme_pages/QUANTILES.md).
 
 ### JLOH junctions 
 
