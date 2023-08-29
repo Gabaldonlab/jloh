@@ -40,8 +40,9 @@ if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
     Matteo Schiavinato
     Barcelona Supercomputing Center (BSC) 
     2023 
+    contact: matteo.schiavinato.90@gmail.com
 
-    v0.24.0
+    v1.0.0
 
     ####
 
