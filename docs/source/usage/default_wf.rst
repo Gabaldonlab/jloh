@@ -1,2 +1,2 @@
-Default workflow
-================
+LOH block extraction pipeline
+=============================

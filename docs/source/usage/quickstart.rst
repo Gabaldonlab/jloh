@@ -1,2 +1,84 @@
 Quick start
 ===========
+
+If you're in a hurry and can't read too much documentation, here's a quick way to use JLOH with commonly available files derived from NGS data analysis. 
+
+Requirements
+------------
+
+JLOH is built to work as an addition to any common **variant calling** pipeline. These pipelines are based on two steps: 1) read mapping and 2) variant calling. Regardless of the tool used to map the reads, the most common alignment format is the SAM format (or its binary version BAM). In the calling step, regardless of the tool used to call variants the output is most often in VCF format.
+
+These are the files you need as input to infer LOH blocks. 
+
++-----------+------------------------------------------------------------------------------------------------------------------+
+| File type | Description                                                                                                      |
++===========+==================================================================================================================+
+| FASTA     | The reference genome sequence where you map your genomic reads.                                                  |
++-----------+------------------------------------------------------------------------------------------------------------------+
+| BAM       | The output of the mapping step.                                                                                  |
++-----------+------------------------------------------------------------------------------------------------------------------+
+| VCF       | The file containing all the single-nucleotide polymorphisms (SNPs) called from the BAM file onto the FASTA file. |
++-----------+------------------------------------------------------------------------------------------------------------------+
+
+These three files will highlight the positions in which the genotype represented from the **reads** has lost heterozygosity when compared to the genotype represented by the **reference**. 
+
+Calculating SNP density
+-----------------------
+
+The first step is to infer the density distribution of the SNPs over the genome, which will aid the recovery of LOH blocks by fine-tuning the block calling parameters. To do so:
+
+.. code-block:: bash 
+
+    jloh stats --vcf my_variants.vcf
+
+
+This step will produce an output that looks like this::
+
+    -- SNPs/Kbp Statistics --
+
+    S       Gen   Het   Homo
+    Median  5.0   4.0   4.0
+    Mean    8.5   8.5   5.6
+    Max     103   103   110
+    Min     1     1     1
+
+    -- SNPs/Kbp Quantiles --
+
+    Q     Gen    Het    Homo
+    5%    1.0    1.0    1.0
+    10%   1.0    1.0    1.0
+    15%   1.0    1.0    2.0
+    50%   5.0    4.0    4.0
+    85%   15.0   15.4   9.0
+    90%   20.0   21.0   11.0
+    95%   30.0   30.0   15.0
+
+
+This step is aimed at choosing an appropriate SNP density threshold to infer LOH blocks in the next step. The user must **choose a value** for heterozygous and homozygous SNPs, which may be corresponding to different quantiles. The chosen values will be the input of the ``--min-snps-kbp`` parameter in the next step.
+
+.. note:: 
+
+    Higher quantiles are stricter in the detection of LOH blocks, they increase the precision but reduce the recall. 
+
+.. tip:: 
+
+    This step tells you how heterozygous and how homozygous your dataset is. Depending on that, you may choose the quantiles appropriately to minimize false positives. 
+
+
+Extracting blocks
+-----------------
+
+The second step is the inference of LOH blocks. This step is done with ``jloh extract``. At the very minimum, the program requires these parameters:
+
+.. code-block:: bash
+
+    jloh extract --vcf my_variants.vcf --bam my_mappings.bam --ref my_reference_genome.fasta
+
+
+Besides the three input parameters, we encourage you to set at least two other parameters, even though they have default values: 
+
+  *  ``--min-snps-kbp <N,N>``: heterozygous/homozygous minimum SNP/kbp densities to label a region as heterozygous/homozygous 
+  *  ``--threads``: number of parallel operations 
+
+
+Among the output files, there is also a table with the inferred LOH blocks which will end with ``*LOH_blocks.tsv``. This is the output of the program, and can be used in the next step. 

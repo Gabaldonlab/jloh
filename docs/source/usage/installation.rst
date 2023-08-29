@@ -56,31 +56,35 @@ Install dependencies
 
 These are the dependencies that **jloh** requires in order to function properly.
 
-+------------------+------------------+------------+------------------------------------------------+
-| Program          | Type             | Version    | Links                                          |
-+==================+==================+============+================================================+
-| all2vcf          | Program          | 0.7.3      | https://github.com/MatteoSchiavinato/all2vcf   |
-+------------------+------------------+------------+------------------------------------------------+
-| bedtools         | Program          | 2.30       | https://bedtools.readthedocs.io/en/latest      |
-+------------------+------------------+------------+------------------------------------------------+
-| Biopython        | Module           | 1.79       | https://biopython.org/                         |
-+------------------+------------------+------------+------------------------------------------------+
-| MUMmer           | Program          | 3.1        | https://mummer4.github.io/install/install.html |
-+------------------+------------------+------------+------------------------------------------------+
-| numpy            | Module           | 1.21.4     |https://numpy.org/                              |
-+------------------+------------------+------------+------------------------------------------------+
-| pandas           | Module           | 1.3.5      | https://pandas.pydata.org/                     |
-+------------------+------------------+------------+------------------------------------------------+
-| pybedtools       | Module           | 0.8.2      | https://daler.github.io/pybedtools/            |
-+------------------+------------------+------------+------------------------------------------------+
-| pandarallel      | Module           | 1.6.1      | https://pypi.org/project/pandarallel/          |
-+------------------+------------------+------------+------------------------------------------------+
-| pysam            | Module           | 0.1.7      | https://pypi.org/project/pysam/                |
-+------------------+------------------+------------+------------------------------------------------+
-| Python           | Interpreter      | 3.6.1      | https://www.python.org/downloads/              |
-+------------------+------------------+------------+------------------------------------------------+
-| samtools         | Program          | 1.13       | http://www.htslib.org/download/                |
-+------------------+------------------+------------+------------------------------------------------+
++------------------+------------------+------------+---------------------------------------------------------+
+| Program          | Type             | Version    | Links                                                   |
++==================+==================+============+=========================================================+
+| all2vcf          | Program          | 0.7.3      | https://github.com/MatteoSchiavinato/all2vcf            |
++------------------+------------------+------------+---------------------------------------------------------+
+| bedtools         | Program          | 2.30       | https://bedtools.readthedocs.io/en/latest               |
++------------------+------------------+------------+---------------------------------------------------------+
+| Biopython        | Module           | 1.79       | https://biopython.org/                                  |
++------------------+------------------+------------+---------------------------------------------------------+
+| ggplot2          | R library        | 3.3.6      | https://cran.r-project.org/src/contrib/Archive/ggplot2/ |
++------------------+------------------+------------+---------------------------------------------------------+
+| MUMmer           | Program          | 3.1        | https://mummer4.github.io/install/install.html          |
++------------------+------------------+------------+---------------------------------------------------------+
+| numpy            | Python module    | 1.21.4     |https://numpy.org/                                       |
++------------------+------------------+------------+---------------------------------------------------------+
+| pandas           | Python module    | 1.3.5      | https://pandas.pydata.org/                              |
++------------------+------------------+------------+---------------------------------------------------------+
+| pybedtools       | Python module    | 0.8.2      | https://daler.github.io/pybedtools/                     |
++------------------+------------------+------------+---------------------------------------------------------+
+| pandarallel      | Python module    | 1.6.1      | https://pypi.org/project/pandarallel/                   |
++------------------+------------------+------------+---------------------------------------------------------+
+| pysam            | Python module    | 0.1.7      | https://pypi.org/project/pysam/                         |
++------------------+------------------+------------+---------------------------------------------------------+
+| Python           | Interpreter      | 3.6        | https://www.python.org/downloads/                       |
++------------------+------------------+------------+---------------------------------------------------------+
+| Rscript          | Interpreter      | 3.6        | https://cran.r-project.org/                             |
++------------------+------------------+------------+---------------------------------------------------------+
+| samtools         | Program          | 1.13       | http://www.htslib.org/download/                         |
++------------------+------------------+------------+---------------------------------------------------------+
 
 .. Note:: 
     The **pybedtools** python module will look for the `bedtools <https://bedtools.readthedocs.io/en/latest/>`_ executable in the ``$PATH``, while the **pysam** python module will look for the `samtools <http://www.htslib.org/download/>`_ executable in the ``$PATH``. Moreover, **MUMmer** and its tools (e.g. ``nucmer``) must be in the ``$PATH`` as well. The installation of MUMmer can be a bit cumbersome in certain systems, hence we recommend you proceed with conda (``conda install -c bioconda mummer``). This will place in the ``$PATH`` all the toolkit from the MUMmer arsenal, in particular the tools needed by JLOH to run: ``nucmer``, ``delta-filter``, ``show-snps``. 
