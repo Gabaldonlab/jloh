@@ -28,11 +28,13 @@ alt_color <- unlist(strsplit(args[7], split=","))[3]
 midpoint_color <- unlist(strsplit(args[7], split=","))[4]
 do_we_merge <- args[8]
 prefix <- args[9]
-
+loh_contrast <- args[10]
 
 # read input file
 dir.create(outdir, showWarnings = FALSE)
 df <- read.table(infile, header=T)
+
+df$Sample <- gsub(".*/", "", df$Sample)
 
 if (do_we_merge == "yes") {
 

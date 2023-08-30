@@ -28,10 +28,35 @@ alt_color <- unlist(strsplit(args[7], split=","))[3]
 midpoint_color <- unlist(strsplit(args[7], split=","))[4]
 do_we_merge <- args[8]
 prefix <- args[9]
+loh_contrast <- args[10]
 
 # read input file
 dir.create(outdir, showWarnings = FALSE)
 df <- read.table(infile, header=T)
+
+df$Sample <- gsub(".*/", "", df$Sample)
+
+# contrast 
+if (loh_contrast == "low") {
+    print("Setting contrast to: low")
+    df$LOH_ratio = 0.25 * (df$LOH_ratio / max(df$LOH_ratio))
+    
+}
+if (loh_contrast == "mid") {
+    print("Setting contrast to: mid")
+    df$LOH_ratio = 0.50 * (df$LOH_ratio / max(df$LOH_ratio))
+
+} else if (loh_contrast == "high") {
+    print("Setting contrast to: high")
+    df$LOH_ratio = 0.75 * (df$LOH_ratio / max(df$LOH_ratio))
+
+} else if (loh_contrast == "max") {
+    print("Setting contrast to: max")
+    df$LOH_ratio = 1 * (df$LOH_ratio / max(df$LOH_ratio))
+
+} else {
+    print("Leaving contrast untouched")
+}
 
 if (do_we_merge == "yes") {
 
@@ -46,12 +71,12 @@ if (do_we_merge == "yes") {
     df$W_start <- df$W_start / 1000000
     df$W_end <- df$W_end / 1000000  
     df$Sample <- factor(as.character(df$Sample), levels=plotOrder)
-    df$LOH_propensity <- df$LOH_ratio - df$Het_ratio 
+    df$LOH_ratio <- df$LOH_ratio - df$Het_ratio 
 
     # plotting the merged version 
-    x <- df[ , c("Merged_key", "Sample", "LOH_propensity")]
+    x <- df[ , c("Merged_key", "Sample", "LOH_ratio")]
 
-    P1 <- ggplot(data=x, aes(x=Merged_key, y=Sample, fill=LOH_propensity)) +
+    P1 <- ggplot(data=x, aes(x=Merged_key, y=Sample, fill=LOH_ratio)) +
     theme_bw() +
     theme(aspect.ratio=myRatio,
         axis.text=element_text(family="Helvetica", face="plain", size=9),
@@ -92,9 +117,9 @@ if (do_we_merge == "yes") {
             df_chr <- df[df$Chromosome==chrom, ]
             df_chr$Chromosome <- factor(df_chr$Chromosome, levels=unique(df_chr$Chromosome))
 
-            x <- df_chr[ , c("Sample", "W_end", "LOH_propensity")]
+            x <- df_chr[ , c("Sample", "W_end", "LOH_ratio")]
 
-            P1 <- ggplot(data=x, aes(x=W_end, y=Sample, fill=LOH_propensity)) +
+            P1 <- ggplot(data=x, aes(x=W_end, y=Sample, fill=LOH_ratio)) +
             theme_bw() +
             theme(aspect.ratio=myRatio,
                 axis.text=element_text(family="Helvetica", face="plain", size=8),
@@ -133,9 +158,9 @@ if (do_we_merge == "yes") {
             df_smp$Sample <- factor(df_smp$Sample, levels=unique(df_smp$Sample))
             df_smp$Chromosome <- factor(df_smp$Chromosome, levels=unique(df_smp$Chromosome))
 
-            x <- df[ , c("Chromosome", "W_end", "LOH_propensity")]
+            x <- df[ , c("Chromosome", "W_end", "LOH_ratio")]
 
-            P1 <- ggplot(data=x, aes(x=W_end, y=Chromosome, fill=LOH_propensity)) +
+            P1 <- ggplot(data=x, aes(x=W_end, y=Chromosome, fill=LOH_ratio)) +
             theme_bw() +
             theme(aspect.ratio=myRatio,
                 axis.text=element_text(family="Helvetica", face="plain", size=8),

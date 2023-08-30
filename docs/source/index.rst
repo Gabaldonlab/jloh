@@ -1,3 +1,5 @@
+.. _home:
+
 .. jloh documentation master file, created by
    sphinx-quickstart on Tue Aug 29 11:07:04 2023.
    You can adapt this file completely to your liking, but it should at least
@@ -8,24 +10,32 @@ Welcome to the JLOH documentation
 
 **What is JLOH?**
 
-
 **JLOH** (`/jay'lo/`) is a tool to extract, filter, and analyse loss of heterozygosity (LOH) blocks based on single-nucleotide polymorphisms (VCF), read mapping information (BAM), and a reference genome sequence (FASTA). 
 
-.. image:: graphical_abstract.jpg
+A publication is currently being reviewed. The preprint can be found in bioRxiv (`Schiavinato et al., 2023 <https://doi.org/10.1101/2023.05.04.539368>`_).
+
+.. image:: images/graphical_abstract.jpg
  
 .. toctree::
    :maxdepth: 1
-   :caption: Get started:
+   :caption: Get started
 
    usage/installation
    usage/quickstart
    usage/run_test_data
+
+
+.. toctree:: 
+   :maxdepth: 1
+   :caption: Workflows
+
    usage/default_wf
    usage/hybrid_wf
 
+
 .. toctree::
    :maxdepth: 1
-   :caption: Modules description:
+   :caption: Modules description
 
    usage/modules/stats
    usage/modules/g2g

@@ -54,7 +54,7 @@ jloh plot --loh <TSV_1> ... <TSV_n> --names <STR_1> ... <STR_n> [options]
 --names-file        File with names to assign to samples, one per row           [off]
                     tab-separated, with input filename  
                     (e.g. MyInputLOHFile.tsv      MySampleName)
---output-dir        Output directory (created if non-existent)                  [JLOH_plot_out]
+--output-dir        Output directory (created if non-existent)                  [jloh_out]
 --prefix            Output files prefix                                         [plot]
 --het               Input BED file containing het regions from JLOH extract     [!]
                     For "--one-ref" mode only 
@@ -80,6 +80,9 @@ jloh plot --loh <TSV_1> ... <TSV_n> --names <STR_1> ... <STR_n> [options]
                     This color is also used to show LOH in --one-ref mode
 --alt-color         Color to use to represent ALT blocks                        [#64B6AC]
 --midpoint-color    Color to use when undecided between het/REF/ALT             [#ffffff]
+--contrast          Increase contrast for samples with few LOH blocks           [off]
+                    Choose one of: off, low, mid, high, max
+                    Currently available for --one-ref only 
 
 """)
     sys.exit(0)
@@ -102,7 +105,7 @@ p.add_argument("--chr", default="ALL")
 p.add_argument("--chr-file")
 p.add_argument("--window-size", default=10000, type=int)
 p.add_argument("--threads", type=int, default=12)
-p.add_argument("--output-dir", default="JLOH_plot_out")
+p.add_argument("--output-dir", default="jloh_out")
 p.add_argument("--prefix", default="plot")
 p.add_argument("--r-exec", default="Rscript", type=str)
 p.add_argument("--aspect-ratio", default=0.35, type=float)
@@ -113,6 +116,7 @@ p.add_argument("--het-color", default="#F7C35C", type=str)
 p.add_argument("--ref-color", default="#EF6F6C", type=str)
 p.add_argument("--alt-color", default="#64B6AC", type=str)
 p.add_argument("--midpoint-color", default="#ffffff", type=str)
+p.add_argument("--contrast", choices=["off", "low", "mid", "high", "max"], default="off")
 args = p.parse_args()
 
 # env 
@@ -824,7 +828,8 @@ def run_one_ref_script(loh_table, Names, args):
         f"{args.ref_name},{args.alt_name}", 
         f"\{args.het_color},\{args.ref_color},\{args.alt_color},\{args.midpoint_color}",
         f"{do_we_merge}",
-        args.prefix ])
+        args.prefix,
+        args.contrast ])
     
     sys.stderr.write(f"\nPlot command that was run:\n{cmd}\n\n")
     os.system(cmd)
@@ -859,7 +864,8 @@ def run_two_ref_script(loh_table, Names, args):
         f"{args.ref_name},{args.alt_name}", 
         f"\{args.het_color},\{args.ref_color},\{args.alt_color},\{args.midpoint_color}",
         f"{do_we_merge}",
-        args.prefix ])
+        args.prefix,
+        args.contrast ])
     
     sys.stderr.write(f"\nPlot command that was run:\n{cmd}\n\n")
     os.system(cmd)

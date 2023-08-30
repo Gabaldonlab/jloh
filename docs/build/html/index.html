@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Welcome to jloh’s documentation! &mdash; jloh 1.0.0 documentation</title>
+  <title>Welcome to the JLOH documentation &mdash; jloh 1.0.0 documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -18,7 +18,8 @@
         <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="search.html" /> 
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Installation" href="usage/installation.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -40,12 +41,31 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <!-- Local TOC -->
-              <div class="local-toc"><ul>
-<li><a class="reference internal" href="#">Welcome to jloh’s documentation!</a></li>
-<li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
+              <p class="caption" role="heading"><span class="caption-text">Get started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="usage/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/quickstart.html">Quick start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/run_test_data.html">Run JLOH with a test dataset</a></li>
 </ul>
-</div>
+<p class="caption" role="heading"><span class="caption-text">Workflows</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="usage/default_wf.html">LOH block extraction pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/hybrid_wf.html">Working with hybrids</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Modules description</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/stats.html">jloh stats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/g2g.html">jloh g2g</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/extract.html">jloh extract</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/filter.html">jloh filter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/intersect.html">jloh intersect</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/cluster.html">jloh cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/chimeric.html">jloh chimeric</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/junctions.html">jloh junctions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/plot.html">jloh plot</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/sim.html">jloh sim</a></li>
+</ul>
+
         </div>
       </div>
     </nav>
@@ -60,7 +80,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Welcome to jloh’s documentation!</li>
+      <li class="breadcrumb-item active">Welcome to the JLOH documentation</li>
       <li class="wy-breadcrumbs-aside">
             <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -70,29 +90,50 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="welcome-to-jloh-s-documentation">
-<h1>Welcome to jloh’s documentation!<a class="headerlink" href="#welcome-to-jloh-s-documentation" title="Link to this heading"></a></h1>
-<p><strong>JLOH</strong> (/jay’lo/) is a tool extract LOH blocks from VCF, BAM and FASTA data.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This project and its documentation are under active development.</p>
+  <span class="target" id="home"></span><section id="welcome-to-the-jloh-documentation">
+<h1>Welcome to the JLOH documentation<a class="headerlink" href="#welcome-to-the-jloh-documentation" title="Link to this heading"></a></h1>
+<p><strong>What is JLOH?</strong></p>
+<p><strong>JLOH</strong> (<cite>/jay’lo/</cite>) is a tool to extract, filter, and analyse loss of heterozygosity (LOH) blocks based on single-nucleotide polymorphisms (VCF), read mapping information (BAM), and a reference genome sequence (FASTA).</p>
+<p>A publication is currently being reviewed. The preprint can be found in bioRxiv (<a class="reference external" href="https://doi.org/10.1101/2023.05.04.539368">Schiavinato et al., 2023</a>).</p>
+<img alt="_images/graphical_abstract.jpg" src="_images/graphical_abstract.jpg" />
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Get started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="usage/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/quickstart.html">Quick start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/run_test_data.html">Run JLOH with a test dataset</a></li>
+</ul>
 </div>
 <div class="toctree-wrapper compound">
-</div>
-</section>
-<section id="indices-and-tables">
-<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Link to this heading"></a></h1>
-<ul class="simple">
-<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
-<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
-<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+<p class="caption" role="heading"><span class="caption-text">Workflows</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="usage/default_wf.html">LOH block extraction pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/hybrid_wf.html">Working with hybrids</a></li>
 </ul>
+</div>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Modules description</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/stats.html">jloh stats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/g2g.html">jloh g2g</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/extract.html">jloh extract</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/filter.html">jloh filter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/intersect.html">jloh intersect</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/cluster.html">jloh cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/chimeric.html">jloh chimeric</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/junctions.html">jloh junctions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/plot.html">jloh plot</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/sim.html">jloh sim</a></li>
+</ul>
+</div>
 </section>
 
 
            </div>
           </div>
-          <footer>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="usage/installation.html" class="btn btn-neutral float-right" title="Installation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
 
   <hr/>
 

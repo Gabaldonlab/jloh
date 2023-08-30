@@ -136,6 +136,23 @@ args = p.parse_args()
 
 # functions
 
+def run_verifications(args):
+
+    """
+    Last update: 30/08/2023 
+    """
+
+    if \
+    (not args.assign_blocks and not os.path.exists(f"{args.bam}.bai")) or \
+    (args.assign_blocks and not all([os.path.exists(f"{bam}.bai") for bam in args.bams])):
+            
+        sys.stderr.write("\nMissing BAM indexes. Index your BAM files before running jloh extract.\n\n")
+        sys.exit()
+
+    else:
+        return True
+
+
 def generate_unique_key(output_dir):
 
     """
@@ -1167,10 +1184,13 @@ def write_vcfs_to_output(args, Handles, mode, Hetero_lines_lst, Homo_lines_lst, 
 def run_in_default_mode(args, tmp_bams):
 
     """
-    Last update: 28/09/2022
+    Last update: 30/08/2023
     """
 
     handle = "exp"
+
+    # verifications 
+    tmp = run_verifications(args)
 
     # snps
     sys.stderr.write(f"[{at()}] Extracting heterozygous and homozygous SNPs...\n")
@@ -1291,11 +1311,14 @@ def run_in_default_mode(args, tmp_bams):
 def run_in_block_assignment_mode(args, tmp_bams):
 
     """
-    Last update: 17/03/2023
+    Last update: 30/08/2023
     """
 
     handle_A = "exp_A"
     handle_B = "exp_B"
+
+    # verifications 
+    tmp = run_verifications(args)
 
     # snps
     sys.stderr.write(f"[{at()}] Extracting heterozygous and homozygous SNPs...\n")
