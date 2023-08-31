@@ -68,14 +68,6 @@ jloh extract --vcf <VCF> --ref <FASTA> --bam <BAM> [options]
 --bams              BAM files used to call the --vcfs (space-separated)         [!]
 --refs              Parental FASTA genomes (space-separated)                    [!]
 
-[one parent]
---vcf               Input VCF file                                              [!]
---bam               BAM file used to call the --vcf variants                    [!]
---ref               Reference FASTA genome                                      [!]
---one-parent        Works like "assign blocks", but with only one reference     [off]
-                    The SNPs are from a hybrid and the reference from a parent
-                    JLOH will use it to assign blocks to REF/ALT
-
 [I/O/E]
 --sample            Sample name / Strain name for output files                  [jloh]
 --output-dir        Output directory                                            [jloh_out]
@@ -111,8 +103,6 @@ p.add_argument("--assign-blocks", action="store_true")
 p.add_argument("--vcfs", nargs="*")
 p.add_argument("--bams", nargs="*")
 p.add_argument("--refs", nargs="*")
-# one parent
-p.add_argument("--one-parent", action="store_true")
 # I/O/E
 p.add_argument("--sample", default="jloh")
 p.add_argument("--output-dir", default="jloh_out")
@@ -1253,13 +1243,6 @@ def run_in_default_mode(args, tmp_bams):
 
     # sort
     LOH = sort_bed_intervals(LOH)
-
-    # assign arbitrary "-" allele 
-    # if the reference passed is a hybrid reference 
-    if args.one_parent == False:
-        LOH = assign_empty_allele_annotation(LOH)
-    else:
-        pass 
     
     # write candidates to output, pre filtering
     out = open(f"{args.output_dir}/{args.sample}.LOH_candidates.tsv", "w")
