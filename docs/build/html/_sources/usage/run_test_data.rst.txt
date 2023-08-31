@@ -32,7 +32,7 @@ To do so, use the following command:
     jloh stats --vcf out.ff.vcf 
 
 
-This command produces the quantiles of heterozygous and homozygous SNP densities. Their need is described in :ref:`jloh-stats` and :ref:`quickstart`.
+This command produces the quantiles of heterozygous and homozygous SNP densities. See :ref:`model-snp-density` for details. You must choose a threshold SNP density for heterozygous SNPs and one for homozygous SNPs. 
 
 Then, we proceed inferring LOH blocks from the dataset. This is done with the :ref:`jloh-extract` module. We used this command: 
 

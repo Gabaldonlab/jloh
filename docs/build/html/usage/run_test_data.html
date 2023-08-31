@@ -19,7 +19,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="LOH block extraction pipeline" href="default_wf.html" />
+    <link rel="next" title="Working with hybrids" href="hybrid_wf.html" />
     <link rel="prev" title="Quick start" href="quickstart.html" /> 
 </head>
 
@@ -50,11 +50,8 @@
 <li class="toctree-l2"><a class="reference internal" href="#get-loh-blocks">Get LOH blocks</a></li>
 </ul>
 </li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">Workflows</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="default_wf.html">LOH block extraction pipeline</a></li>
 <li class="toctree-l1"><a class="reference internal" href="hybrid_wf.html">Working with hybrids</a></li>
+<li class="toctree-l1"><a class="reference internal" href="one_parent.html">Hybrids with only one known parental</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Modules description</span></p>
 <ul>
@@ -130,7 +127,7 @@
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>stats<span class="w"> </span>--vcf<span class="w"> </span>out.ff.vcf
 </pre></div>
 </div>
-<p>This command produces the quantiles of heterozygous and homozygous SNP densities. Their need is described in <a class="reference internal" href="modules/stats.html#jloh-stats"><span class="std std-ref">jloh stats</span></a> and <a class="reference internal" href="quickstart.html#quickstart"><span class="std std-ref">Quick start</span></a>.</p>
+<p>This command produces the quantiles of heterozygous and homozygous SNP densities. See <a class="reference internal" href="model_snp_density.html#model-snp-density"><span class="std std-ref">Modelling SNP density</span></a> for details. You must choose a threshold SNP density for heterozygous SNPs and one for homozygous SNPs.</p>
 <p>Then, we proceed inferring LOH blocks from the dataset. This is done with the <a class="reference internal" href="modules/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> module. We used this command:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>extract<span class="w"> </span><span class="se">\</span>
 --vcf<span class="w"> </span>out.ff.vcf<span class="w"> </span>--bam<span class="w"> </span>out.fs.bam<span class="w"> </span>--ref<span class="w"> </span>S_para.chrXII.fa<span class="w"> </span><span class="se">\</span>
@@ -157,7 +154,7 @@
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="quickstart.html" class="btn btn-neutral float-left" title="Quick start" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="default_wf.html" class="btn btn-neutral float-right" title="LOH block extraction pipeline" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="hybrid_wf.html" class="btn btn-neutral float-right" title="Working with hybrids" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

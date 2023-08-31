@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Modelling SNP density &mdash; jloh 1.0.0 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../_static/documentation_options.js?v=8d563738"></script>
+        <script src="../_static/doctools.js?v=888ff710"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: white" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            jloh
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Get started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="run_test_data.html">Run JLOH with a test dataset</a></li>
+<li class="toctree-l1"><a class="reference internal" href="hybrid_wf.html">Working with hybrids</a></li>
+<li class="toctree-l1"><a class="reference internal" href="one_parent.html">Hybrids with only one known parental</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Modules description</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/stats.html">jloh stats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/g2g.html">jloh g2g</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/extract.html">jloh extract</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/filter.html">jloh filter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/intersect.html">jloh intersect</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/cluster.html">jloh cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/chimeric.html">jloh chimeric</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/junctions.html">jloh junctions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/plot.html">jloh plot</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/sim.html">jloh sim</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: white" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">jloh</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Modelling SNP density</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/usage/model_snp_density.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="modelling-snp-density">
+<span id="model-snp-density"></span><h1>Modelling SNP density<a class="headerlink" href="#modelling-snp-density" title="Link to this heading"></a></h1>
+<img alt="../_images/snp_density.png" src="../_images/snp_density.png" />
+<section id="how-to-do-it">
+<h2>How to do it<a class="headerlink" href="#how-to-do-it" title="Link to this heading"></a></h2>
+<p>A crucial aspect of using JLOH is modelling SNP density. This is done with <a class="reference internal" href="modules/stats.html#jloh-stats"><span class="std std-ref">jloh stats</span></a>, which profiles the density of heterozygous and homozygous SNPs over the genome in windows of adjustable size (<code class="docutils literal notranslate"><span class="pre">--window-size</span></code> and <code class="docutils literal notranslate"><span class="pre">--step-size</span></code>). This step is aimed at choosing an appropriate SNP density threshold to infer LOH blocks when running <a class="reference internal" href="modules/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a>.</p>
+<p>To infer the density distribution of the SNPs over the genome, one must run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>stats<span class="w"> </span>--vcf<span class="w"> </span>my_variants.vcf
+</pre></div>
+</div>
+<p>This step will produce an output that looks like this:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">--</span> <span class="n">SNPs</span><span class="o">/</span><span class="n">Kbp</span> <span class="n">Statistics</span> <span class="o">--</span>
+
+<span class="n">S</span>       <span class="n">Gen</span>   <span class="n">Het</span>   <span class="n">Homo</span>
+<span class="n">Median</span>  <span class="mf">5.0</span>   <span class="mf">4.0</span>   <span class="mf">4.0</span>
+<span class="n">Mean</span>    <span class="mf">8.5</span>   <span class="mf">8.5</span>   <span class="mf">5.6</span>
+<span class="n">Max</span>     <span class="mi">103</span>   <span class="mi">103</span>   <span class="mi">110</span>
+<span class="n">Min</span>     <span class="mi">1</span>     <span class="mi">1</span>     <span class="mi">1</span>
+
+<span class="o">--</span> <span class="n">SNPs</span><span class="o">/</span><span class="n">Kbp</span> <span class="n">Quantiles</span> <span class="o">--</span>
+
+<span class="n">Q</span>     <span class="n">Gen</span>    <span class="n">Het</span>    <span class="n">Homo</span>
+<span class="mi">5</span><span class="o">%</span>    <span class="mf">1.0</span>    <span class="mf">1.0</span>    <span class="mf">1.0</span>
+<span class="mi">10</span><span class="o">%</span>   <span class="mf">1.0</span>    <span class="mf">1.0</span>    <span class="mf">1.0</span>
+<span class="mi">15</span><span class="o">%</span>   <span class="mf">1.0</span>    <span class="mf">1.0</span>    <span class="mf">2.0</span>
+<span class="mi">50</span><span class="o">%</span>   <span class="mf">5.0</span>    <span class="mf">4.0</span>    <span class="mf">4.0</span>
+<span class="mi">85</span><span class="o">%</span>   <span class="mf">15.0</span>   <span class="mf">15.4</span>   <span class="mf">9.0</span>
+<span class="mi">90</span><span class="o">%</span>   <span class="mf">20.0</span>   <span class="mf">21.0</span>   <span class="mf">11.0</span>
+<span class="mi">95</span><span class="o">%</span>   <span class="mf">30.0</span>   <span class="mf">30.0</span>   <span class="mf">15.0</span>
+</pre></div>
+</div>
+<p>The user must choose a <strong>Het</strong> and a <strong>Homo</strong> value from a quantile (e.g. Q10) or a descriptor (e.g. median). The values will be used as thresholds to separate blocks into candidate LOH blocks and not. The two chosen values (e.g. 8 and 5) will become the arguments of the <code class="docutils literal notranslate"><span class="pre">--min-snps-kbp</span></code> parameter of <a class="reference internal" href="modules/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> (see below).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Higher quantiles are stricter in the detection of LOH blocks, they increase the precision but reduce the recall.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>This step tells you how heterozygous and how homozygous your dataset is. Depending on that, you may choose the quantiles appropriately to minimize false positives.</p>
+</div>
+</section>
+<section id="explanation">
+<h2>Explanation<a class="headerlink" href="#explanation" title="Link to this heading"></a></h2>
+<p>A quantile cuts a distribution in two. For example, “quantile 10” means that 10% of the items in the distribution have a value that is lower than the one desccribed by Q10.</p>
+<p>If we’re talking about SNP densities, a Q10 = 5 means that 10% of the windows in the analysed genome have less than 5 SNPs/kbp.</p>
+<p>In a genomic scenario, we can expect the majority of the genome to float around a certain average het/homo SNPs/kbp value. Then, there will be regions of very low heterozygosity (candidate LOH blocks), and regions of high homozygosity (candidate LOH blocks with an alternative allele). These are the ones we want to select for.</p>
+<p>This is why <a class="reference internal" href="modules/stats.html#jloh-stats"><span class="std std-ref">jloh stats</span></a> shows the <strong>mean</strong> and the <strong>median</strong> of the distribution together with the quantiles. The easiest approach is to take the mean as threshold: any window that has less than that many SNPs/kbp will be a candidate LOH block.</p>
+<p>However, for greater precision, one can choose to use a quantile (Q15, Q10, Q5). these will be lower than the average and still include 15%, 10%, or 5% of the total windows of the genome.</p>
+<p>Displayed higher quantiles (Q85, Q90, Q95) are for extreme cases. Hypothetically, if about 90% of a genome has undergone LOH, one could set the threshold at Q90 to make sure that nothing is left behind. Note that using high quantiles in case studies with “normal” or low heterozygosity will massively introduce false positives.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Matteo Schiavinato.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+    <!-- Theme Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-XXXXXXXXXX', {
+          'anonymize_ip': false,
+      });
+    </script> 
+
+</body>
+</html>

@@ -121,41 +121,12 @@
 <p>These three files will highlight the positions in which the genotype represented from the <strong>reads</strong> has lost heterozygosity when compared to the genotype represented by the <strong>reference</strong>.</p>
 </section>
 <section id="calculating-snp-density">
-<span id="snp-density"></span><h2>Calculating SNP density<a class="headerlink" href="#calculating-snp-density" title="Link to this heading"></a></h2>
-<p>The first step is to infer the density distribution of the SNPs over the genome, which will aid the recovery of LOH blocks by fine-tuning the block calling parameters. To do so:</p>
+<h2>Calculating SNP density<a class="headerlink" href="#calculating-snp-density" title="Link to this heading"></a></h2>
+<p>This is done with <a class="reference internal" href="modules/stats.html#jloh-stats"><span class="std std-ref">jloh stats</span></a>, for details see <a class="reference internal" href="model_snp_density.html#model-snp-density"><span class="std std-ref">Modelling SNP density</span></a>. Run the command:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>stats<span class="w"> </span>--vcf<span class="w"> </span>my_variants.vcf
 </pre></div>
 </div>
-<p>This step will produce an output that looks like this:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">--</span> <span class="n">SNPs</span><span class="o">/</span><span class="n">Kbp</span> <span class="n">Statistics</span> <span class="o">--</span>
-
-<span class="n">S</span>       <span class="n">Gen</span>   <span class="n">Het</span>   <span class="n">Homo</span>
-<span class="n">Median</span>  <span class="mf">5.0</span>   <span class="mf">4.0</span>   <span class="mf">4.0</span>
-<span class="n">Mean</span>    <span class="mf">8.5</span>   <span class="mf">8.5</span>   <span class="mf">5.6</span>
-<span class="n">Max</span>     <span class="mi">103</span>   <span class="mi">103</span>   <span class="mi">110</span>
-<span class="n">Min</span>     <span class="mi">1</span>     <span class="mi">1</span>     <span class="mi">1</span>
-
-<span class="o">--</span> <span class="n">SNPs</span><span class="o">/</span><span class="n">Kbp</span> <span class="n">Quantiles</span> <span class="o">--</span>
-
-<span class="n">Q</span>     <span class="n">Gen</span>    <span class="n">Het</span>    <span class="n">Homo</span>
-<span class="mi">5</span><span class="o">%</span>    <span class="mf">1.0</span>    <span class="mf">1.0</span>    <span class="mf">1.0</span>
-<span class="mi">10</span><span class="o">%</span>   <span class="mf">1.0</span>    <span class="mf">1.0</span>    <span class="mf">1.0</span>
-<span class="mi">15</span><span class="o">%</span>   <span class="mf">1.0</span>    <span class="mf">1.0</span>    <span class="mf">2.0</span>
-<span class="mi">50</span><span class="o">%</span>   <span class="mf">5.0</span>    <span class="mf">4.0</span>    <span class="mf">4.0</span>
-<span class="mi">85</span><span class="o">%</span>   <span class="mf">15.0</span>   <span class="mf">15.4</span>   <span class="mf">9.0</span>
-<span class="mi">90</span><span class="o">%</span>   <span class="mf">20.0</span>   <span class="mf">21.0</span>   <span class="mf">11.0</span>
-<span class="mi">95</span><span class="o">%</span>   <span class="mf">30.0</span>   <span class="mf">30.0</span>   <span class="mf">15.0</span>
-</pre></div>
-</div>
-<p>This step is aimed at choosing an appropriate SNP density threshold to infer LOH blocks in the next step. The user must <strong>choose a value</strong> for heterozygous and homozygous SNPs, which may be corresponding to different quantiles. The chosen values will be the input of the <code class="docutils literal notranslate"><span class="pre">--min-snps-kbp</span></code> parameter in the next step.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Higher quantiles are stricter in the detection of LOH blocks, they increase the precision but reduce the recall.</p>
-</div>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p>This step tells you how heterozygous and how homozygous your dataset is. Depending on that, you may choose the quantiles appropriately to minimize false positives.</p>
-</div>
+<p>And choose the thresholds of SNP density for heterozygous and homozygous SNPs.</p>
 </section>
 <section id="extracting-blocks">
 <h2>Extracting blocks<a class="headerlink" href="#extracting-blocks" title="Link to this heading"></a></h2>

@@ -25,49 +25,17 @@ These are the files you need as input to infer LOH blocks.
 These three files will highlight the positions in which the genotype represented from the **reads** has lost heterozygosity when compared to the genotype represented by the **reference**. 
 
 
-.. _snp-density:
-
 Calculating SNP density
 -----------------------
 
-The first step is to infer the density distribution of the SNPs over the genome, which will aid the recovery of LOH blocks by fine-tuning the block calling parameters. To do so:
+This is done with :ref:`jloh-stats`, for details see :ref:`model-snp-density`. Run the command:
 
 .. code-block:: bash 
 
-    jloh stats --vcf my_variants.vcf
+    jloh stats --vcf my_variants.vcf 
 
 
-This step will produce an output that looks like this::
-
-    -- SNPs/Kbp Statistics --
-
-    S       Gen   Het   Homo
-    Median  5.0   4.0   4.0
-    Mean    8.5   8.5   5.6
-    Max     103   103   110
-    Min     1     1     1
-
-    -- SNPs/Kbp Quantiles --
-
-    Q     Gen    Het    Homo
-    5%    1.0    1.0    1.0
-    10%   1.0    1.0    1.0
-    15%   1.0    1.0    2.0
-    50%   5.0    4.0    4.0
-    85%   15.0   15.4   9.0
-    90%   20.0   21.0   11.0
-    95%   30.0   30.0   15.0
-
-
-This step is aimed at choosing an appropriate SNP density threshold to infer LOH blocks in the next step. The user must **choose a value** for heterozygous and homozygous SNPs, which may be corresponding to different quantiles. The chosen values will be the input of the ``--min-snps-kbp`` parameter in the next step.
-
-.. note:: 
-
-    Higher quantiles are stricter in the detection of LOH blocks, they increase the precision but reduce the recall. 
-
-.. tip:: 
-
-    This step tells you how heterozygous and how homozygous your dataset is. Depending on that, you may choose the quantiles appropriately to minimize false positives. 
+And choose the thresholds of SNP density for heterozygous and homozygous SNPs. 
 
 
 Extracting blocks

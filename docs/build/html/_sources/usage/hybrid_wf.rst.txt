@@ -131,7 +131,7 @@ This step is to be performed only once, with both parental genomes. It produces 
 Analyse SNP density distribution
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-This step was described in :ref:`snp-density`, and is performed by :ref:`jloh-stats`. By modelling SNP density (SNPs/kbp) over each parental genome (i.e. running it twice), you will see how homo/heterozygous your hybrid reads are when compared to each reference. 
+This step is performed by :ref:`jloh-stats`. By modelling SNP density (SNPs/kbp) over each parental genome (i.e. running it twice), you will see how homo/heterozygous your hybrid reads are when compared to each reference. More info on how it works can be found here: :ref:`model-snp-density`.
 
 .. code-block:: bash 
 
@@ -139,28 +139,7 @@ This step was described in :ref:`snp-density`, and is performed by :ref:`jloh-st
     jloh stats --vcf vars_B.vcf 
 
 
-This step will produce an output that looks like this::
-
-    -- SNPs/Kbp Statistics --
-
-    S       Gen   Het   Homo
-    Median  5.0   4.0   4.0
-    Mean    8.5   8.5   5.6
-    Max     103   103   110
-    Min     1     1     1
-
-    -- SNPs/Kbp Quantiles --
-
-    Q     Gen    Het    Homo
-    5%    1.0    1.0    1.0
-    10%   1.0    1.0    1.0
-    15%   1.0    1.0    2.0
-    50%   5.0    4.0    4.0
-    85%   15.0   15.4   9.0
-    90%   20.0   21.0   11.0
-    95%   30.0   30.0   15.0
-
-Choose the **Het** and the **Homo** values from a quantile (e.g. Q10) or a descriptor (e.g. median). The values will be used as thresholds to separate blocks into candidate LOH blocks and not. The two chosen values (e.g. 8 and 5) will become the arguments of the ``--min-snps-kbp`` parameter of :ref:`jloh-extract` (see below). 
+This step will produce SNP density quantiles for heterozygous and homozygous SNPs (see :ref:`model-snp-density` for details). You must choose a threshold value of SNP density for heterozygous SNPs and one for homozygous SNPs. 
 
 .. tip:: 
 
@@ -169,6 +148,7 @@ Choose the **Het** and the **Homo** values from a quantile (e.g. Q10) or a descr
 .. note:: 
 
     The heterozygosity level detected in A and B should be comparable, as it arises from differences between A and B. The homozygosity level, instead, may be different if all the LOH events went towards one of the two subgenomes. If they all went towards A, then B will be full of homozygous SNPs and A will be depleted of them. 
+
 
 
 Infer LOH blocks in hybrids
@@ -197,9 +177,18 @@ Here, we're leveraging 24 threads from our HPC cluster. All the other parameters
     By default, :ref:`jloh-extract` keeps every candidate block that is at least 100 bp long. At low divergence (1-3%) this may inflate false positives. In that case, increase the minimum length. 
 
 
+Here's a graphical representation of block assignment based on SNP clusters.
 
-Plot detected LOH
------------------
+.. image:: ../images/snp_clustering.png
+
+
+When running :ref:`jloh-extract` in ``--assign-blocks`` mode, there are four possible outcomes in terms of blocks, shown in the next figure:
+
+.. image:: ../images/block_types.png
+    
+
+Plot LOH blocks
+---------------
 
 This step is performed by :ref:`jloh-plot`. Since you're analysing a hybrid with two parental genomes, run it in ``--two-ref`` mode. This mode compares blocks labelled as "REF" with those labelled as "ALT". You can choose what "REF" and "ALT" are, e.g. "Subgenome A" and "Subgenome B". 
 

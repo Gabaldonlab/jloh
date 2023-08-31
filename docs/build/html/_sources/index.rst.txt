@@ -23,6 +23,7 @@ A publication is currently being reviewed. The preprint can be found in bioRxiv 
    usage/installation
    usage/quickstart
    usage/run_test_data
+   usage/model_snp_density
    usage/hybrid_wf
    usage/one_parent
 
