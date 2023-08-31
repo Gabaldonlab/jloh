@@ -197,6 +197,11 @@ Here, we're leveraging 24 threads from our HPC cluster. All the other parameters
     By default, :ref:`jloh-extract` keeps every candidate block that is at least 100 bp long. At low divergence (1-3%) this may inflate false positives. In that case, increase the minimum length. 
 
 
+Here's a graphical representation of block assignment based on SNP clusters.
+
+.. image:: images/snp_clustering.png
+
+
 
 Plot detected LOH
 -----------------
