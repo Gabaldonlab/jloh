@@ -53,7 +53,7 @@ jloh chimeric --blocks-A <TSV> --blocks-B <TSV> --het <BED> --gff <GFF> [options
 --blocks-B          Another TSV file produced by JLOH extract (haplotype 2)     [!]
                     If coming from --hybrid mode, use only REF blocks
 --het               Heterozygous regions identified by JLOH extract             [!]
-                    If coming from --hybrid mode, "cat" them into a single file
+                    If coming from --assign-blocks, "cat" them into a single file
 --gff               GFF file containing gene annotations                        [!]
 --out-prefix        Pre-pend this prefix to each output file (path allowed)     [out]
 --quiet             Suppress warnings                                           [off]

@@ -60,12 +60,15 @@ jloh cluster [options] --loh <LOH_A.tsv> ... <LOH_N.tsv>
     sys.exit(0)
 
 # parser 
-p = ap.ArgumentParser()
-p.add_argument("--loh", nargs="+", required=True)
-p.add_argument("--out-prefix", default="jloh_clust_out", type=str)
-p.add_argument("--threads", default=4, type=int)
-p.add_argument("--max-dist", default=0.1, type=float)
-args = p.parse_args()
+def create_parser():
+    p = ap.ArgumentParser()
+    p.add_argument("--loh", nargs="+", required=True)
+    p.add_argument("--out-prefix", default="jloh_clust_out", type=str)
+    p.add_argument("--threads", default=4, type=int)
+    p.add_argument("--max-dist", default=0.1, type=float)
+    args = p.parse_args()
+
+    return args 
 
 # functions
 def dump_queue(q):
@@ -220,4 +223,5 @@ def main(args):
 
 # main 
 if __name__ == "__main__":
+    args = create_parser()
     main(args)

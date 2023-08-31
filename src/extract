@@ -68,25 +68,27 @@ jloh extract --vcf <VCF> --ref <FASTA> --bam <BAM> [options]
 --bams              BAM files used to call the --vcfs (space-separated)         [!]
 --refs              Parental FASTA genomes (space-separated)                    [!]
 
+[variants]
+--min-snps-kbp      Min. SNPs/kbp to retain a block (het,homo)                  [5,1]
+--filter-mode       "pass" to keep only PASS variants, "all" to keep everything [all]
+--min-af            Min. allele frequency to consider a variant heterozygous    [0.3]
+--max-af            Max. allele frequency to consider a variant heterozygous    [0.7]
+
+[blocks]
+--min-length        Min. LOH block length                                       [100]
+--coarseness        Don't consider any interval (het/homo) smaller than this    [100]
+--min-frac-cov      Min. fraction of LOH block that has to be covered by reads  [0.5]
+--hemi              Frac. of the mean coverage under which LOH is hemizygous    [0.75]
+--overhang          Kb up/downstream of the LOH block for coverage comparison   [5000]
+--min-overhang      Min frac. (0.0-1.0) of overhang to assign zygosity          [0.9]
+--merge-uncov       Merge blocks if separated by up to these many uncov pos     [10]
+
 [I/O/E]
 --sample            Sample name / Strain name for output files                  [jloh]
 --output-dir        Output directory                                            [jloh_out]
 --threads           Number of parallel computing threads                        [4]
 --regions           BED file containing regions to keep in the analysis         [off]
                     Can include regions from both --refs
-
-[parameters]
---min-snps-kbp      Min. SNPs/kbp to retain a block (het,homo)                  [5,1]
---filter-mode       "pass" to keep only PASS variants, "all" to keep everything [all]
---min-length        Min. LOH block length                                       [100]
---coarseness        Don't consider any interval (het/homo) smaller than this    [100]
---min-af            Min. allele frequency to consider a variant heterozygous    [0.3]
---max-af            Max. allele frequency to consider a variant heterozygous    [0.7]
---min-frac-cov      Min. fraction of LOH block that has to be covered by reads  [0.5]
---hemi              Frac. of the mean coverage under which LOH is hemizygous    [0.75]
---overhang          Kb up/downstream of the LOH block for coverage comparison   [5000]
---min-overhang      Min frac. (0.0-1.0) of overhang to assign zygosity          [0.9]
---merge-uncov       Merge blocks if separated by up to these many uncov pos     [10]
 
 """)
     sys.exit(0)

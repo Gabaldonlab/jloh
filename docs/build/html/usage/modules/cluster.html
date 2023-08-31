@@ -47,6 +47,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick start</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../run_test_data.html">Run JLOH with a test dataset</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../model_snp_density.html">Modelling SNP density</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../hybrid_wf.html">Working with hybrids</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../one_parent.html">Hybrids with only one known parental</a></li>
 </ul>
@@ -57,7 +58,12 @@
 <li class="toctree-l1"><a class="reference internal" href="extract.html">jloh extract</a></li>
 <li class="toctree-l1"><a class="reference internal" href="filter.html">jloh filter</a></li>
 <li class="toctree-l1"><a class="reference internal" href="intersect.html">jloh intersect</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">jloh cluster</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">jloh cluster</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#description">Description</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#usage">Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#parameters">Parameters</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="chimeric.html">jloh chimeric</a></li>
 <li class="toctree-l1"><a class="reference internal" href="junctions.html">jloh junctions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="plot.html">jloh plot</a></li>
@@ -90,6 +96,43 @@
              
   <section id="jloh-cluster">
 <span id="id1"></span><h1>jloh cluster<a class="headerlink" href="#jloh-cluster" title="Link to this heading"></a></h1>
+<section id="description">
+<h2>Description<a class="headerlink" href="#description" title="Link to this heading"></a></h2>
+<p>Cluster multiple <a class="reference internal" href="extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> runs by overlap of their LOH blocks.</p>
+</section>
+<section id="usage">
+<h2>Usage<a class="headerlink" href="#usage" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>cluster<span class="w"> </span><span class="o">[</span>options<span class="o">]</span><span class="w"> </span>--loh<span class="w"> </span>&lt;LOH_A.tsv&gt;<span class="w"> </span>...<span class="w"> </span>&lt;LOH_N.tsv&gt;
+</pre></div>
+</div>
+</section>
+<section id="parameters">
+<h2>Parameters<a class="headerlink" href="#parameters" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--loh</span> <span class="pre">&lt;PATH_1&gt;</span> <span class="pre">...</span> <span class="pre">&lt;PATH_n&gt;</span></span></dt>
+<dd><p>Space-separated list of *.LOH_blocks.tsv files produced by <a class="reference internal" href="extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--out-prefix</span> <span class="pre">&lt;PATH|STR&gt;</span></span></dt>
+<dd><p>Pre-pend this prefix to each output file (path allowed).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--max-dist</span> <span class="pre">&lt;FLOAT&gt;</span></span></dt>
+<dd><p>Maximum distance [0.0 - 1.0] between elements in a cluster.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--threads</span> <span class="pre">&lt;INT&gt;</span></span></dt>
+<dd><p>Number of parallel operations performed.</p>
+</dd></dl>
+
+</section>
 </section>
 
 
