@@ -52,11 +52,8 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="run_test_data.html">Run JLOH with a test dataset</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">Workflows</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="default_wf.html">LOH block extraction pipeline</a></li>
 <li class="toctree-l1"><a class="reference internal" href="hybrid_wf.html">Working with hybrids</a></li>
+<li class="toctree-l1"><a class="reference internal" href="one_parent.html">Hybrids with only one known parental</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Modules description</span></p>
 <ul>
@@ -98,7 +95,7 @@
              
   <section id="quick-start">
 <span id="quickstart"></span><h1>Quick start<a class="headerlink" href="#quick-start" title="Link to this heading"></a></h1>
-<p>If you’re in a hurry and can’t read too much documentation, here’s a quick way to use JLOH with commonly available files derived from NGS data analysis.</p>
+<p>If you’re in a hurry and can’t read too much documentation, here’s a quick way to use JLOH with commonly available files derived from NGS data analysis. If, instead, you’re working with a hybrid organism, make sure you read this section: <a class="reference internal" href="hybrid_wf.html#hybrid-wf"><span class="std std-ref">Working with hybrids</span></a>.</p>
 <section id="requirements">
 <h2>Requirements<a class="headerlink" href="#requirements" title="Link to this heading"></a></h2>
 <p>JLOH is built to work as an addition to any common <strong>variant calling</strong> pipeline. These pipelines are based on two steps: 1) read mapping and 2) variant calling. Regardless of the tool used to map the reads, the most common alignment format is the SAM format (or its binary version BAM). In the calling step, regardless of the tool used to call variants the output is most often in VCF format.</p>
@@ -124,7 +121,7 @@
 <p>These three files will highlight the positions in which the genotype represented from the <strong>reads</strong> has lost heterozygosity when compared to the genotype represented by the <strong>reference</strong>.</p>
 </section>
 <section id="calculating-snp-density">
-<h2>Calculating SNP density<a class="headerlink" href="#calculating-snp-density" title="Link to this heading"></a></h2>
+<span id="snp-density"></span><h2>Calculating SNP density<a class="headerlink" href="#calculating-snp-density" title="Link to this heading"></a></h2>
 <p>The first step is to infer the density distribution of the SNPs over the genome, which will aid the recovery of LOH blocks by fine-tuning the block calling parameters. To do so:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>stats<span class="w"> </span>--vcf<span class="w"> </span>my_variants.vcf
 </pre></div>

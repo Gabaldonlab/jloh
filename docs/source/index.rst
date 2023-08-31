@@ -23,15 +23,8 @@ A publication is currently being reviewed. The preprint can be found in bioRxiv 
    usage/installation
    usage/quickstart
    usage/run_test_data
-
-
-.. toctree:: 
-   :maxdepth: 1
-   :caption: Workflows
-
-   usage/default_wf
    usage/hybrid_wf
-
+   usage/one_parent
 
 .. toctree::
    :maxdepth: 1
@@ -47,3 +40,4 @@ A publication is currently being reviewed. The preprint can be found in bioRxiv 
    usage/modules/junctions 
    usage/modules/plot 
    usage/modules/sim 
+

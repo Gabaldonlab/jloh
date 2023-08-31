@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hybrids with only one known parental &mdash; jloh 1.0.0 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../_static/documentation_options.js?v=8d563738"></script>
+        <script src="../_static/doctools.js?v=888ff710"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="jloh stats" href="modules/stats.html" />
+    <link rel="prev" title="Working with hybrids" href="hybrid_wf.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: white" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            jloh
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Get started</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="run_test_data.html">Run JLOH with a test dataset</a></li>
+<li class="toctree-l1"><a class="reference internal" href="hybrid_wf.html">Working with hybrids</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Hybrids with only one known parental</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Modules description</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/stats.html">jloh stats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/g2g.html">jloh g2g</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/extract.html">jloh extract</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/filter.html">jloh filter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/intersect.html">jloh intersect</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/cluster.html">jloh cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/chimeric.html">jloh chimeric</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/junctions.html">jloh junctions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/plot.html">jloh plot</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/sim.html">jloh sim</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: white" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">jloh</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Hybrids with only one known parental</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/usage/one_parent.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="hybrids-with-only-one-known-parental">
+<span id="one-parent"></span><h1>Hybrids with only one known parental<a class="headerlink" href="#hybrids-with-only-one-known-parental" title="Link to this heading"></a></h1>
+<p>If you’re working in a hybrid setup but only have one parental genome at hand, <em>you can still use JLOH</em>. There’s only a few adjustments you shall take into account.</p>
+<p>To generate the necessary BAM and VCF files, follow the guidelines described in <a class="reference internal" href="hybrid_wf.html#hybrid-wf"><span class="std std-ref">Working with hybrids</span></a>, doing each step only once (i.e. with the only parental genome you have). You won’t be able to run <a class="reference internal" href="modules/g2g.html#jloh-g2g"><span class="std std-ref">jloh g2g</span></a>, since you don’t have two parental genomes.</p>
+<p>When running <a class="reference internal" href="modules/stats.html#jloh-stats"><span class="std std-ref">jloh stats</span></a>, you won’t have any information regarding the homozygosity derived from the missing parental. Hence, you must go forward with the quantile values you choose from the distribution of your only known parental.</p>
+<p>When running <a class="reference internal" href="modules/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a>, simply run it in default mode (i.e. <em>without</em> <code class="docutils literal notranslate"><span class="pre">--assign-blocks</span></code>) and pass the parental genome you have as <code class="docutils literal notranslate"><span class="pre">--ref</span></code>. Blocks annotated as <code class="docutils literal notranslate"><span class="pre">REF</span></code> did not have many homozygous SNPs and are assumed to carry the allele of the parental genome you have in your possession. Those annotated as <code class="docutils literal notranslate"><span class="pre">ALT</span></code> are likely carrying the allele of the other parental.</p>
+<p>When running <a class="reference internal" href="modules/plot.html#jloh-plot"><span class="std std-ref">jloh plot</span></a>, use it in <code class="docutils literal notranslate"><span class="pre">--one-ref</span></code> mode as you would do with a normal (i.e. non-hybrid) run.</p>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="hybrid_wf.html" class="btn btn-neutral float-left" title="Working with hybrids" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="modules/stats.html" class="btn btn-neutral float-right" title="jloh stats" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Matteo Schiavinato.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+    <!-- Theme Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-XXXXXXXXXX', {
+          'anonymize_ip': false,
+      });
+    </script> 
+
+</body>
+</html>

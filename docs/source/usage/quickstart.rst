@@ -3,7 +3,7 @@
 Quick start
 ===========
 
-If you're in a hurry and can't read too much documentation, here's a quick way to use JLOH with commonly available files derived from NGS data analysis. 
+If you're in a hurry and can't read too much documentation, here's a quick way to use JLOH with commonly available files derived from NGS data analysis. If, instead, you're working with a hybrid organism, make sure you read this section: :ref:`hybrid-wf`.
 
 Requirements
 ------------
@@ -23,6 +23,9 @@ These are the files you need as input to infer LOH blocks.
 +-----------+------------------------------------------------------------------------------------------------------------------+
 
 These three files will highlight the positions in which the genotype represented from the **reads** has lost heterozygosity when compared to the genotype represented by the **reference**. 
+
+
+.. _snp-density:
 
 Calculating SNP density
 -----------------------

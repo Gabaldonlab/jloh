@@ -1,4 +1,0 @@
-.. _default-wf:
-
-LOH block extraction pipeline
-=============================

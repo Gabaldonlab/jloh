@@ -19,8 +19,8 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="jloh stats" href="modules/stats.html" />
-    <link rel="prev" title="LOH block extraction pipeline" href="default_wf.html" /> 
+    <link rel="next" title="Hybrids with only one known parental" href="one_parent.html" />
+    <link rel="prev" title="Run JLOH with a test dataset" href="run_test_data.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -43,15 +43,30 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Get started</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick start</a></li>
 <li class="toctree-l1"><a class="reference internal" href="run_test_data.html">Run JLOH with a test dataset</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Working with hybrids</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#map-hybrid-reads-onto-parentals">Map hybrid reads onto parentals</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#estimate-mismatches-allowed">Estimate mismatches allowed</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#remove-secondary-alignments">Remove secondary alignments</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Workflows</span></p>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="default_wf.html">LOH block extraction pipeline</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Working with hybrids</a></li>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#call-variants">Call variants</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#add-allele-frequency-if-missing">Add allele frequency if missing</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#run-jloh">Run JLOH</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#analyse-parental-genomes">Analyse parental genomes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#analyse-snp-density-distribution">Analyse SNP density distribution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#infer-loh-blocks-in-hybrids">Infer LOH blocks in hybrids</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#plot-detected-loh">Plot detected LOH</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="one_parent.html">Hybrids with only one known parental</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Modules description</span></p>
 <ul>
@@ -93,14 +108,179 @@
              
   <section id="working-with-hybrids">
 <span id="hybrid-wf"></span><h1>Working with hybrids<a class="headerlink" href="#working-with-hybrids" title="Link to this heading"></a></h1>
+<p>One area of research in which LOH is particularly studied is the one of hybrids (<a class="reference external" href="https://doi.org/10.1186/s12915-023-01608-z">Mixão et al., 2022</a>). Hybrids are organisms whose parents come from very divergent populations of the same species (intra-specific hybrids) or directly from different species (inter-specific hybrids).</p>
+<p>In hybrids, LOH tends to reduce differences between subgenomes. Whenever one piece of DNA is damaged or lost, the other subgenome is used as template to regenerate it. This process leads to loss of the heterozygosity that was present in that stretch, and if the new arrangement of alleles is increasing the fitness, it fixates in the population.</p>
+<img alt="../_images/loh.png" src="../_images/loh.png" />
+<p>Hence, to study LOH in hybrids with NGS data people sequence the hybrid species and then map the derived reads onto its parental genome sequences. This approach is not error-free: the inherent divergence between the two parental genomes may hinder proper read mapping, as we show in our publication (<a class="reference external" href="https://doi.org/10.1101/2023.05.04.539368">Schiavinato et al., 2023</a>).</p>
+<p>In this page we guide you through the steps necessary to produce a successful LOH block inference with hybrid data.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>If you only have one parental genome sequence, follow this other workflow instead: <a class="reference internal" href="one_parent.html#one-parent"><span class="std std-ref">Hybrids with only one known parental</span></a>.</p>
+</div>
+<section id="map-hybrid-reads-onto-parentals">
+<h2>Map hybrid reads onto parentals<a class="headerlink" href="#map-hybrid-reads-onto-parentals" title="Link to this heading"></a></h2>
+<p>You must map the reads extracted from the hybrid (i.e. containing both subgenomic components) against one parental genome at a time. For simplicity, we will refer to the subgenomes as A and B from now on.</p>
+<p>The mapping operation must be carried out in a way that allows sufficient mismatches between the reads and the reference, so that reads from both A and B may map against the parental A (or B). If both subgenomic components map against a parental genome, you’ll see heterozygous SNPs in the final VCF files and you’ll be able to infer LOH blocks.</p>
+<section id="estimate-mismatches-allowed">
+<h3>Estimate mismatches allowed<a class="headerlink" href="#estimate-mismatches-allowed" title="Link to this heading"></a></h3>
+<p>If you’re using <a class="reference external" href="http://daehwankimlab.github.io/hisat2">HISAT2</a> or <a class="reference external" href="https://bowtie-bio.sourceforge.net/bowtie2/index.shtml">bowtie2</a>, the parameter that allows you to fine-tune the mapping tolerance is <code class="docutils literal notranslate"><span class="pre">--score-min</span></code>. This parameter defines a scoring function that allows a number of mismatches correlated with the read length.</p>
+<p>The default HISAT2 values are <code class="docutils literal notranslate"><span class="pre">--score-min</span> <span class="pre">L,0.0,-0.2</span> <span class="pre">--mp</span> <span class="pre">6,2</span></code> (scoring function and mismatch penalty). With reads that are 125 nt long, this is the calculation performed:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Max</span> <span class="n">penalty</span> <span class="o">=</span> <span class="p">(</span><span class="mi">125</span> <span class="o">*</span> <span class="o">-</span><span class="mf">0.2</span><span class="p">)</span> <span class="o">+</span> <span class="mf">0.0</span> <span class="o">=</span> <span class="o">-</span><span class="mi">25</span>
+<span class="n">Max</span> <span class="n">mismatches</span> <span class="o">=</span> <span class="mi">25</span> <span class="o">/</span> <span class="mi">6</span> <span class="o">=</span> <span class="mf">4.2</span> <span class="o">--&gt;</span> <span class="mi">4</span> <span class="n">mismatches</span>
+</pre></div>
+</div>
+<p>Hence, increasing the absolute value in the third field of the <code class="docutils literal notranslate"><span class="pre">--score-min</span></code> argument will accomodate more mismatches. For example, bringing it to -0.8 would mean:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Max</span> <span class="n">penalty</span> <span class="o">=</span> <span class="p">(</span><span class="mi">125</span> <span class="o">*</span> <span class="o">-</span><span class="mf">0.8</span><span class="p">)</span> <span class="o">+</span> <span class="mf">0.0</span> <span class="o">=</span> <span class="o">-</span><span class="mi">100</span>
+<span class="n">Max</span> <span class="n">mismatches</span> <span class="o">=</span> <span class="mi">100</span> <span class="o">/</span> <span class="mi">6</span> <span class="o">=</span> <span class="mf">16.7</span> <span class="o">--&gt;</span> <span class="mi">16</span> <span class="n">mismatches</span>
+</pre></div>
+</div>
+<p>To properly choose this parameter, you must know an estimate of the divergence between the two subgenomes of your hybrid. If their divergence is 5%, you can expect 5 mismatches every 100 bp. This means that reads of L=100 from B will map onto A only if the mapping algorithm can accomodate at least 5 mismatches. If reads were L=125 (as in the above example), it should accomodate at least 6.25 mismatches (approx. 6).</p>
+<p>Here’s a practical conversion formula to set your <code class="docutils literal notranslate"><span class="pre">--score-min</span></code>, with <code class="docutils literal notranslate"><span class="pre">div</span></code> being divergence (1-100), <code class="docutils literal notranslate"><span class="pre">pen</span></code> being the mismatch penalty (default: 6 in HISAT2), <code class="docutils literal notranslate"><span class="pre">f</span></code> being the absolute value in the <code class="docutils literal notranslate"><span class="pre">--score-min</span></code> argument (e.g. 0.2, without the sign).</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">f</span> <span class="o">=</span> <span class="p">((</span><span class="n">div</span> <span class="o">/</span> <span class="mi">100</span><span class="p">)</span> <span class="o">*</span> <span class="n">pen</span><span class="p">)</span>
+
+<span class="n">Leading</span> <span class="n">to</span><span class="p">:</span>
+<span class="o">--</span><span class="n">score</span><span class="o">-</span><span class="nb">min</span> <span class="n">L</span><span class="p">,</span><span class="mf">0.0</span><span class="p">,</span><span class="o">-</span><span class="n">f</span>
+</pre></div>
+</div>
+<p>Hence, we suggest as a good rule of thumb to set the mapping parameters in a way that they accomodate slightly more mismatches than those required by the subgenomic divergence (e.g. 7-8 mismatches when working with L=125 and div=5%).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Once you estimated the number of mismatches and set the mapping parameters accordingly, you must repeat the mapping twice: once onto the A parental genome, and once onto the B parental genome.</p>
+</div>
+</section>
+<section id="remove-secondary-alignments">
+<h3>Remove secondary alignments<a class="headerlink" href="#remove-secondary-alignments" title="Link to this heading"></a></h3>
+<p>Most mappers will return more than one mapping location for each read in the output SAM file. Each read derives from a fragment of DNA, and therefore belongs to a unique spot in the genome, not plenty. It is therefore important to remove secondary alignments and keep only the best one in order to avoid coverage inflation and false SNP detection.</p>
+<p>To do so, simply use <a class="reference external" href="http://www.htslib.org/download/">samtools</a> and its <strong>view</strong> module, removing records with the “secondary” bitwise flag (0x0100) and those with the “unmapped” bitwise flag to save disk space (0x4). Here in the example, we’re taking advantage of multithreading (-&#64; 24). We’re also piping the <strong>view</strong> command to the <strong>sort</strong> command to sort the output BAM directly by genome coordinate.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>samtools<span class="w"> </span>view<span class="w"> </span>-@<span class="w"> </span><span class="m">24</span><span class="w"> </span>-h<span class="w"> </span>-b<span class="w"> </span>-F<span class="w"> </span>0x0100<span class="w"> </span>-F<span class="w"> </span>0x4<span class="w"> </span>my_alignment.sam<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
+samtools<span class="w"> </span>sort<span class="w"> </span>-@<span class="w"> </span><span class="m">24</span><span class="w"> </span><span class="se">\</span>
+&gt;<span class="w"> </span>my_filtered_alignment.bam
+</pre></div>
+</div>
+<p>Repeat this operation for both alignments (A and B).</p>
+</section>
+</section>
+<section id="call-variants">
+<h2>Call variants<a class="headerlink" href="#call-variants" title="Link to this heading"></a></h2>
+<p>The variant calling procedure does not need any significant retouch and can be performed any way the user wants, as long as it produces a VCF file that contains both homozygous and heterozygous SNPs.</p>
+<p>Some users perform variant calling combining <a class="reference external" href="http://www.htslib.org/download/">bcftools</a> <strong>mpileup</strong> and <strong>call</strong>. Other users prefer the <a class="reference external" href="https://gatk.broadinstitute.org/hc/en-us">GATK</a> pipeline.</p>
+<section id="add-allele-frequency-if-missing">
+<h3>Add allele frequency if missing<a class="headerlink" href="#add-allele-frequency-if-missing" title="Link to this heading"></a></h3>
+<p>A final, crucial step before running JLOH is to add allele frequency (<code class="docutils literal notranslate"><span class="pre">AF</span></code>) as an annotation to the VCF file in the <code class="docutils literal notranslate"><span class="pre">FORMAT</span></code> field. This can be done manually with simple scripts but we suggest to do it with <a class="reference external" href="https://github.com/MatteoSchiavinato/all2vcf">all2vcf</a>, which has a module called <strong>frequency</strong> taking care of that exactly. A distribution of <a class="reference external" href="https://github.com/MatteoSchiavinato/all2vcf">all2vcf</a> is already included with JLOH (<code class="docutils literal notranslate"><span class="pre">src/all2vcf</span></code>).</p>
+<p>Once your VCF files contain the <code class="docutils literal notranslate"><span class="pre">AF</span></code> annotation in the <code class="docutils literal notranslate"><span class="pre">FORMAT</span></code> field, they’re good to go for running JLOH.</p>
+</section>
+</section>
+<section id="run-jloh">
+<h2>Run JLOH<a class="headerlink" href="#run-jloh" title="Link to this heading"></a></h2>
+<p>Basic information on how to run JLOH can be found in <a class="reference internal" href="quickstart.html#quickstart"><span class="std std-ref">Quick start</span></a> and <a class="reference internal" href="run_test_data.html#test-data"><span class="std std-ref">Run JLOH with a test dataset</span></a>. However, when using hybrids, there are some adjustments to be done.</p>
+<section id="analyse-parental-genomes">
+<h3>Analyse parental genomes<a class="headerlink" href="#analyse-parental-genomes" title="Link to this heading"></a></h3>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This step is optional, but highly suggested.</p>
+</div>
+<p>This first step is performed by <a class="reference internal" href="modules/g2g.html#jloh-g2g"><span class="std std-ref">jloh g2g</span></a>. This tool maps one parental genome onto the other using <a class="reference external" href="https://mummer4.github.io/install/install.html">nucmer</a>, and finds regions where the two parental genomes have SNPs. These are the regions where LOH could have taken place, as they were different in the parentals. Regions where the genomes were identical in the first place could not have undergone LOH, and would increase false positives.</p>
+<p>Here’s a basic command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>g2g<span class="w"> </span>--target<span class="w"> </span>genome_A.fa<span class="w"> </span>--query<span class="w"> </span>genome_B.fa
+</pre></div>
+</div>
+<p>For further information consult <a class="reference internal" href="modules/g2g.html#jloh-g2g"><span class="std std-ref">jloh g2g</span></a>. In case you need to set the <code class="docutils literal notranslate"><span class="pre">--all2vcf-exe</span></code> parameter, remember that a distribution of <a class="reference external" href="https://github.com/MatteoSchiavinato/all2vcf">all2vcf</a> is already included with JLOH (<code class="docutils literal notranslate"><span class="pre">src/all2vcf</span></code>).</p>
+<p>This step is to be performed only once, with both parental genomes. It produces a BED file that you can pass to <a class="reference internal" href="modules/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> later on, as argument of the <code class="docutils literal notranslate"><span class="pre">--regions</span></code> parameter.</p>
+</section>
+<section id="analyse-snp-density-distribution">
+<h3>Analyse SNP density distribution<a class="headerlink" href="#analyse-snp-density-distribution" title="Link to this heading"></a></h3>
+<p>This step was described in <a class="reference internal" href="quickstart.html#snp-density"><span class="std std-ref">Calculating SNP density</span></a>, and is performed by <a class="reference internal" href="modules/stats.html#jloh-stats"><span class="std std-ref">jloh stats</span></a>. By modelling SNP density (SNPs/kbp) over each parental genome (i.e. running it twice), you will see how homo/heterozygous your hybrid reads are when compared to each reference.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>stats<span class="w"> </span>--vcf<span class="w"> </span>vars_A.vcf
+jloh<span class="w"> </span>stats<span class="w"> </span>--vcf<span class="w"> </span>vars_B.vcf
+</pre></div>
+</div>
+<p>This step will produce an output that looks like this:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">--</span> <span class="n">SNPs</span><span class="o">/</span><span class="n">Kbp</span> <span class="n">Statistics</span> <span class="o">--</span>
+
+<span class="n">S</span>       <span class="n">Gen</span>   <span class="n">Het</span>   <span class="n">Homo</span>
+<span class="n">Median</span>  <span class="mf">5.0</span>   <span class="mf">4.0</span>   <span class="mf">4.0</span>
+<span class="n">Mean</span>    <span class="mf">8.5</span>   <span class="mf">8.5</span>   <span class="mf">5.6</span>
+<span class="n">Max</span>     <span class="mi">103</span>   <span class="mi">103</span>   <span class="mi">110</span>
+<span class="n">Min</span>     <span class="mi">1</span>     <span class="mi">1</span>     <span class="mi">1</span>
+
+<span class="o">--</span> <span class="n">SNPs</span><span class="o">/</span><span class="n">Kbp</span> <span class="n">Quantiles</span> <span class="o">--</span>
+
+<span class="n">Q</span>     <span class="n">Gen</span>    <span class="n">Het</span>    <span class="n">Homo</span>
+<span class="mi">5</span><span class="o">%</span>    <span class="mf">1.0</span>    <span class="mf">1.0</span>    <span class="mf">1.0</span>
+<span class="mi">10</span><span class="o">%</span>   <span class="mf">1.0</span>    <span class="mf">1.0</span>    <span class="mf">1.0</span>
+<span class="mi">15</span><span class="o">%</span>   <span class="mf">1.0</span>    <span class="mf">1.0</span>    <span class="mf">2.0</span>
+<span class="mi">50</span><span class="o">%</span>   <span class="mf">5.0</span>    <span class="mf">4.0</span>    <span class="mf">4.0</span>
+<span class="mi">85</span><span class="o">%</span>   <span class="mf">15.0</span>   <span class="mf">15.4</span>   <span class="mf">9.0</span>
+<span class="mi">90</span><span class="o">%</span>   <span class="mf">20.0</span>   <span class="mf">21.0</span>   <span class="mf">11.0</span>
+<span class="mi">95</span><span class="o">%</span>   <span class="mf">30.0</span>   <span class="mf">30.0</span>   <span class="mf">15.0</span>
+</pre></div>
+</div>
+<p>Choose the <strong>Het</strong> and the <strong>Homo</strong> values from a quantile (e.g. Q10) or a descriptor (e.g. median). The values will be used as thresholds to separate blocks into candidate LOH blocks and not. The two chosen values (e.g. 8 and 5) will become the arguments of the <code class="docutils literal notranslate"><span class="pre">--min-snps-kbp</span></code> parameter of <a class="reference internal" href="modules/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> (see below).</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Run this tool twice (once per subgenome) and take the average of the two values chosen for A and the two chosen for B.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The heterozygosity level detected in A and B should be comparable, as it arises from differences between A and B. The homozygosity level, instead, may be different if all the LOH events went towards one of the two subgenomes. If they all went towards A, then B will be full of homozygous SNPs and A will be depleted of them.</p>
+</div>
+</section>
+<section id="infer-loh-blocks-in-hybrids">
+<h3>Infer LOH blocks in hybrids<a class="headerlink" href="#infer-loh-blocks-in-hybrids" title="Link to this heading"></a></h3>
+<p>This step is performed by <a class="reference internal" href="modules/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a>. Differently from the default program setup described in <a class="reference internal" href="quickstart.html#quickstart"><span class="std std-ref">Quick start</span></a> and <a class="reference internal" href="run_test_data.html#test-data"><span class="std std-ref">Run JLOH with a test dataset</span></a>, when working with hybrids the user must use the <code class="docutils literal notranslate"><span class="pre">--assign-blocks</span></code> flag.</p>
+<p>The user will be asked to provide two reference genomes (<code class="docutils literal notranslate"><span class="pre">--refs</span></code>), two BAM files (<code class="docutils literal notranslate"><span class="pre">--bams</span></code>) and two VCF files (<code class="docutils literal notranslate"><span class="pre">--vcfs</span></code>). These are the files you generated in the step above, following this guide.</p>
+<p>Together with these parameters, pass also the <code class="docutils literal notranslate"><span class="pre">--min-snps-kbp</span></code> parameter with the two values you chose in the previous step (separated by a comma). If you ran <a class="reference internal" href="modules/g2g.html#jloh-g2g"><span class="std std-ref">jloh g2g</span></a> as well, pass the produced BED file as argument to <code class="docutils literal notranslate"><span class="pre">--regions</span></code>.</p>
+<p>Here, we’re leveraging 24 threads from our HPC cluster. All the other parameters are described in <a class="reference internal" href="modules/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>extract<span class="w"> </span><span class="se">\</span>
+--refs<span class="w"> </span>genome_A.fa<span class="w"> </span>genome_B.fa<span class="w"> </span><span class="se">\</span>
+--bams<span class="w"> </span>mapping_A.bam<span class="w"> </span>mapping_B.bam<span class="w"> </span><span class="se">\</span>
+--vcfs<span class="w"> </span>variants_A.vcf<span class="w"> </span>variants_B.vcf<span class="w"> </span><span class="se">\</span>
+--min-snps-kbp<span class="w"> </span><span class="m">8</span>,5<span class="w"> </span><span class="se">\</span>
+--threads<span class="w"> </span><span class="m">24</span>
+</pre></div>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>By default, <a class="reference internal" href="modules/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> keeps every candidate block that is at least 100 bp long. At low divergence (1-3%) this may inflate false positives. In that case, increase the minimum length.</p>
+</div>
+</section>
+</section>
+<section id="plot-detected-loh">
+<h2>Plot detected LOH<a class="headerlink" href="#plot-detected-loh" title="Link to this heading"></a></h2>
+<p>This step is performed by <a class="reference internal" href="modules/plot.html#jloh-plot"><span class="std std-ref">jloh plot</span></a>. Since you’re analysing a hybrid with two parental genomes, run it in <code class="docutils literal notranslate"><span class="pre">--two-ref</span></code> mode. This mode compares blocks labelled as “REF” with those labelled as “ALT”. You can choose what “REF” and “ALT” are, e.g. “Subgenome A” and “Subgenome B”.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># For parent A</span>
+
+jloh<span class="w"> </span>plot<span class="w"> </span><span class="se">\</span>
+--two-ref<span class="w"> </span><span class="se">\</span>
+--loh<span class="w"> </span>subg_A.LOH_blocks.tsv<span class="w"> </span><span class="se">\</span>
+--het<span class="w"> </span>subg_A.exp.het_blocks.bed<span class="w"> </span><span class="se">\</span>
+--ref-name<span class="w"> </span>Parent_A<span class="w"> </span><span class="se">\</span>
+--alt-name<span class="w"> </span>Parent_B
+
+<span class="c1"># For parent B</span>
+
+jloh<span class="w"> </span>plot<span class="w"> </span><span class="se">\</span>
+--two-ref<span class="w"> </span><span class="se">\</span>
+--loh<span class="w"> </span>subg_B.LOH_blocks.tsv<span class="w"> </span><span class="se">\</span>
+--het<span class="w"> </span>subg_B.exp.het_blocks.bed<span class="w"> </span><span class="se">\</span>
+--ref-name<span class="w"> </span>Parent_B<span class="w"> </span><span class="se">\</span>
+--alt-name<span class="w"> </span>Parent_A
+</pre></div>
+</div>
+<p>Then, compare the output visually. Strongest LOH candidates are those that show up in both plots (A and B), “REF” in one case and “ALT” in the other. See our publication for an example (<a class="reference external" href="https://doi.org/10.1101/2023.05.04.539368">Schiavinato et al., 2023</a>).</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>You can increase or decrease the sensitivity of the plotting engine with the <code class="docutils literal notranslate"><span class="pre">--contrast</span></code> and with the <code class="docutils literal notranslate"><span class="pre">--window-size</span></code> options (see <a class="reference internal" href="modules/plot.html#jloh-plot"><span class="std std-ref">jloh plot</span></a>).</p>
+</div>
+</section>
 </section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="default_wf.html" class="btn btn-neutral float-left" title="LOH block extraction pipeline" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="modules/stats.html" class="btn btn-neutral float-right" title="jloh stats" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="run_test_data.html" class="btn btn-neutral float-left" title="Run JLOH with a test dataset" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="one_parent.html" class="btn btn-neutral float-right" title="Hybrids with only one known parental" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
