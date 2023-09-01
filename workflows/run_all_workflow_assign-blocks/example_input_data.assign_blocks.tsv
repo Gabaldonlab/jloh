@@ -1,4 +1,0 @@
-sample_A	/path/to/A.R1.fastq	/path/to/A.R2.fastq	parent_A	/path/to/parent_A.fasta	parent_B	/path/to/parent_B.fasta
-sample_B	/path/to/B.R1.fastq	/path/to/B.R2.fastq	parent_A	/path/to/parent_A.fasta	parent_B	/path/to/parent_B.fasta
-sample_C	/path/to/C.R1.fastq	/path/to/C.R2.fastq	parent_A	/path/to/parent_A.fasta	parent_C	/path/to/parent_C.fasta
-sample_D	/path/to/D.R1.fastq	/path/to/D.R2.fastq	parent_A	/path/to/parent_A.fasta	parent_C	/path/to/parent_C.fasta
