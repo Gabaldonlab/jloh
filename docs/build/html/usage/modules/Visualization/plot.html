@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>jloh plot &mdash; jloh 1.0.0 documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+        <script src="../../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="jloh sim" href="../Simulation/sim.html" />
+    <link rel="prev" title="jloh cluster" href="../Operations/cluster.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: white" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            jloh
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Get started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quick start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../run_test_data.html">Run JLOH with a test dataset</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../model_snp_density.html">Modelling SNP density</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../hybrid_wf.html">Working with hybrids</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../one_parent.html">Hybrids with only one known parental</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Extraction tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../Extraction/stats.html">jloh stats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../Extraction/g2g.html">jloh g2g</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../Extraction/extract.html">jloh extract</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Operations tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../Operations/filter.html">jloh filter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../Operations/intersect.html">jloh intersect</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../Operations/chimeric.html">jloh chimeric</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../Operations/junctions.html">jloh junctions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../Operations/cluster.html">jloh cluster</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Visualization tools</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">jloh plot</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#description">Description</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#usage">Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#parameters">Parameters</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#modes">Modes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#input-output">Input / Output</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#input">Input</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#output">Output</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#plot-construction-options">Plot construction options</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#r-ggplot2-options">R / ggplot2 options</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Simulation tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../Simulation/sim.html">jloh sim</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: white" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">jloh</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">jloh plot</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/usage/modules/Visualization/plot.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="jloh-plot">
+<span id="id1"></span><h1>jloh plot<a class="headerlink" href="#jloh-plot" title="Link to this heading"></a></h1>
+<section id="description">
+<h2>Description<a class="headerlink" href="#description" title="Link to this heading"></a></h2>
+<p>Plot LOH propensity over all or specific chromosomes from multiple JLOH extract TSV output files.</p>
+</section>
+<section id="usage">
+<h2>Usage<a class="headerlink" href="#usage" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>plot<span class="w"> </span><span class="o">[</span>--one-ref<span class="w"> </span><span class="p">|</span><span class="w"> </span>--two-ref<span class="o">]</span><span class="w"> </span>--loh<span class="w"> </span>&lt;TSV_1&gt;<span class="w"> </span>...<span class="w"> </span>&lt;TSV_n&gt;<span class="w"> </span><span class="o">[</span>options<span class="o">]</span>
+</pre></div>
+</div>
+</section>
+<section id="parameters">
+<h2>Parameters<a class="headerlink" href="#parameters" title="Link to this heading"></a></h2>
+<section id="modes">
+<h3>Modes<a class="headerlink" href="#modes" title="Link to this heading"></a></h3>
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--one-ref</span> <span class="pre">&lt;BOOL&gt;</span></span></dt>
+<dd><p>Plot block propensity towards LOH or heterozygosity. Must be used in combination with <code class="docutils literal notranslate"><span class="pre">--het</span></code> parameter.
+This mode compares the regions with candidate LOH blocks with the regions with heterozygous blocks.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--two-ref</span> <span class="pre">&lt;BOOL&gt;</span></span></dt>
+<dd><p>Plot LOH propensity towards genome A or B, with results obtained from <a class="reference internal" href="../Extraction/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> ran in <code class="docutils literal notranslate"><span class="pre">--assign-blocks</span></code> mode.
+This mode compares the blocks assigned to “REF” with those assigned to “ALT”.</p>
+</dd></dl>
+
+</section>
+<section id="input-output">
+<h3>Input / Output<a class="headerlink" href="#input-output" title="Link to this heading"></a></h3>
+<section id="input">
+<h4>Input<a class="headerlink" href="#input" title="Link to this heading"></a></h4>
+<p>Choose one of these three options:</p>
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--loh</span> <span class="pre">[&lt;PATH_1&gt;</span> <span class="pre">...</span> <span class="pre">&lt;PATH_n&gt;]</span></span></dt>
+<dd><p>*.LOH_blocks.tsv output files produced by <a class="reference internal" href="../Extraction/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--loh-files</span> <span class="pre">&lt;PATH&gt;</span></span></dt>
+<dd><p>File of file names (.fofn) containing paths to *.LOH_blocks.tsv files produced by <a class="reference internal" href="../Extraction/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a>, one per line. This option is an alternative to <code class="docutils literal notranslate"><span class="pre">--loh</span></code>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--names-file</span> <span class="pre">&lt;PATH&gt;</span></span></dt>
+<dd><p>TAB-separated file containing paths to *.LOH_blocks.tsv files produced by <a class="reference internal" href="../Extraction/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a>, and an associated <em>sample name</em>. This option is an alternative to <code class="docutils literal notranslate"><span class="pre">--loh</span></code>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--het</span> <span class="pre">&lt;PATH&gt;</span></span></dt>
+<dd><p>*.exp.het_blocks.tsv output file produced by <a class="reference internal" href="../Extraction/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a>. This file contains annotated heterozygous blocks and is needed only in <code class="docutils literal notranslate"><span class="pre">--one-ref</span></code> mode.</p>
+</dd></dl>
+
+</section>
+<section id="output">
+<h4>Output<a class="headerlink" href="#output" title="Link to this heading"></a></h4>
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--output-dir</span> <span class="pre">&lt;PATH&gt;</span></span></dt>
+<dd><p>Path to the output directory.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--prefix</span> <span class="pre">&lt;STR&gt;</span></span></dt>
+<dd><p>Prefix to include in output files.</p>
+</dd></dl>
+
+</section>
+</section>
+<section id="plot-construction-options">
+<h3>Plot construction options<a class="headerlink" href="#plot-construction-options" title="Link to this heading"></a></h3>
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--ref-name</span> <span class="pre">&lt;STR&gt;</span></span></dt>
+<dd><p>Name to use when labelling the reference (REF) allele.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--alt-name</span> <span class="pre">&lt;STR&gt;</span></span></dt>
+<dd><p>Name to use when labelling the alternative (ALT) allele.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--by-sample</span> <span class="pre">&lt;BOOL&gt;</span></span></dt>
+<dd><p>Produce a plot for each sample instead of a plot for each chromosome.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--merge</span> <span class="pre">&lt;BOOL&gt;</span></span></dt>
+<dd><p>The output plot will combine all chromosomes into one.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--clusters</span> <span class="pre">&lt;PATH&gt;</span></span></dt>
+<dd><p>Pass the output file produced by <a class="reference internal" href="../Operations/cluster.html#jloh-cluster"><span class="std std-ref">jloh cluster</span></a> to sort the samples in the output plot according to the cluster.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--threads</span> <span class="pre">&lt;INT&gt;</span></span></dt>
+<dd><p>Number of parallel workers to use in the plot table construction.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--chr</span> <span class="pre">&lt;STR&gt;</span></span></dt>
+<dd><p>Restrict the analysis to this specific chromosome.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--chr-file</span> <span class="pre">&lt;PATH&gt;</span></span></dt>
+<dd><p>Restrict the analysis to these specific chromosomes (file with names, one per line).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--window-size</span> <span class="pre">&lt;INT&gt;</span></span></dt>
+<dd><p>Size of the plotting chromosomal windows. Smaller windows are more precise but slower to build.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--contrast</span> <span class="pre">&lt;STR&gt;</span></span></dt>
+<dd><p>Increase plot contrast for samples with low LOH rate. Choose one of:</p>
+<ul class="simple">
+<li><p><strong>off</strong> (default): leave plot contrast untouched.</p></li>
+<li><p><strong>low</strong>: set contrast to “low”. This scales the LOH propensity to the 0 - 0.25 range.</p></li>
+<li><p><strong>mid</strong>: set contrast to “mid”. This scales the LOH propensity to the 0 - 0.50 range.</p></li>
+<li><p><strong>high</strong>: set contrast to “high”. This scales the LOH propensity to the 0 - 0.75 range.</p></li>
+<li><p><strong>max</strong>: set contrast to “max”. This scales the LOH propensity to the 0 - 1.00 range.</p></li>
+</ul>
+<p>At the moment, this function works only with the <code class="docutils literal notranslate"><span class="pre">--one-ref</span></code> mode.</p>
+</dd></dl>
+
+</section>
+<section id="r-ggplot2-options">
+<h3>R / ggplot2 options<a class="headerlink" href="#r-ggplot2-options" title="Link to this heading"></a></h3>
+<p>More info on some of these options can be found in the <a class="reference external" href="https://ggplot2.tidyverse.org/reference/theme.html">tidyverse official ggplot2 theme()</a> manual.
+Colors are represented in HEX notation, find yours <a class="reference external" href="https://htmlcolorcodes.com/">here</a>.</p>
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--r-exec</span> <span class="pre">&lt;PATH&gt;</span></span></dt>
+<dd><p>Path to the <code class="docutils literal notranslate"><span class="pre">Rscript</span></code> executable.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--aspect-ratio</span> <span class="pre">&lt;FLOAT&gt;</span></span></dt>
+<dd><p>y/x length ratio.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--width</span> <span class="pre">&lt;INT&gt;</span></span></dt>
+<dd><p>Plot width (px).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--height</span> <span class="pre">&lt;INT&gt;</span></span></dt>
+<dd><p>Plot height (px).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--res</span> <span class="pre">&lt;INT&gt;</span></span></dt>
+<dd><p>Plot resolution.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--het-color</span> <span class="pre">&lt;STR&gt;</span></span></dt>
+<dd><p>Color to use to represent heterozygous blocks (<code class="docutils literal notranslate"><span class="pre">#...</span></code> HEX code).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--ref-color</span> <span class="pre">&lt;STR&gt;</span></span></dt>
+<dd><p>Color to use to represent reference LOH blocks (<code class="docutils literal notranslate"><span class="pre">#...</span></code> HEX code).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--alt-color</span> <span class="pre">&lt;STR&gt;</span></span></dt>
+<dd><p>Color to use to represent alternative LOH blocks (<code class="docutils literal notranslate"><span class="pre">#...</span></code> HEX code).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--midpoint-color</span> <span class="pre">&lt;STR&gt;</span></span></dt>
+<dd><p>Color to use to represent the midpoint between ALT and REF (<code class="docutils literal notranslate"><span class="pre">#...</span></code> HEX code).</p>
+</dd></dl>
+
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../Operations/cluster.html" class="btn btn-neutral float-left" title="jloh cluster" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../Simulation/sim.html" class="btn btn-neutral float-right" title="jloh sim" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Matteo Schiavinato.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+    <!-- Theme Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-XXXXXXXXXX', {
+          'anonymize_ip': false,
+      });
+    </script> 
+
+</body>
+</html>

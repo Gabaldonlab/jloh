@@ -41,14 +41,14 @@ Plot LOH propensity over all or specific chromosomes from multiple JLOH extract
 TSV output files  
 
 Usage:
-jloh plot --loh <TSV_1> ... <TSV_n> --names <STR_1> ... <STR_n> [options]
+jloh plot [--one-ref | --two-ref] --loh <TSV_1> ... <TSV_n> [options]
 
 
 [modes]
 --one-ref           Plot LOH vs Het propensity (use --het in combination)       [off]
 --two-ref           Plot LOH towards genome A vs B                              [off]
 
-[parameters]
+[I/O/E]
 --loh               Files to plot (ending in *LOH_blocks.tsv)                   [!]
 --loh-files         File with input LOH files (one per row)                     [off]
 --names-file        File with names to assign to samples, one per row           [off]
@@ -58,6 +58,8 @@ jloh plot --loh <TSV_1> ... <TSV_n> --names <STR_1> ... <STR_n> [options]
 --prefix            Output files prefix                                         [plot]
 --het               Input BED file containing het regions from JLOH extract     [!]
                     For "--one-ref" mode only 
+
+[parameters]
 --ref-name          Name to label the reference allele                          [REF]
 --alt-name          Name to label the alternative allele                        [ALT]
 --by-sample         Use "by sample" mode (each plot is a different sample)      [off]
@@ -68,6 +70,9 @@ jloh plot --loh <TSV_1> ... <TSV_n> --names <STR_1> ... <STR_n> [options]
 --chr               Restrict the analysis to this specific chromosome           [off]
 --chr-file          Indicate multiple chromosomes, one per row                  [off]
 --window-size       Size of window for plotting, the shorter the slower         [10000]
+--contrast          Increase contrast for samples with few LOH blocks           [off]
+                    Choose one of: off, low, mid, high, max
+                    Currently available for --one-ref only 
 
 [R/ggplot2 options]
 --r-exec            R executable name to run plotting scripts                   [Rscript] 
@@ -80,9 +85,6 @@ jloh plot --loh <TSV_1> ... <TSV_n> --names <STR_1> ... <STR_n> [options]
                     This color is also used to show LOH in --one-ref mode
 --alt-color         Color to use to represent ALT blocks                        [#64B6AC]
 --midpoint-color    Color to use when undecided between het/REF/ALT             [#ffffff]
---contrast          Increase contrast for samples with few LOH blocks           [off]
-                    Choose one of: off, low, mid, high, max
-                    Currently available for --one-ref only 
 
 """)
     sys.exit(0)
@@ -107,6 +109,7 @@ p.add_argument("--window-size", default=10000, type=int)
 p.add_argument("--threads", type=int, default=12)
 p.add_argument("--output-dir", default="jloh_out")
 p.add_argument("--prefix", default="plot")
+p.add_argument("--contrast", choices=["off", "low", "mid", "high", "max"], default="off")
 p.add_argument("--r-exec", default="Rscript", type=str)
 p.add_argument("--aspect-ratio", default=0.35, type=float)
 p.add_argument("--width", default=2000, type=int)
@@ -116,7 +119,6 @@ p.add_argument("--het-color", default="#F7C35C", type=str)
 p.add_argument("--ref-color", default="#EF6F6C", type=str)
 p.add_argument("--alt-color", default="#64B6AC", type=str)
 p.add_argument("--midpoint-color", default="#ffffff", type=str)
-p.add_argument("--contrast", choices=["off", "low", "mid", "high", "max"], default="off")
 args = p.parse_args()
 
 # env 

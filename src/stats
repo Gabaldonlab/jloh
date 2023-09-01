@@ -45,10 +45,10 @@ jloh stats --vcf <VCF>
 [I/O]
 
 --vcf               Input VCF file to use for density calculations              [!]
---threads           Number of max. parallel operations                          [4]
 
 [parameters]
 
+--threads           Number of max. parallel operations                          [4]
 --window-size       Size in bp to use for distribution                          [1000]
 --step-size         Step size in bp for sliding window                          [500]
 

@@ -49,19 +49,19 @@ pass them as --regions to try and reduce the number of false positives
 
 
 Usage:
-jloh g2g --target <FASTA> --query <FASTA> [options]
+jloh g2g --ref-A <FASTA> --ref-B <FASTA> [options]
 
-[I/O/E]
+[Input/Output]
 --ref-A                 First FASTA sequence                                    [!]
 --ref-B                 Second FASTA sequence                                   [!]
 --output-dir            Where to place the output files                         [.]
 
-[mapping]
+[mapping presets]
 --default               nucmer parameters: -c 65 -b 200 -l 20
 --sensitive             nucmer parameters: -c 100 -b 50 -l 50 --mum             [off]
 --relaxed               nucmer parameters: -c 50 -b 500 -l 20                   [off]
 
-[parameters]
+[other]
 --est-divergence        Estimated divergence between the two genomes (0.0-1.0)  [0.01]
                         Alignments will be retained up to twice this divergence
                         (e.g. div=0.05 --> min. identity=90%)

@@ -50,18 +50,27 @@
 <li class="toctree-l1"><a class="reference internal" href="usage/hybrid_wf.html">Working with hybrids</a></li>
 <li class="toctree-l1"><a class="reference internal" href="usage/one_parent.html">Hybrids with only one known parental</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Modules description</span></p>
+<p class="caption" role="heading"><span class="caption-text">Extraction tools</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="usage/modules/stats.html">jloh stats</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/modules/g2g.html">jloh g2g</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/modules/extract.html">jloh extract</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/modules/filter.html">jloh filter</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/modules/intersect.html">jloh intersect</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/modules/cluster.html">jloh cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/modules/chimeric.html">jloh chimeric</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/modules/junctions.html">jloh junctions</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/modules/plot.html">jloh plot</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/modules/sim.html">jloh sim</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/Extraction/stats.html">jloh stats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/Extraction/g2g.html">jloh g2g</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/Extraction/extract.html">jloh extract</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Operations tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/Operations/filter.html">jloh filter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/Operations/intersect.html">jloh intersect</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/Operations/chimeric.html">jloh chimeric</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/Operations/junctions.html">jloh junctions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/Operations/cluster.html">jloh cluster</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Visualization tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/Visualization/plot.html">jloh plot</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Simulation tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/Simulation/sim.html">jloh sim</a></li>
 </ul>
 
         </div>
@@ -97,27 +106,114 @@
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Get started</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="usage/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/quickstart.html">Quick start</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/run_test_data.html">Run JLOH with a test dataset</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/model_snp_density.html">Modelling SNP density</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/hybrid_wf.html">Working with hybrids</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage/installation.html#docker">Docker</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/installation.html#github">GitHub</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage/quickstart.html">Quick start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage/quickstart.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/quickstart.html#calculating-snp-density">Calculating SNP density</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/quickstart.html#extracting-blocks">Extracting blocks</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage/run_test_data.html">Run JLOH with a test dataset</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage/run_test_data.html#get-loh-blocks">Get LOH blocks</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage/model_snp_density.html">Modelling SNP density</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage/model_snp_density.html#how-to-do-it">How to do it</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/model_snp_density.html#explanation">Explanation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage/hybrid_wf.html">Working with hybrids</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage/hybrid_wf.html#map-hybrid-reads-onto-parentals">Map hybrid reads onto parentals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/hybrid_wf.html#call-variants">Call variants</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/hybrid_wf.html#run-jloh">Run JLOH</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/hybrid_wf.html#plot-loh-blocks">Plot LOH blocks</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="usage/one_parent.html">Hybrids with only one known parental</a></li>
 </ul>
 </div>
 <div class="toctree-wrapper compound">
-<p class="caption" role="heading"><span class="caption-text">Modules description</span></p>
+<p class="caption" role="heading"><span class="caption-text">Extraction tools</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="usage/modules/stats.html">jloh stats</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/modules/g2g.html">jloh g2g</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/modules/extract.html">jloh extract</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/modules/filter.html">jloh filter</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/modules/intersect.html">jloh intersect</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/modules/cluster.html">jloh cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/modules/chimeric.html">jloh chimeric</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/modules/junctions.html">jloh junctions</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/modules/plot.html">jloh plot</a></li>
-<li class="toctree-l1"><a class="reference internal" href="usage/modules/sim.html">jloh sim</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/Extraction/stats.html">jloh stats</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Extraction/stats.html#description">Description</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Extraction/stats.html#usage">Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Extraction/stats.html#parameters">Parameters</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/Extraction/g2g.html">jloh g2g</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Extraction/g2g.html#description">Description</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Extraction/g2g.html#usage">Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Extraction/g2g.html#parameters">Parameters</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/Extraction/extract.html">jloh extract</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Extraction/extract.html#description">Description</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Extraction/extract.html#usage">Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Extraction/extract.html#parameters">Parameters</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Operations tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/Operations/filter.html">jloh filter</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Operations/filter.html#description">Description</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Operations/filter.html#usage">Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Operations/filter.html#parameters">Parameters</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/Operations/intersect.html">jloh intersect</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Operations/intersect.html#description">Description</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Operations/intersect.html#usage">Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Operations/intersect.html#parameters">Parameters</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/Operations/chimeric.html">jloh chimeric</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Operations/chimeric.html#description">Description</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Operations/chimeric.html#usage">Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Operations/chimeric.html#parameters">Parameters</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/Operations/junctions.html">jloh junctions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Operations/junctions.html#description">Description</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Operations/junctions.html#usage">Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Operations/junctions.html#parameters">Parameters</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/Operations/cluster.html">jloh cluster</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Operations/cluster.html#description">Description</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Operations/cluster.html#usage">Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Operations/cluster.html#parameters">Parameters</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Visualization tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/Visualization/plot.html">jloh plot</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Visualization/plot.html#description">Description</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Visualization/plot.html#usage">Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Visualization/plot.html#parameters">Parameters</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Simulation tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="usage/modules/Simulation/sim.html">jloh sim</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Simulation/sim.html#description">Description</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Simulation/sim.html#usage">Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage/modules/Simulation/sim.html#parameters">Parameters</a></li>
+</ul>
+</li>
 </ul>
 </div>
 </section>

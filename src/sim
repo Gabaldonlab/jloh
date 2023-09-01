@@ -49,12 +49,12 @@ Usage:
 jloh sim --fasta <FASTA> [options]
 
 [I/O/E]
---threads               Number of parallel operations                           [4]
 --fasta                 Input FASTA file to generate mutations on               [!]
 --out-fasta             Output FASTA filename                                   [mut.fa]
 --out-haplotypes        TSV file with generated haplotypes (div=0 is LOH)       [mut.haplotypes.tsv]
 
 [parameters]
+--threads               Number of parallel operations                           [4]
 --mean-haplotype-size   Generated haplotypes will have this average size        [25000]
 --min-haplotype-length  Minimum length of generated haplotypes                  [1000]
 --divergence            How much divergence in the mutated genome (0.0-1.0)     [0.01]

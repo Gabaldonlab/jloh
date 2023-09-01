@@ -17,7 +17,7 @@ A publication is currently being reviewed. The preprint can be found in bioRxiv 
 .. image:: images/graphical_abstract.jpg
  
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Get started
 
    usage/installation
@@ -26,19 +26,34 @@ A publication is currently being reviewed. The preprint can be found in bioRxiv 
    usage/model_snp_density
    usage/hybrid_wf
    usage/one_parent
+   
+.. toctree::
+   :maxdepth: 2
+   :caption: Extraction tools
+
+   usage/modules/Extraction/stats
+   usage/modules/Extraction/g2g 
+   usage/modules/Extraction/extract 
+
+.. toctree:: 
+   :maxdepth: 2
+   :caption: Operations tools 
+
+   usage/modules/Operations/filter 
+   usage/modules/Operations/intersect 
+   usage/modules/Operations/chimeric
+   usage/modules/Operations/junctions  
+   usage/modules/Operations/cluster 
 
 .. toctree::
-   :maxdepth: 1
-   :caption: Modules description
+   :maxdepth: 2
+   :caption: Visualization tools 
 
-   usage/modules/stats
-   usage/modules/g2g
-   usage/modules/extract
-   usage/modules/filter
-   usage/modules/intersect 
-   usage/modules/cluster 
-   usage/modules/chimeric 
-   usage/modules/junctions 
-   usage/modules/plot 
-   usage/modules/sim 
+   usage/modules/Visualization/plot 
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Simulation tools 
+
+   usage/modules/Simulation/sim 
 
