@@ -16,7 +16,6 @@ release = '1.0.0'
 
 extensions = [
     'sphinx_rtd_theme',
-    'sphinxarg.ext',
 ]
 
 templates_path = ['_templates']
