@@ -19,7 +19,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="jloh stats" href="modules/stats.html" />
+    <link rel="next" title="jloh stats" href="modules/Extraction/stats.html" />
     <link rel="prev" title="Working with hybrids" href="hybrid_wf.html" /> 
 </head>
 
@@ -51,18 +51,27 @@
 <li class="toctree-l1"><a class="reference internal" href="hybrid_wf.html">Working with hybrids</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Hybrids with only one known parental</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Modules description</span></p>
+<p class="caption" role="heading"><span class="caption-text">Extraction tools</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="modules/stats.html">jloh stats</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/g2g.html">jloh g2g</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/extract.html">jloh extract</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/filter.html">jloh filter</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/intersect.html">jloh intersect</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/cluster.html">jloh cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/chimeric.html">jloh chimeric</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/junctions.html">jloh junctions</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/plot.html">jloh plot</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/sim.html">jloh sim</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Extraction/stats.html">jloh stats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Extraction/g2g.html">jloh g2g</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Extraction/extract.html">jloh extract</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Operations tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/Operations/filter.html">jloh filter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Operations/intersect.html">jloh intersect</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Operations/chimeric.html">jloh chimeric</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Operations/junctions.html">jloh junctions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Operations/cluster.html">jloh cluster</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Visualization tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/Visualization/plot.html">jloh plot</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Simulation tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/Simulation/sim.html">jloh sim</a></li>
 </ul>
 
         </div>
@@ -92,10 +101,10 @@
   <section id="hybrids-with-only-one-known-parental">
 <span id="one-parent"></span><h1>Hybrids with only one known parental<a class="headerlink" href="#hybrids-with-only-one-known-parental" title="Link to this heading"></a></h1>
 <p>If you’re working in a hybrid setup but only have one parental genome at hand, <em>you can still use JLOH</em>. There’s only a few adjustments you shall take into account.</p>
-<p>To generate the necessary BAM and VCF files, follow the guidelines described in <a class="reference internal" href="hybrid_wf.html#hybrid-wf"><span class="std std-ref">Working with hybrids</span></a>, doing each step only once (i.e. with the only parental genome you have). You won’t be able to run <a class="reference internal" href="modules/g2g.html#jloh-g2g"><span class="std std-ref">jloh g2g</span></a>, since you don’t have two parental genomes.</p>
-<p>When running <a class="reference internal" href="modules/stats.html#jloh-stats"><span class="std std-ref">jloh stats</span></a>, you won’t have any information regarding the homozygosity derived from the missing parental. Hence, you must go forward with the quantile values you choose from the distribution of your only known parental.</p>
-<p>When running <a class="reference internal" href="modules/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a>, simply run it in default mode (i.e. <em>without</em> <code class="docutils literal notranslate"><span class="pre">--assign-blocks</span></code>) and pass the parental genome you have as <code class="docutils literal notranslate"><span class="pre">--ref</span></code>. Blocks annotated as <code class="docutils literal notranslate"><span class="pre">REF</span></code> did not have many homozygous SNPs and are assumed to carry the allele of the parental genome you have in your possession. Those annotated as <code class="docutils literal notranslate"><span class="pre">ALT</span></code> are likely carrying the allele of the other parental.</p>
-<p>When running <a class="reference internal" href="modules/plot.html#jloh-plot"><span class="std std-ref">jloh plot</span></a>, use it in <code class="docutils literal notranslate"><span class="pre">--one-ref</span></code> mode as you would do with a normal (i.e. non-hybrid) run.</p>
+<p>To generate the necessary BAM and VCF files, follow the guidelines described in <a class="reference internal" href="hybrid_wf.html#hybrid-wf"><span class="std std-ref">Working with hybrids</span></a>, doing each step only once (i.e. with the only parental genome you have). You won’t be able to run <a class="reference internal" href="modules/Extraction/g2g.html#jloh-g2g"><span class="std std-ref">jloh g2g</span></a>, since you don’t have two parental genomes.</p>
+<p>When running <a class="reference internal" href="modules/Extraction/stats.html#jloh-stats"><span class="std std-ref">jloh stats</span></a>, you won’t have any information regarding the homozygosity derived from the missing parental. Hence, you must go forward with the quantile values you choose from the distribution of your only known parental.</p>
+<p>When running <a class="reference internal" href="modules/Extraction/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a>, simply run it in default mode (i.e. <em>without</em> <code class="docutils literal notranslate"><span class="pre">--assign-blocks</span></code>) and pass the parental genome you have as <code class="docutils literal notranslate"><span class="pre">--ref</span></code>. Blocks annotated as <code class="docutils literal notranslate"><span class="pre">REF</span></code> did not have many homozygous SNPs and are assumed to carry the allele of the parental genome you have in your possession. Those annotated as <code class="docutils literal notranslate"><span class="pre">ALT</span></code> are likely carrying the allele of the other parental.</p>
+<p>When running <a class="reference internal" href="modules/Visualization/plot.html#jloh-plot"><span class="std std-ref">jloh plot</span></a>, use it in <code class="docutils literal notranslate"><span class="pre">--one-ref</span></code> mode as you would do with a normal (i.e. non-hybrid) run.</p>
 </section>
 
 
@@ -103,7 +112,7 @@
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="hybrid_wf.html" class="btn btn-neutral float-left" title="Working with hybrids" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="modules/stats.html" class="btn btn-neutral float-right" title="jloh stats" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="modules/Extraction/stats.html" class="btn btn-neutral float-right" title="jloh stats" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

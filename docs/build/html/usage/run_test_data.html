@@ -54,18 +54,27 @@
 <li class="toctree-l1"><a class="reference internal" href="hybrid_wf.html">Working with hybrids</a></li>
 <li class="toctree-l1"><a class="reference internal" href="one_parent.html">Hybrids with only one known parental</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Modules description</span></p>
+<p class="caption" role="heading"><span class="caption-text">Extraction tools</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="modules/stats.html">jloh stats</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/g2g.html">jloh g2g</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/extract.html">jloh extract</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/filter.html">jloh filter</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/intersect.html">jloh intersect</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/cluster.html">jloh cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/chimeric.html">jloh chimeric</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/junctions.html">jloh junctions</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/plot.html">jloh plot</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/sim.html">jloh sim</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Extraction/stats.html">jloh stats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Extraction/g2g.html">jloh g2g</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Extraction/extract.html">jloh extract</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Operations tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/Operations/filter.html">jloh filter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Operations/intersect.html">jloh intersect</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Operations/chimeric.html">jloh chimeric</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Operations/junctions.html">jloh junctions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Operations/cluster.html">jloh cluster</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Visualization tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/Visualization/plot.html">jloh plot</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Simulation tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/Simulation/sim.html">jloh sim</a></li>
 </ul>
 
         </div>
@@ -119,24 +128,24 @@
 </table>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>A key feature of the VCF file used here is that it contains allele frequency (AF) annotation in the FORMAT (8th) field. This is crucial for <a class="reference internal" href="modules/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> to work.</p>
+<p>A key feature of the VCF file used here is that it contains allele frequency (AF) annotation in the FORMAT (8th) field. This is crucial for <a class="reference internal" href="modules/Extraction/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> to work.</p>
 </div>
 <section id="get-loh-blocks">
 <h2>Get LOH blocks<a class="headerlink" href="#get-loh-blocks" title="Link to this heading"></a></h2>
-<p>To infer LOH blocks from the test dataset, you first should model the distribution of SNP densities across the genome with <a class="reference internal" href="modules/stats.html#jloh-stats"><span class="std std-ref">jloh stats</span></a>.</p>
+<p>To infer LOH blocks from the test dataset, you first should model the distribution of SNP densities across the genome with <a class="reference internal" href="modules/Extraction/stats.html#jloh-stats"><span class="std std-ref">jloh stats</span></a>.</p>
 <p>To do so, use the following command:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>stats<span class="w"> </span>--vcf<span class="w"> </span>out.ff.vcf
 </pre></div>
 </div>
 <p>This command produces the quantiles of heterozygous and homozygous SNP densities. See <a class="reference internal" href="model_snp_density.html#model-snp-density"><span class="std std-ref">Modelling SNP density</span></a> for details. You must choose a threshold SNP density for heterozygous SNPs and one for homozygous SNPs.</p>
-<p>Then, we proceed inferring LOH blocks from the dataset. This is done with the <a class="reference internal" href="modules/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> module. We used this command:</p>
+<p>Then, we proceed inferring LOH blocks from the dataset. This is done with the <a class="reference internal" href="modules/Extraction/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> module. We used this command:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>extract<span class="w"> </span><span class="se">\</span>
 --vcf<span class="w"> </span>out.ff.vcf<span class="w"> </span>--bam<span class="w"> </span>out.fs.bam<span class="w"> </span>--ref<span class="w"> </span>S_para.chrXII.fa<span class="w"> </span><span class="se">\</span>
 --min-snps-kbp<span class="w"> </span><span class="m">2</span>,5<span class="w"> </span>--output-dir<span class="w"> </span>jloh_out
 </pre></div>
 </div>
 <p>The output will be placed in the <code class="docutils literal notranslate"><span class="pre">jloh_out</span></code> directory. The most important file produced by this command is the <code class="docutils literal notranslate"><span class="pre">jloh.LOH_blocks.tsv</span></code> file. This file contains the detected LOH blocks based on the distribution of heterozygous and homozygous SNPs. It is accompanied by a BED file representing the same intervals in a 0-based half-open fashion.</p>
-<p>The <code class="docutils literal notranslate"><span class="pre">jloh.LOH_blocks.tsv</span></code> file can be passed to the <a class="reference internal" href="modules/plot.html#jloh-plot"><span class="std std-ref">jloh plot</span></a> module to represent LOH graphically with this command:</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">jloh.LOH_blocks.tsv</span></code> file can be passed to the <a class="reference internal" href="modules/Visualization/plot.html#jloh-plot"><span class="std std-ref">jloh plot</span></a> module to represent LOH graphically with this command:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>plot<span class="w"> </span><span class="se">\</span>
 --one-ref<span class="w"> </span><span class="se">\</span>
 --loh<span class="w"> </span>jloh_out/jloh.LOH_blocks.tsv<span class="w"> </span><span class="se">\</span>
@@ -144,7 +153,7 @@
 --contrast<span class="w"> </span>max
 </pre></div>
 </div>
-<p>Due to the low variation in the test dataset, we have increased the <code class="docutils literal notranslate"><span class="pre">--contrast</span></code> to the maximum value to highlight potential LOH regions. The <code class="docutils literal notranslate"><span class="pre">--one-ref</span></code> option indicates that the <a class="reference internal" href="modules/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> was run in default mode with only one reference FASTA file.</p>
+<p>Due to the low variation in the test dataset, we have increased the <code class="docutils literal notranslate"><span class="pre">--contrast</span></code> to the maximum value to highlight potential LOH regions. The <code class="docutils literal notranslate"><span class="pre">--one-ref</span></code> option indicates that the <a class="reference internal" href="modules/Extraction/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> was run in default mode with only one reference FASTA file.</p>
 <p>Here’s how the plot should look like.</p>
 <img alt="../_images/plot.max_contrast.png" src="../_images/plot.max_contrast.png" />
 </section>

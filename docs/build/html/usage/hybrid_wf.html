@@ -69,18 +69,27 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="one_parent.html">Hybrids with only one known parental</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Modules description</span></p>
+<p class="caption" role="heading"><span class="caption-text">Extraction tools</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="modules/stats.html">jloh stats</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/g2g.html">jloh g2g</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/extract.html">jloh extract</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/filter.html">jloh filter</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/intersect.html">jloh intersect</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/cluster.html">jloh cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/chimeric.html">jloh chimeric</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/junctions.html">jloh junctions</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/plot.html">jloh plot</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/sim.html">jloh sim</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Extraction/stats.html">jloh stats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Extraction/g2g.html">jloh g2g</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Extraction/extract.html">jloh extract</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Operations tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/Operations/filter.html">jloh filter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Operations/intersect.html">jloh intersect</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Operations/chimeric.html">jloh chimeric</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Operations/junctions.html">jloh junctions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Operations/cluster.html">jloh cluster</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Visualization tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/Visualization/plot.html">jloh plot</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Simulation tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/Simulation/sim.html">jloh sim</a></li>
 </ul>
 
         </div>
@@ -180,17 +189,17 @@ samtools<span class="w"> </span>sort<span class="w"> </span>-@<span class="w"> <
 <p class="admonition-title">Note</p>
 <p>This step is optional, but highly suggested.</p>
 </div>
-<p>This first step is performed by <a class="reference internal" href="modules/g2g.html#jloh-g2g"><span class="std std-ref">jloh g2g</span></a>. This tool maps one parental genome onto the other using <a class="reference external" href="https://mummer4.github.io/install/install.html">nucmer</a>, and finds regions where the two parental genomes have SNPs. These are the regions where LOH could have taken place, as they were different in the parentals. Regions where the genomes were identical in the first place could not have undergone LOH, and would increase false positives.</p>
+<p>This first step is performed by <a class="reference internal" href="modules/Extraction/g2g.html#jloh-g2g"><span class="std std-ref">jloh g2g</span></a>. This tool maps one parental genome onto the other using <a class="reference external" href="https://mummer4.github.io/install/install.html">nucmer</a>, and finds regions where the two parental genomes have SNPs. These are the regions where LOH could have taken place, as they were different in the parentals. Regions where the genomes were identical in the first place could not have undergone LOH, and would increase false positives.</p>
 <p>Here’s a basic command:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>g2g<span class="w"> </span>--target<span class="w"> </span>genome_A.fa<span class="w"> </span>--query<span class="w"> </span>genome_B.fa
 </pre></div>
 </div>
-<p>For further information consult <a class="reference internal" href="modules/g2g.html#jloh-g2g"><span class="std std-ref">jloh g2g</span></a>. In case you need to set the <code class="docutils literal notranslate"><span class="pre">--all2vcf-exe</span></code> parameter, remember that a distribution of <a class="reference external" href="https://github.com/MatteoSchiavinato/all2vcf">all2vcf</a> is already included with JLOH (<code class="docutils literal notranslate"><span class="pre">src/all2vcf</span></code>).</p>
-<p>This step is to be performed only once, with both parental genomes. It produces a BED file that you can pass to <a class="reference internal" href="modules/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> later on, as argument of the <code class="docutils literal notranslate"><span class="pre">--regions</span></code> parameter.</p>
+<p>For further information consult <a class="reference internal" href="modules/Extraction/g2g.html#jloh-g2g"><span class="std std-ref">jloh g2g</span></a>. In case you need to set the <code class="docutils literal notranslate"><span class="pre">--all2vcf-exe</span></code> parameter, remember that a distribution of <a class="reference external" href="https://github.com/MatteoSchiavinato/all2vcf">all2vcf</a> is already included with JLOH (<code class="docutils literal notranslate"><span class="pre">src/all2vcf</span></code>).</p>
+<p>This step is to be performed only once, with both parental genomes. It produces a BED file that you can pass to <a class="reference internal" href="modules/Extraction/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> later on, as argument of the <code class="docutils literal notranslate"><span class="pre">--regions</span></code> parameter.</p>
 </section>
 <section id="analyse-snp-density-distribution">
 <h3>Analyse SNP density distribution<a class="headerlink" href="#analyse-snp-density-distribution" title="Link to this heading"></a></h3>
-<p>This step is performed by <a class="reference internal" href="modules/stats.html#jloh-stats"><span class="std std-ref">jloh stats</span></a>. By modelling SNP density (SNPs/kbp) over each parental genome (i.e. running it twice), you will see how homo/heterozygous your hybrid reads are when compared to each reference. More info on how it works can be found here: <a class="reference internal" href="model_snp_density.html#model-snp-density"><span class="std std-ref">Modelling SNP density</span></a>.</p>
+<p>This step is performed by <a class="reference internal" href="modules/Extraction/stats.html#jloh-stats"><span class="std std-ref">jloh stats</span></a>. By modelling SNP density (SNPs/kbp) over each parental genome (i.e. running it twice), you will see how homo/heterozygous your hybrid reads are when compared to each reference. More info on how it works can be found here: <a class="reference internal" href="model_snp_density.html#model-snp-density"><span class="std std-ref">Modelling SNP density</span></a>.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>stats<span class="w"> </span>--vcf<span class="w"> </span>vars_A.vcf
 jloh<span class="w"> </span>stats<span class="w"> </span>--vcf<span class="w"> </span>vars_B.vcf
 </pre></div>
@@ -207,10 +216,10 @@ jloh<span class="w"> </span>stats<span class="w"> </span>--vcf<span class="w"> <
 </section>
 <section id="infer-loh-blocks-in-hybrids">
 <h3>Infer LOH blocks in hybrids<a class="headerlink" href="#infer-loh-blocks-in-hybrids" title="Link to this heading"></a></h3>
-<p>This step is performed by <a class="reference internal" href="modules/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a>. Differently from the default program setup described in <a class="reference internal" href="quickstart.html#quickstart"><span class="std std-ref">Quick start</span></a> and <a class="reference internal" href="run_test_data.html#test-data"><span class="std std-ref">Run JLOH with a test dataset</span></a>, when working with hybrids the user must use the <code class="docutils literal notranslate"><span class="pre">--assign-blocks</span></code> flag.</p>
+<p>This step is performed by <a class="reference internal" href="modules/Extraction/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a>. Differently from the default program setup described in <a class="reference internal" href="quickstart.html#quickstart"><span class="std std-ref">Quick start</span></a> and <a class="reference internal" href="run_test_data.html#test-data"><span class="std std-ref">Run JLOH with a test dataset</span></a>, when working with hybrids the user must use the <code class="docutils literal notranslate"><span class="pre">--assign-blocks</span></code> flag.</p>
 <p>The user will be asked to provide two reference genomes (<code class="docutils literal notranslate"><span class="pre">--refs</span></code>), two BAM files (<code class="docutils literal notranslate"><span class="pre">--bams</span></code>) and two VCF files (<code class="docutils literal notranslate"><span class="pre">--vcfs</span></code>). These are the files you generated in the step above, following this guide.</p>
-<p>Together with these parameters, pass also the <code class="docutils literal notranslate"><span class="pre">--min-snps-kbp</span></code> parameter with the two values you chose in the previous step (separated by a comma). If you ran <a class="reference internal" href="modules/g2g.html#jloh-g2g"><span class="std std-ref">jloh g2g</span></a> as well, pass the produced BED file as argument to <code class="docutils literal notranslate"><span class="pre">--regions</span></code>.</p>
-<p>Here, we’re leveraging 24 threads from our HPC cluster. All the other parameters are described in <a class="reference internal" href="modules/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a>.</p>
+<p>Together with these parameters, pass also the <code class="docutils literal notranslate"><span class="pre">--min-snps-kbp</span></code> parameter with the two values you chose in the previous step (separated by a comma). If you ran <a class="reference internal" href="modules/Extraction/g2g.html#jloh-g2g"><span class="std std-ref">jloh g2g</span></a> as well, pass the produced BED file as argument to <code class="docutils literal notranslate"><span class="pre">--regions</span></code>.</p>
+<p>Here, we’re leveraging 24 threads from our HPC cluster. All the other parameters are described in <a class="reference internal" href="modules/Extraction/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a>.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>extract<span class="w"> </span><span class="se">\</span>
 --refs<span class="w"> </span>genome_A.fa<span class="w"> </span>genome_B.fa<span class="w"> </span><span class="se">\</span>
 --bams<span class="w"> </span>mapping_A.bam<span class="w"> </span>mapping_B.bam<span class="w"> </span><span class="se">\</span>
@@ -221,17 +230,17 @@ jloh<span class="w"> </span>stats<span class="w"> </span>--vcf<span class="w"> <
 </div>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
-<p>By default, <a class="reference internal" href="modules/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> keeps every candidate block that is at least 100 bp long. At low divergence (1-3%) this may inflate false positives. In that case, increase the minimum length.</p>
+<p>By default, <a class="reference internal" href="modules/Extraction/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> keeps every candidate block that is at least 100 bp long. At low divergence (1-3%) this may inflate false positives. In that case, increase the minimum length.</p>
 </div>
 <p>Here’s a graphical representation of block assignment based on SNP clusters.</p>
 <img alt="../_images/snp_clustering.png" src="../_images/snp_clustering.png" />
-<p>When running <a class="reference internal" href="modules/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> in <code class="docutils literal notranslate"><span class="pre">--assign-blocks</span></code> mode, there are four possible outcomes in terms of blocks, shown in the next figure:</p>
+<p>When running <a class="reference internal" href="modules/Extraction/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> in <code class="docutils literal notranslate"><span class="pre">--assign-blocks</span></code> mode, there are four possible outcomes in terms of blocks, shown in the next figure:</p>
 <img alt="../_images/block_types.png" src="../_images/block_types.png" />
 </section>
 </section>
 <section id="plot-loh-blocks">
 <h2>Plot LOH blocks<a class="headerlink" href="#plot-loh-blocks" title="Link to this heading"></a></h2>
-<p>This step is performed by <a class="reference internal" href="modules/plot.html#jloh-plot"><span class="std std-ref">jloh plot</span></a>. Since you’re analysing a hybrid with two parental genomes, run it in <code class="docutils literal notranslate"><span class="pre">--two-ref</span></code> mode. This mode compares blocks labelled as “REF” with those labelled as “ALT”. You can choose what “REF” and “ALT” are, e.g. “Subgenome A” and “Subgenome B”.</p>
+<p>This step is performed by <a class="reference internal" href="modules/Visualization/plot.html#jloh-plot"><span class="std std-ref">jloh plot</span></a>. Since you’re analysing a hybrid with two parental genomes, run it in <code class="docutils literal notranslate"><span class="pre">--two-ref</span></code> mode. This mode compares blocks labelled as “REF” with those labelled as “ALT”. You can choose what “REF” and “ALT” are, e.g. “Subgenome A” and “Subgenome B”.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># For parent A</span>
 
 jloh<span class="w"> </span>plot<span class="w"> </span><span class="se">\</span>
@@ -254,7 +263,7 @@ jloh<span class="w"> </span>plot<span class="w"> </span><span class="se">\</span
 <p>Then, compare the output visually. Strongest LOH candidates are those that show up in both plots (A and B), “REF” in one case and “ALT” in the other. See our publication for an example (<a class="reference external" href="https://doi.org/10.1101/2023.05.04.539368">Schiavinato et al., 2023</a>).</p>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
-<p>You can increase or decrease the sensitivity of the plotting engine with the <code class="docutils literal notranslate"><span class="pre">--contrast</span></code> and with the <code class="docutils literal notranslate"><span class="pre">--window-size</span></code> options (see <a class="reference internal" href="modules/plot.html#jloh-plot"><span class="std std-ref">jloh plot</span></a>).</p>
+<p>You can increase or decrease the sensitivity of the plotting engine with the <code class="docutils literal notranslate"><span class="pre">--contrast</span></code> and with the <code class="docutils literal notranslate"><span class="pre">--window-size</span></code> options (see <a class="reference internal" href="modules/Visualization/plot.html#jloh-plot"><span class="std std-ref">jloh plot</span></a>).</p>
 </div>
 </section>
 </section>

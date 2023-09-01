@@ -28,7 +28,7 @@ A publication is currently being reviewed. The preprint can be found in bioRxiv 
    usage/one_parent
    
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Extraction tools
 
    usage/modules/Extraction/stats
@@ -36,7 +36,7 @@ A publication is currently being reviewed. The preprint can be found in bioRxiv 
    usage/modules/Extraction/extract 
 
 .. toctree:: 
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Operations tools 
 
    usage/modules/Operations/filter 
@@ -46,13 +46,13 @@ A publication is currently being reviewed. The preprint can be found in bioRxiv 
    usage/modules/Operations/cluster 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Visualization tools 
 
    usage/modules/Visualization/plot 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Simulation tools 
 
    usage/modules/Simulation/sim 

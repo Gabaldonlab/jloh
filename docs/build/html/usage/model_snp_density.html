@@ -55,18 +55,27 @@
 <li class="toctree-l1"><a class="reference internal" href="hybrid_wf.html">Working with hybrids</a></li>
 <li class="toctree-l1"><a class="reference internal" href="one_parent.html">Hybrids with only one known parental</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Modules description</span></p>
+<p class="caption" role="heading"><span class="caption-text">Extraction tools</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="modules/stats.html">jloh stats</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/g2g.html">jloh g2g</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/extract.html">jloh extract</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/filter.html">jloh filter</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/intersect.html">jloh intersect</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/cluster.html">jloh cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/chimeric.html">jloh chimeric</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/junctions.html">jloh junctions</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/plot.html">jloh plot</a></li>
-<li class="toctree-l1"><a class="reference internal" href="modules/sim.html">jloh sim</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Extraction/stats.html">jloh stats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Extraction/g2g.html">jloh g2g</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Extraction/extract.html">jloh extract</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Operations tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/Operations/filter.html">jloh filter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Operations/intersect.html">jloh intersect</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Operations/chimeric.html">jloh chimeric</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Operations/junctions.html">jloh junctions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/Operations/cluster.html">jloh cluster</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Visualization tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/Visualization/plot.html">jloh plot</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Simulation tools</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/Simulation/sim.html">jloh sim</a></li>
 </ul>
 
         </div>
@@ -98,7 +107,7 @@
 <img alt="../_images/snp_density.png" src="../_images/snp_density.png" />
 <section id="how-to-do-it">
 <h2>How to do it<a class="headerlink" href="#how-to-do-it" title="Link to this heading"></a></h2>
-<p>A crucial aspect of using JLOH is modelling SNP density. This is done with <a class="reference internal" href="modules/stats.html#jloh-stats"><span class="std std-ref">jloh stats</span></a>, which profiles the density of heterozygous and homozygous SNPs over the genome in windows of adjustable size (<code class="docutils literal notranslate"><span class="pre">--window-size</span></code> and <code class="docutils literal notranslate"><span class="pre">--step-size</span></code>). This step is aimed at choosing an appropriate SNP density threshold to infer LOH blocks when running <a class="reference internal" href="modules/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a>.</p>
+<p>A crucial aspect of using JLOH is modelling SNP density. This is done with <a class="reference internal" href="modules/Extraction/stats.html#jloh-stats"><span class="std std-ref">jloh stats</span></a>, which profiles the density of heterozygous and homozygous SNPs over the genome in windows of adjustable size (<code class="docutils literal notranslate"><span class="pre">--window-size</span></code> and <code class="docutils literal notranslate"><span class="pre">--step-size</span></code>). This step is aimed at choosing an appropriate SNP density threshold to infer LOH blocks when running <a class="reference internal" href="modules/Extraction/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a>.</p>
 <p>To infer the density distribution of the SNPs over the genome, one must run:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>stats<span class="w"> </span>--vcf<span class="w"> </span>my_variants.vcf
 </pre></div>
@@ -124,7 +133,7 @@
 <span class="mi">95</span><span class="o">%</span>   <span class="mf">30.0</span>   <span class="mf">30.0</span>   <span class="mf">15.0</span>
 </pre></div>
 </div>
-<p>The user must choose a <strong>Het</strong> and a <strong>Homo</strong> value from a quantile (e.g. Q10) or a descriptor (e.g. median). The values will be used as thresholds to separate blocks into candidate LOH blocks and not. The two chosen values (e.g. 8 and 5) will become the arguments of the <code class="docutils literal notranslate"><span class="pre">--min-snps-kbp</span></code> parameter of <a class="reference internal" href="modules/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> (see below).</p>
+<p>The user must choose a <strong>Het</strong> and a <strong>Homo</strong> value from a quantile (e.g. Q10) or a descriptor (e.g. median). The values will be used as thresholds to separate blocks into candidate LOH blocks and not. The two chosen values (e.g. 8 and 5) will become the arguments of the <code class="docutils literal notranslate"><span class="pre">--min-snps-kbp</span></code> parameter of <a class="reference internal" href="modules/Extraction/extract.html#jloh-extract"><span class="std std-ref">jloh extract</span></a> (see below).</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>Higher quantiles are stricter in the detection of LOH blocks, they increase the precision but reduce the recall.</p>
@@ -139,7 +148,7 @@
 <p>A quantile cuts a distribution in two. For example, “quantile 10” means that 10% of the items in the distribution have a value that is lower than the one desccribed by Q10.</p>
 <p>If we’re talking about SNP densities, a Q10 = 5 means that 10% of the windows in the analysed genome have less than 5 SNPs/kbp.</p>
 <p>In a genomic scenario, we can expect the majority of the genome to float around a certain average het/homo SNPs/kbp value. Then, there will be regions of very low heterozygosity (candidate LOH blocks), and regions of high homozygosity (candidate LOH blocks with an alternative allele). These are the ones we want to select for.</p>
-<p>This is why <a class="reference internal" href="modules/stats.html#jloh-stats"><span class="std std-ref">jloh stats</span></a> shows the <strong>mean</strong> and the <strong>median</strong> of the distribution together with the quantiles. The easiest approach is to take the mean as threshold: any window that has less than that many SNPs/kbp will be a candidate LOH block.</p>
+<p>This is why <a class="reference internal" href="modules/Extraction/stats.html#jloh-stats"><span class="std std-ref">jloh stats</span></a> shows the <strong>mean</strong> and the <strong>median</strong> of the distribution together with the quantiles. The easiest approach is to take the mean as threshold: any window that has less than that many SNPs/kbp will be a candidate LOH block.</p>
 <p>However, for greater precision, one can choose to use a quantile (Q15, Q10, Q5). these will be lower than the average and still include 15%, 10%, or 5% of the total windows of the genome.</p>
 <p>Displayed higher quantiles (Q85, Q90, Q95) are for extreme cases. Hypothetically, if about 90% of a genome has undergone LOH, one could set the threshold at Q90 to make sure that nothing is left behind. Note that using high quantiles in case studies with “normal” or low heterozygosity will massively introduce false positives.</p>
 </section>
