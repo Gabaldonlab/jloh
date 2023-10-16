@@ -828,7 +828,7 @@ def run_one_ref_script(loh_table, Names, args):
         str(",".join(Names)),
         f"{str(args.aspect_ratio)},{str(args.width)},{str(args.height)},{str(args.res)}",
         f"{args.ref_name},{args.alt_name}", 
-        f"\{args.het_color},\{args.ref_color},\{args.alt_color},\{args.midpoint_color}",
+        f"\\{args.het_color},\\{args.ref_color},\\{args.alt_color},\\{args.midpoint_color}",
         f"{do_we_merge}",
         args.prefix,
         args.contrast ])
@@ -864,7 +864,7 @@ def run_two_ref_script(loh_table, Names, args):
         str(",".join(Names)),
         f"{str(args.aspect_ratio)},{str(args.width)},{str(args.height)},{str(args.res)}",
         f"{args.ref_name},{args.alt_name}", 
-        f"\{args.het_color},\{args.ref_color},\{args.alt_color},\{args.midpoint_color}",
+        f"\\{args.het_color},\\{args.ref_color},\\{args.alt_color},\\{args.midpoint_color}",
         f"{do_we_merge}",
         args.prefix,
         args.contrast ])
