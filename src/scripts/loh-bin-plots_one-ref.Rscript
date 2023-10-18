@@ -40,7 +40,6 @@ df$Sample <- gsub(".*/", "", df$Sample)
 if (loh_contrast == "low") {
     print("Setting contrast to: low")
     df$LOH_ratio = 0.25 * (df$LOH_ratio / max(df$LOH_ratio))
-    
 }
 if (loh_contrast == "mid") {
     print("Setting contrast to: mid")
@@ -59,6 +58,8 @@ if (loh_contrast == "mid") {
 }
 
 if (do_we_merge == "yes") {
+
+    midpoint_color = het_color
 
     # merging combination 
     df["Merged_key"] <- paste(df$Chromosome, df$W_start, sep="__")
@@ -104,6 +105,8 @@ if (do_we_merge == "yes") {
 
     if (plotType == "by_chromosome") {
 
+        midpoint_color = het_color
+
         # identify chromosomes 
         Chroms <- unique(as.character(df$Chromosome))
         chrom_counter = 0
@@ -144,6 +147,8 @@ if (do_we_merge == "yes") {
 
     } else if (plotType == "by_sample") {
     
+        midpoint_color = het_color
+
         # identify samples
         Samples <- unique(as.character(df$Sample))
         sample_counter = 0
