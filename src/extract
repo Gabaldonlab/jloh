@@ -1248,6 +1248,7 @@ def run_in_default_mode(args, tmp_bams):
     
     # write candidates to output, pre filtering
     out = open(f"{args.output_dir}/{args.sample}.LOH_candidates.tsv", "w")
+    out.write("\t".join(["#Chrom", "Start", "End", "Cov", "Cov_frac", "Cov_ratio_up", "Cov_ratio_down", "Zygosity", "Length", "Allele", "Homo_snps", "Hetero_snps"]) + "\n")
 
     for row in LOH:
         item = str(row).rstrip("\b\n\r").split("\t")
@@ -1394,6 +1395,8 @@ def run_in_block_assignment_mode(args, tmp_bams):
 
     out_A = open(f"{args.output_dir}/{args.sample}.LOH_candidates.A.tsv", "w")
     out_B = open(f"{args.output_dir}/{args.sample}.LOH_candidates.B.tsv", "w")
+    out_A.write("\t".join(["#Chrom", "Start", "End", "Cov", "Cov_frac", "Cov_ratio_up", "Cov_ratio_down", "Zygosity", "Length", "Allele", "Homo_snps", "Hetero_snps"]) + "\n")
+    out_B.write("\t".join(["#Chrom", "Start", "End", "Cov", "Cov_frac", "Cov_ratio_up", "Cov_ratio_down", "Zygosity", "Length", "Allele", "Homo_snps", "Hetero_snps"]) + "\n")
 
     for row in LOH_A:
         item = str(row).rstrip("\b\n\r").split("\t")

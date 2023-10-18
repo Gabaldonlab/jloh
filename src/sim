@@ -58,6 +58,7 @@ jloh sim --fasta <FASTA> [options]
 --mean-haplotype-size   Generated haplotypes will have this average size        [25000]
 --min-haplotype-length  Minimum length of generated haplotypes                  [1000]
 --divergence            How much divergence in the mutated genome (0.0-1.0)     [0.01]
+--max-divergence        Max divergence value to allow in haplotypes             [0.2]
 --loh                   Apply this level of LOH (0.0-1.0)                       [0.0]
 --chrom-name-replace    Pattern and replacement for chrom names in mutated out  [off]
                         (space separated, --chrom-name-replace <pat> <rep>)
@@ -75,6 +76,7 @@ p.add_argument("--hybrid", action="store_true")
 p.add_argument("--mean-haplotype-size", default=25000, type=int)
 p.add_argument("--min-haplotype-length", default=1000, type=int)
 p.add_argument("--divergence", default=0.01, type=float)
+p.add_argument("--max-divergence", default=0.2, type=float)
 p.add_argument("--loh", default=0.00, type=float)
 p.add_argument("--chrom-name-replace", nargs=2)
 args = p.parse_args()
@@ -162,10 +164,10 @@ def get_chrom_random_intervals(mean_haplotype_size, min_haplotype_len, stdev_fac
     return Intervals
 
 
-def get_chrom_interval_divergences(Chrom_intervals, divergence, stdev_factor):
+def get_chrom_interval_divergences(Chrom_intervals, divergence, max_divergence, stdev_factor):
 
     """
-    03/03/2023
+    18/10/2023
     """
 
     # beta distribution 
@@ -183,8 +185,13 @@ def get_chrom_interval_divergences(Chrom_intervals, divergence, stdev_factor):
 
     if divergence > 0:
 
+        if divergence > max_divergence:
+            sys.stderr.write("--divergence cannot be higher than --max-divergence\n")
+            sys.exit()
+
         # establish beta distribution parameters
         mu = divergence 
+        maxdiv = max_divergence
         stdev = mu * stdev_factor
         var = stdev ** 2
         alpha = ((1-mu)/var - 1/mu) * mu ** 2
@@ -192,7 +199,15 @@ def get_chrom_interval_divergences(Chrom_intervals, divergence, stdev_factor):
 
         for chrom in Chrom_intervals.keys():
             num_intervals = len(Chrom_intervals[chrom])
+
+            # select only divergences within 0 and max-divergence 
             Divs = list(np.random.beta(a=alpha, b=beta, size=num_intervals))
+            while (sum([div > max_divergence for div in Divs]) >= 0.5 * len(Divs)):
+                Divs = list(np.random.beta(a=alpha, b=beta, size=num_intervals))
+                sys.stderr.write(f"Redrafting divergences with div={mu} and maxdiv={maxdiv}...\n")
+
+            Divs = [i for i in Divs if i <= maxdiv]
+
             for i in range(0,num_intervals):
                 Chrom_intervals_w_div.append(
                     (
@@ -245,10 +260,10 @@ def nullify_fraction_of_intervals(Chrom_intervals_w_div, loh):
     return Intervals_w_loh
 
 
-def correct_divergences_after_loh(Int_w_loh, divergence):
+def correct_divergences_after_loh(Int_w_loh, divergence, max_divergence):
 
     """
-    03/03/2023
+    18/10/2023
     """
 
     if divergence > 0:
@@ -267,12 +282,12 @@ def correct_divergences_after_loh(Int_w_loh, divergence):
             idx = np.random.choice(len(Int_w_loh_corr))
             
             if (mean_div < 0.999 * divergence):
-                # increase divergence by 5% in that slot 
-                Int_w_loh_corr[idx][3] = round(min(1, Int_w_loh_corr[idx][3] + Int_w_loh_corr[idx][3] * 0.05), 3)
+                # increase divergence by 10% in that slot 
+                Int_w_loh_corr[idx][3] = round(min(max_divergence, Int_w_loh_corr[idx][3] + Int_w_loh_corr[idx][3] * 0.1), 3)
 
             elif (mean_div > 1.001 * divergence):
-                # decrease divergence by 5% in that slot 
-                Int_w_loh_corr[idx][3] = round(max(0, Int_w_loh_corr[idx][3] - Int_w_loh_corr[idx][3] * 0.05), 3)
+                # decrease divergence by 10% in that slot 
+                Int_w_loh_corr[idx][3] = round(max(0, Int_w_loh_corr[idx][3] - Int_w_loh_corr[idx][3] * 0.1), 3)
 
             # re-calculate mean divergence 
             mean_div = mean([x[3] for x in Int_w_loh_corr])
@@ -373,46 +388,72 @@ def join_chrom_subseqs(Int_w_loh_corr_seqs_mut):
 def main(args):
 
     """
-    08/02/2023
+    18/10/2023
     """
 
     # script variables 
     stdev_factor = 0.25
 
     # get assembly chromosome lengths
+    sys.stderr.write(f"[{at()}] Getting chromosome sizes ... \r")
     Chrom_sizes = get_chrom_sizes(args.fasta)
+    Chrom_intervals = { chrom : get_chrom_random_intervals(args.mean_haplotype_size, args.min_haplotype_length, stdev_factor, Chrom_sizes[chrom]) for chrom in Chrom_sizes.keys() }
+    sys.stderr.write(f"[{at()}] Getting chromosome sizes ... DONE \n")
+
+    sys.stderr.write(f"[{at()}] Reading their sequences ... \r")
     Chrom_seqs = get_chrom_sequences(args.fasta)
     INPUT = open(args.fasta, "r")
+    sys.stderr.write(f"[{at()}] Reading their sequences ... DONE \n")
+
+    sys.stderr.write(f"[{at()}] Storing their order in input file ... \r")
     Chrom_order = [line.lstrip(">").rstrip("\b\r\n") for line in INPUT if line[0] == ">"]
     INPUT.close()
+    sys.stderr.write(f"[{at()}] Storing their order in input file ... DONE \n")
 
     # obtain list of intervals based on random lengths centered at 
     # mean haplotype size (--mean-haplotype-size)
     # use numpy's random normal distribution centered at mean haplo size 
-    Chrom_intervals = { chrom : get_chrom_random_intervals(args.mean_haplotype_size, args.min_haplotype_length, stdev_factor, Chrom_sizes[chrom]) for chrom in Chrom_sizes.keys() }
+
 
     # obtain simulated distribution of haplotype divergence based on --divergence 
     # for each haplotype
-    Chrom_intervals_w_div = get_chrom_interval_divergences(Chrom_intervals, args.divergence, stdev_factor)
+    sys.stderr.write(f"[{at()}] Modelling internal divergences ... \r")
+    Chrom_intervals_w_div = get_chrom_interval_divergences(Chrom_intervals, 
+                                                           args.divergence, 
+                                                           args.max_divergence, 
+                                                           stdev_factor)
+    sys.stderr.write(f"[{at()}] Modelling internal divergences ... DONE \n")
 
     # introduce loh based on the --loh argument
     # turn to 0 the corresponding % of the sampled distribution
+    sys.stderr.write(f"[{at()}] Introducing required loh if specified ... \r")
     Int_w_loh = nullify_fraction_of_intervals(Chrom_intervals_w_div, args.loh)
+    sys.stderr.write(f"[{at()}] Introducing required loh if specified ... DONE \n")
     
     # recalculate the distribution mean 
     # randomly increase divergence in non-zero haplotypes to match --divergence 
-    Int_w_loh_corr = correct_divergences_after_loh(Int_w_loh, args.divergence)
+    if args.loh > 0:
+        sys.stderr.write(f"[{at()}] Recalculating divergence after loh ... \r")
+        Int_w_loh = correct_divergences_after_loh(Int_w_loh, args.divergence, args.max_divergence)
+        sys.stderr.write(f"[{at()}] Recalculating divergence after loh ... DONE \n")
 
     # break down genome in chunks like the haplotypes 
-    Int_w_loh_corr_seqs = get_chrom_subseqs(Int_w_loh_corr, Chrom_seqs)
+    sys.stderr.write(f"[{at()}] Extracting subsequences of chromosomes ... \r")
+    Int_w_loh_corr_seqs = get_chrom_subseqs(Int_w_loh, Chrom_seqs)
+    sys.stderr.write(f"[{at()}] Extracting subsequences of chromosomes ... DONE \n")
 
     # introduce mutations according to simulated divergence rates 
+    sys.stderr.write(f"[{at()}] Extracting mutated sequence fragments ... \r")
     Int_w_loh_corr_seqs_mut = get_mutate_sequence_pieces(Int_w_loh_corr_seqs, args.threads)
+    sys.stderr.write(f"[{at()}] Extracting mutated sequence fragments ... DONE \n")
 
     # join sequences
+    sys.stderr.write(f"[{at()}] Joining chromosomal subsequences after mutation ... \r")
     Mut_chrom_seqs = join_chrom_subseqs(Int_w_loh_corr_seqs_mut)
+    sys.stderr.write(f"[{at()}] Joining chromosomal subsequences after mutation ... DONE \n")
 
     # write to output a tsv with introduced haplotypes and blocks 
+    sys.stderr.write(f"[{at()}] Writing to output ... \r")
     OUTPUT = open(args.out_haplotypes, "w")
     OUTPUT.write("\t".join(["Chrom", "Start", "End", "Length", "Divergence", "Haplotype"]) + "\n")
     for x in Int_w_loh_corr_seqs_mut:
@@ -437,6 +478,7 @@ def main(args):
         # write sequence and name to output 
         OUTPUT.write(f">{chrom}\n{mut_seq}\n")
     OUTPUT.close()
+    sys.stderr.write(f"[{at()}] Writing to output ... DONE \n")
 
 
 if __name__=='__main__':

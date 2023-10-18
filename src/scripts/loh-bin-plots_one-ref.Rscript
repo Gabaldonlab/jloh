@@ -35,6 +35,7 @@ dir.create(outdir, showWarnings = FALSE)
 df <- read.table(infile, header=T)
 
 df$Sample <- gsub(".*/", "", df$Sample)
+plotOrder <- unlist(strsplit(plotOrder, ","))
 
 # contrast 
 if (loh_contrast == "low") {
@@ -57,9 +58,14 @@ if (loh_contrast == "mid") {
     print("Leaving contrast untouched")
 }
 
-if (do_we_merge == "yes") {
+# fix positions and names 
+df$W_start <- df$W_start / 1000000
+df$W_end <- df$W_end / 1000000  
+df$Sample <- factor(as.character(df$Sample), levels=plotOrder)
+df$LOH_ratio <- df$LOH_ratio - df$Het_ratio 
 
-    midpoint_color = het_color
+
+if (do_we_merge == "yes") {
 
     # merging combination 
     df["Merged_key"] <- paste(df$Chromosome, df$W_start, sep="__")
@@ -67,12 +73,6 @@ if (do_we_merge == "yes") {
 
     # read plot order 
     plotOrder <- rev(unlist(strsplit(plotOrder, ",", fixed=T)))
-
-    # fix positions and names 
-    df$W_start <- df$W_start / 1000000
-    df$W_end <- df$W_end / 1000000  
-    df$Sample <- factor(as.character(df$Sample), levels=plotOrder)
-    df$LOH_ratio <- df$LOH_ratio - df$Het_ratio 
 
     # plotting the merged version 
     x <- df[ , c("Merged_key", "Sample", "LOH_ratio")]
@@ -88,7 +88,7 @@ if (do_we_merge == "yes") {
     geom_tile() +
     scale_x_discrete(name="Concatenated chromosomes [Mbp]", labels=NULL) +
     scale_fill_gradient2(low=het_color, mid=midpoint_color, high=ref_color, midpoint=0,
-                        na.value = "grey50", breaks=c(-1,1), limits=c(-1,1),
+                        na.value = "grey80", breaks=c(-1,1), limits=c(-1,1),
                         labels=c("Het", "LOH"), 
                         name="") +
     ylab("")
@@ -104,8 +104,6 @@ if (do_we_merge == "yes") {
     # plotting split versions 
 
     if (plotType == "by_chromosome") {
-
-        midpoint_color = het_color
 
         # identify chromosomes 
         Chroms <- unique(as.character(df$Chromosome))
@@ -133,7 +131,7 @@ if (do_we_merge == "yes") {
             geom_tile() +
             xlab("Position [Mbp]") +
             scale_fill_gradient2(low=het_color, mid=midpoint_color, high=ref_color, midpoint=0,
-                                na.value = "grey50", breaks=c(-1,1), limits=c(-1,1),
+                                na.value = "grey80", breaks=c(-1,1), limits=c(-1,1),
                                 labels=c("Het", "LOH"), 
                                 name="") +
             ylab("")
@@ -147,8 +145,6 @@ if (do_we_merge == "yes") {
 
     } else if (plotType == "by_sample") {
     
-        midpoint_color = het_color
-
         # identify samples
         Samples <- unique(as.character(df$Sample))
         sample_counter = 0
@@ -176,7 +172,7 @@ if (do_we_merge == "yes") {
             geom_tile() +
             xlab("Position [Mbp]") +
             scale_fill_gradient2(low=het_color, mid=midpoint_color, high=ref_color, midpoint=0,
-                                na.value = "grey50", breaks=c(-1,1), limits=c(-1,1),
+                                na.value = "grey80", breaks=c(-1,1), limits=c(-1,1),
                                 labels=c("Het", "LOH"), 
                                 name="") +
             ylab("")
