@@ -27,6 +27,7 @@ from time import asctime as at
 from Bio import SeqIO, Seq
 import argparse as ap
 from operator import itemgetter
+import pandas as pd 
 import numpy as np
 from pybedtools import BedTool
 import pybedtools
@@ -52,6 +53,7 @@ jloh sim --fasta <FASTA> [options]
 --fasta                 Input FASTA file to generate mutations on               [!]
 --out-fasta             Output FASTA filename                                   [mut.fa]
 --out-haplotypes        TSV file with generated haplotypes (div=0 is LOH)       [mut.haplotypes.tsv]
+--use-existing-hap      Do not generate new haplotypes, use these (TSV)         [off]
 
 [parameters]
 --threads               Number of parallel operations                           [4]
@@ -72,6 +74,7 @@ p.add_argument("--threads", default=4, type=int)
 p.add_argument("--fasta")
 p.add_argument("--out-fasta", default="mut.fa")
 p.add_argument("--out-haplotypes", default="mut.haplotypes.tsv")
+p.add_argument("--use-existing-hap")
 p.add_argument("--hybrid", action="store_true")
 p.add_argument("--mean-haplotype-size", default=25000, type=int)
 p.add_argument("--min-haplotype-length", default=1000, type=int)
@@ -388,7 +391,7 @@ def join_chrom_subseqs(Int_w_loh_corr_seqs_mut):
 def main(args):
 
     """
-    18/10/2023
+    19/10/2023
     """
 
     # script variables 
@@ -414,28 +417,34 @@ def main(args):
     # mean haplotype size (--mean-haplotype-size)
     # use numpy's random normal distribution centered at mean haplo size 
 
+    if not args.use_existing_hap:
 
-    # obtain simulated distribution of haplotype divergence based on --divergence 
-    # for each haplotype
-    sys.stderr.write(f"[{at()}] Modelling internal divergences ... \r")
-    Chrom_intervals_w_div = get_chrom_interval_divergences(Chrom_intervals, 
-                                                           args.divergence, 
-                                                           args.max_divergence, 
-                                                           stdev_factor)
-    sys.stderr.write(f"[{at()}] Modelling internal divergences ... DONE \n")
+        # obtain simulated distribution of haplotype divergence based on --divergence 
+        # for each haplotype
+        sys.stderr.write(f"[{at()}] Modelling internal divergences ... \r")
+        Chrom_intervals_w_div = get_chrom_interval_divergences(Chrom_intervals, 
+                                                            args.divergence, 
+                                                            args.max_divergence, 
+                                                            stdev_factor)
+        sys.stderr.write(f"[{at()}] Modelling internal divergences ... DONE \n")
 
-    # introduce loh based on the --loh argument
-    # turn to 0 the corresponding % of the sampled distribution
-    sys.stderr.write(f"[{at()}] Introducing required loh if specified ... \r")
-    Int_w_loh = nullify_fraction_of_intervals(Chrom_intervals_w_div, args.loh)
-    sys.stderr.write(f"[{at()}] Introducing required loh if specified ... DONE \n")
-    
-    # recalculate the distribution mean 
-    # randomly increase divergence in non-zero haplotypes to match --divergence 
-    if args.loh > 0:
-        sys.stderr.write(f"[{at()}] Recalculating divergence after loh ... \r")
-        Int_w_loh = correct_divergences_after_loh(Int_w_loh, args.divergence, args.max_divergence)
-        sys.stderr.write(f"[{at()}] Recalculating divergence after loh ... DONE \n")
+        # introduce loh based on the --loh argument
+        # turn to 0 the corresponding % of the sampled distribution
+        sys.stderr.write(f"[{at()}] Introducing required loh if specified ... \r")
+        Int_w_loh = nullify_fraction_of_intervals(Chrom_intervals_w_div, args.loh)
+        sys.stderr.write(f"[{at()}] Introducing required loh if specified ... DONE \n")
+        
+        # recalculate the distribution mean 
+        # randomly increase divergence in non-zero haplotypes to match --divergence 
+        if args.loh > 0:
+            sys.stderr.write(f"[{at()}] Recalculating divergence after loh ... \r")
+            Int_w_loh = correct_divergences_after_loh(Int_w_loh, args.divergence, args.max_divergence)
+            sys.stderr.write(f"[{at()}] Recalculating divergence after loh ... DONE \n")
+
+    else:
+        Int_w_loh = pd.read_csv(args.use_existing_hap, sep="\t")
+        Int_w_loh = Int_w_loh.loc[:,["Chrom", "Start", "End", "Divergence"]]
+        Int_w_loh = [tuple(tup[1:]) for tup in Int_w_loh.itertuples()]
 
     # break down genome in chunks like the haplotypes 
     sys.stderr.write(f"[{at()}] Extracting subsequences of chromosomes ... \r")
