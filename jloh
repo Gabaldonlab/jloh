@@ -42,7 +42,7 @@ if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
     2023 
     contact: matteo.schiavinato.90@gmail.com
 
-    v1.0.1
+    v1.0.2
 
     ####
 
