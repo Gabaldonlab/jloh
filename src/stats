@@ -26,9 +26,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import argparse as ap
 import sys
 import pandas as pd
+import numpy as np 
 import multiprocessing as mp
 from time import asctime as at
 from operator import itemgetter
+
+ss = sys.exit 
 
 # help section
 if len(sys.argv) == 1:
@@ -49,8 +52,8 @@ jloh stats --vcf <VCF>
 [parameters]
 
 --threads           Number of max. parallel operations                          [4]
---window-size       Size in bp to use for distribution                          [1000]
---step-size         Step size in bp for sliding window                          [500]
+--window-size       Size in bp to use for distribution                          [25000]
+--step-size         Step size in bp for sliding window                          [5000]
 
 """)
     sys.exit(0)
@@ -59,8 +62,8 @@ jloh stats --vcf <VCF>
 p = ap.ArgumentParser()
 p.add_argument("--vcf")
 p.add_argument("--threads", default=4, type=int)
-p.add_argument("--window-size", default=1000, type=int)
-p.add_argument("--step-size", default=500, type=int)
+p.add_argument("--window-size", default=25000, type=int)
+p.add_argument("--step-size", default=5000, type=int)
 args = p.parse_args()
 
 
@@ -157,41 +160,26 @@ def is_a_snp(line):
         return False
 
 
-def count_snps_in_window(Snps, w_start, w_end):
+
+def get_chrom_snps(args, chrom_snps, chrom, w_start, w_end, queue):
 
     """
-    23/08/2022
+    Last update: 23/10/2023 
     """
 
-    tot = 0
-    k = 0
-
-    if len(Snps) > 0:
-        while (k < len(Snps)):
-            if (Snps[k] >= w_start) and (Snps[k] <= w_end):
-                tot+=1
-            if (Snps[k] > w_end):
+    w_snps = 0
+    chrom_snps = [x for x in chrom_snps if x >= w_start]
+    if len(chrom_snps) > 0:
+        for var in chrom_snps:
+            if (var < w_start):
+                continue
+            elif (w_start <= var <= w_end):
+                w_snps+=1
+            else:
                 break
-            k += 1
     else:
-        tot = 0
-
-    return tot
-
-
-def get_chrom_snps(args, chrom_snps, chrom_len, chrom, queue):
-
-    """
-    Last update: 03/11/2022
-    """
-
-    w_start = 0
-    w_end = w_start + args.window_size
-    while w_end < chrom_len:
-        w_snps = count_snps_in_window(chrom_snps, w_start, w_end)
-        w_start += args.step_size
-        w_end += args.step_size
-        queue.put([chrom, w_start, w_snps])
+        w_snps = 0
+    queue.put([chrom, w_start, w_snps])
 
 
 def get_chrom_distances(chrom_snps, chrom, queue):
@@ -210,14 +198,13 @@ def get_chrom_distances(chrom_snps, chrom, queue):
 def calculate_chrom_snp_densities(Variants, Chrom_lengths, args):
 
     """
-    Last update: 03/11/2022
+    Last update: 23/10/2023 
     """
 
     # extract SNPs and chromosome lengths
     # subdivide SNPs by chromosome
     Snps = [ (line.split("\t")[0], line) for line in Variants if is_a_snp(line) == True ]
     Snps_by_chrom = { chrom : [] for chrom in Chrom_lengths.keys() }
-    Distances = []
 
     for snp in Snps:
         Snps_by_chrom[snp[0]].append(int(snp[1].split("\t")[1]))
@@ -226,7 +213,19 @@ def calculate_chrom_snp_densities(Variants, Chrom_lengths, args):
     pool = mp.Pool(args.threads)
 
     for chrom in Snps_by_chrom.keys():
-        pool.apply_async(get_chrom_snps, args=(args, Snps_by_chrom[chrom], Chrom_lengths[chrom], chrom, queue))
+        w_start = 0 
+        w_end = w_start + args.window_size 
+        chrom_snps = Snps_by_chrom[chrom]
+
+        
+        # while w_end < Chrom_lengths[chrom]:
+
+        ### DEBUG ###
+        while (w_end <= 700000):
+        ### DEBUG ###
+            pool.apply_async(get_chrom_snps, args=(args, chrom_snps, chrom, w_start, w_end, queue))
+            w_start += args.step_size
+            w_end += args.step_size    
 
     pool.close()
     pool.join()
@@ -239,9 +238,13 @@ def calculate_chrom_snp_densities(Variants, Chrom_lengths, args):
     df = pd.DataFrame(out)
     df.columns = ["Chrom", "W_start", "Snps"]
     df = df.sort_values(by=["Chrom", "W_start"], ascending=[True, True])
-
-    df = df.loc[df["Snps"] > 0, :]
-    df_quant = df.quantile(q=[0.05, 0.10, 0.15, 0.50, 0.85, 0.90, 0.95])
+    df = df.loc[df["Snps"] > 0 , :]
+    df["Snps"] = (df["Snps"] / args.window_size * 1000).round(2)
+    df = df.set_index(["Chrom", "W_start"])
+    df_quant = df.quantile(q=list(np.arange(0,1,0.05)))
+    df_quant = df_quant.reset_index(drop=False)
+    df_quant = df_quant.rename({"index":"Quantile"}, axis=1)
+    df_quant["Quantile"] = (df_quant["Quantile"] * 100).round(0).astype("int")
 
     return (df, df_quant)
 
@@ -266,42 +269,29 @@ def main(args):
     sys.stderr.write(f"[{at()}] Combining to get general SNP densities\n")
     All, All_quant = calculate_chrom_snp_densities(All, Chrom_lengths, args)
 
-    if All.empty:
-        all_median = float(0)
-        all_mean = float(0)
-        all_min = float(0)
-        all_max = float(0)
-    else:
-        all_median = round(All["Snps"].median(), 1)
-        all_mean = round(All["Snps"].mean(), 1)
-        all_min = round(All["Snps"].min(), 1)
-        all_max = round(All["Snps"].max(), 1)
+    # unite them 
+    df = All_quant.merge(Het_quant, on=["Quantile"]).merge(Homo_quant, on=["Quantile"])
+    df.columns = ["Quantile", "Gen", "Het", "Homo"]
+    Stats = df.loc[:,["Gen", "Het", "Homo"]].describe(include='float').round(2)
 
-    if Het.empty:
-        het_median = float(0)
-        het_mean = float(0)
-        het_min = float(0)
-        het_max = float(0)
-    else:
-        het_median = round(Het["Snps"].median(), 1)
-        het_mean = round(Het["Snps"].mean(), 1)
-        het_min = round(Het["Snps"].min(), 1)
-        het_max = round(Het["Snps"].max(), 1)
+    all_mean = Stats.loc["mean", "Gen"]
+    all_min = Stats.loc["min", "Gen"]
+    all_max = Stats.loc["max", "Gen"]
 
-    if Homo.empty:
-        homo_median = float(0)
-        homo_mean = float(0)
-        homo_min = float(0)
-        homo_max = float(0)
-    else:
-        homo_median = round(Homo["Snps"].median(), 1)
-        homo_mean = round(Homo["Snps"].mean(), 1)
-        homo_min = round(Homo["Snps"].min(), 1)
-        homo_max = round(Homo["Snps"].max(), 1)
+    het_mean = Stats.loc["mean", "Het"]
+    het_min = Stats.loc["min", "Het"]
+    het_max = Stats.loc["max", "Het"]
 
-    All_quant = All_quant.fillna(1)
-    Het_quant = Het_quant.fillna(1)
-    Homo_quant = Homo_quant.fillna(1)
+    homo_mean = Stats.loc["mean", "Homo"]
+    homo_min = Stats.loc["min", "Homo"]
+    homo_max = Stats.loc["max", "Homo"]
+
+    # 
+    Out = [list(tup) for tup in df.itertuples()]
+    Out = [(f" {x[1]}%", round(x[2], 2), round(x[3], 2), round(x[4], 2)) for x in Out]
+    Out = ["\t".join([str(x) for x in lst]) for lst in Out]
+    Out = [f" Q\tGen\tHet\tHomo"] + Out
+    out_str = "\n".join(Out)
 
     # write to output
     sys.stderr.write(f"""
@@ -309,23 +299,15 @@ def main(args):
  -- SNPs/Kbp Statistics --
 
  S\tGen\tHet\tHomo
- Median\t{all_median}\t{het_median}\t{homo_median}
  Mean\t{all_mean}\t{het_mean}\t{homo_mean}
  Max\t{all_max}\t{het_max}\t{homo_max}
  Min\t{all_min}\t{het_min}\t{homo_min}
 
  -- SNPs/Kbp Quantiles --
 
- Q\tGen\tHet\tHomo
- 5%\t{round(All_quant["Snps"].loc[0.05], 1)}\t{round(Het_quant["Snps"].loc[0.05], 1)}\t{round(Homo_quant["Snps"].loc[0.05], 1)}
- 10%\t{round(All_quant["Snps"].loc[0.10], 1)}\t{round(Het_quant["Snps"].loc[0.10], 1)}\t{round(Homo_quant["Snps"].loc[0.10], 1)}
- 15%\t{round(All_quant["Snps"].loc[0.15], 1)}\t{round(Het_quant["Snps"].loc[0.15], 1)}\t{round(Homo_quant["Snps"].loc[0.15], 1)}
- 50%\t{round(All_quant["Snps"].loc[0.50], 1)}\t{round(Het_quant["Snps"].loc[0.50], 1)}\t{round(Homo_quant["Snps"].loc[0.50], 1)}
- 85%\t{round(All_quant["Snps"].loc[0.85], 1)}\t{round(Het_quant["Snps"].loc[0.85], 1)}\t{round(Homo_quant["Snps"].loc[0.85], 1)}
- 90%\t{round(All_quant["Snps"].loc[0.90], 1)}\t{round(Het_quant["Snps"].loc[0.90], 1)}\t{round(Homo_quant["Snps"].loc[0.90], 1)}
- 95%\t{round(All_quant["Snps"].loc[0.95], 1)}\t{round(Het_quant["Snps"].loc[0.95], 1)}\t{round(Homo_quant["Snps"].loc[0.95], 1)}
+{out_str}
 
-""")
+ """)
 
 if __name__ == "__main__":
     main(args)
