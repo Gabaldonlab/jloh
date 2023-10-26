@@ -43,6 +43,7 @@ jloh filter --loh <LOH.tsv> [options]
 
 [I/O/E]
 --loh               TSV file produced by "jloh extract"                         [!]
+--bed               Emit intervals also in BED file with this name              [off]
 
 [basic filters]
 --length            Min. LOH length                                             [off]
@@ -67,6 +68,7 @@ jloh filter --loh <LOH.tsv> [options]
 p = ap.ArgumentParser()
 # input and output
 p.add_argument("--loh", required=True)
+p.add_argument("--bed", type=str)
 # basic filters
 p.add_argument("--length", default=0, type=int)
 p.add_argument("--alleles", nargs="*", default="ALL")
@@ -134,8 +136,8 @@ def filter_by_coverage(args, df):
     Keep only blocks with at least a certain coverage
     """
 
-    df["Cov"] = df["Cov"].str.replace("x", "")
-    df["Cov"] = pd.to_numeric(df["Cov"])
+    df.loc[:,"Cov"] = df.loc[:,"Cov"].str.replace("x", "")
+    df.loc[:,"Cov"] = pd.to_numeric(df.loc[:,"Cov"])
     df = df.loc[ df["Cov"] >= args.coverage, : ]
 
     return df
@@ -257,13 +259,16 @@ def main(args):
 
     df = pd.read_csv(args.loh, comment="@", sep="\t")
     df = df.fillna("NA")
-    # df.columns[0] = "Chrom"
     df = apply_basic_filters(args, df)
     df = apply_snp_filters(args, df)
-    # df.columns[0] = "#Chrom"
-    # sys.stdout.write(df)
-    # sys.stdout.write("\n")
+
     df.to_csv(sys.stdout, sep="\t", header=True, index=False)
+
+    if args.bed:
+        df_bed = df.loc[:,["#Chrom", "Start", "End"]].copy()
+        df_bed["Start"] = df_bed["Start"].apply(lambda x : max(0, x-1))
+        df_bed.to_csv(args.bed, sep="\t", header=False, index=False)
+
 
 if __name__ == "__main__":
     main(args)
