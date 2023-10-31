@@ -7,24 +7,24 @@
 
 *[Still the one from the block](https://www.youtube.com/watch?v=dly6p4Fu5TE)*
 
-# What is JLOH?
+## What is JLOH?
 
 JLOH is a tool to extract, filter, and analyse loss of heterozygosity (LOH) blocks based on single-nucleotide polymorphisms (SNPs), read mapping information, and a reference genome sequence.
 
-## Warning 
+### Warning 
 
 JLOH is made to assess LOH in genomes with at least 1% heterozygosity between their homolog chromosomes (or subgenomes, if hybrids). As of now, it isn't suitable for cancer data setups. 
 
 As of September 2023, this is just a landing page. Read the full documentation on [jloh.readthedocs.io](http://jloh.readthedocs.io).
 
-# What input does it need?
+## What input does it need?
 
 JLOH only needs three file types as input: 
 - **VCF** file with called heterozygous and homozygous SNPs 
 - **BAM/SAM** file with read mapping results, from which the variants were called
 - **FASTA** file with a reference genome sequence where reads were mapped to get the BAM and VCF files
 
-# I have a hybrid, does it work with it?
+## I have a hybrid, does it work with it?
 
 Yes, it does. The extraction module `jloh extract` can work with reads from a hybrid species mapped onto the hybrid's reference genome. See more about it on [jloh.readthedocs.io](http://jloh.readthedocs.io). 
 
