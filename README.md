@@ -11,6 +11,8 @@
 
 JLOH is a tool to extract, filter, and analyse loss of heterozygosity (LOH) blocks based on single-nucleotide polymorphisms (SNPs), read mapping information, and a reference genome sequence.
 
+*WARNING*: JLOH is made to assess LOH in genomes with at least 1% heterozygosity between their homolog chromosomes (or subgenomes, if hybrids). As of now, it isn't suitable for cancer data setups. 
+
 As of September 2023, this is just a landing page. Read the full documentation on [jloh.readthedocs.io](http://jloh.readthedocs.io).
 
 ### What input does it need?
