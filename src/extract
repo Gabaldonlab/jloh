@@ -979,7 +979,7 @@ def assess_coverage(args, Chrom_bams, ref, bt, handle):
     ###
     v2
     Author: Matteo Schiavinato
-    Last change: 28/09/2022
+    Last change: 23/10/2023 
     """
 
     # get coverage of each chromosome independently

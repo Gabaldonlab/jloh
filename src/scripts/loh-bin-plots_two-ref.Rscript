@@ -11,6 +11,8 @@ library(scales)
 
 })
 
+options(bitmapType='cairo')
+
 args <- commandArgs(trailingOnly=T)
 infile <- args[1]
 outdir <- args[2]
