@@ -92,6 +92,10 @@ def hetero_and_homo_snps(vcf):
         values = lst[9].split(":")
         dict = { annotations[i]:values[i] for i in range(0, len(annotations)) }
 
+        # Manage phased genotypes
+        if dict["GT"][1] == "|":
+            dict["GT"] = dict["GT"].replace("|", "/")
+
         # if it's a single heterozygous SNP
         if ((len(lst[3]) == len(lst[4]) == 1) and (dict["GT"]=="0/1")):
 
