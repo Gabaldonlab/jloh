@@ -73,6 +73,9 @@ RUN cd /root/src \
     && git clone -b v1.0.3 https://github.com/Gabaldonlab/jloh.git \
     && ln -s /root/src/jloh/jloh /usr/bin
 
+#Change permissions making Docker to Singularity/Apptainer conversions usable
+RUN chmod 755 /root
+
 #Purge unnecessary dependencies
 RUN apt purge -y git make g++ zlib1g-dev python3-pip automake wget curl make zlib1g-dev libbz2-dev libncurses5-dev libncursesw5-dev liblzma-dev libzstd-dev libreadline6-dev libxt-dev \
     && rm -rf /var/lib/apt/lists/*
