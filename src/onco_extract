@@ -53,8 +53,8 @@ jloh onco_extract --vcf <VCF> --ref <FASTA> --bam <BAM> [options]
 --ref               Reference FASTA genome                                           [!]                     
 
 [variants]
---max-dist          Maximum distance (bp) to retain
---filter-VCF        "pass" to keep only PASS variants, "all" to keep everything      [all]
+--max-dist          Maximum distance (bp) to retain                                  [1000]
+--filter-mode       "pass" to keep only PASS variants, "all" to keep everything      [all]
 --min-af            Min. allele frequency to consider a variant heterozygous         [0.25]
 --max-af            Max. . . . . . . . . . . . . . . . . . . . . . . . . . .         [0.75]
 
@@ -71,7 +71,7 @@ jloh onco_extract --vcf <VCF> --ref <FASTA> --bam <BAM> [options]
                      
 [I/O/E]
 --sample            Sample name for output files                                     [exp]
---output-dir        Output directory                                                 [onco_jloh_out]
+--output-dir        Output directory                                                 [oncojloh]
 
 """)
     sys.exit(0)
@@ -90,15 +90,15 @@ p.add_argument("--bam",help="Give as an input a BAM/SAM file to be parsed", type
 
 
 # I/O/E
-p.add_argument("-o", "--output", help="Specify the output file path", type=str, default="exp")
-p.add_argument("--output-dir", help="Specify the output directory path", type=str, default="onco_JLOH_out")
+p.add_argument("-s", "--sample", help="Sample name for output files", type=str, default="exp")
+p.add_argument("--output-dir", help="Specify the output directory path", type=str, default="oncojloh")
 
 
 # parameters
 p.add_argument("--min-af", default=0.25, type=float)
 p.add_argument("--max-af", default=0.75, type=float)
 p.add_argument("--threads", default=4, type=int)
-p.add_argument("--filter-VCF", help="Specify to select those variants with filter annotation == PASS", type=bool, default=False)
+p.add_argument("--filter-mode", help="Specify to select those variants with filter annotation == PASS", type=bool, default=False)
 p.add_argument("--min_length", default=100, type=int)
 p.add_argument("--min_snps", default=2, type=int)
 p.add_argument("--min_snps_het", default=4, type=int)
@@ -182,7 +182,7 @@ def extract_variants(vcf_input, vcf_output, min_af, max_af, dir, name):
     writer_homo=vcfpy.Writer.from_path(homo_vcf_output, vcf.header)
     for record in vcf:
         if record.is_snv(): #this will filter only REAL SNV
-            if args.filter_VCF: #filter-vcf is provided by the user
+            if args.filter_mode: #filter-vcf is provided by the user
                  if "PASS" in record.FILTER:  # Check if FILTER annotation is "PASS"
                     af_values = record.calls[0].data.get("AF", [])  # Get AF values, obtain an empty value if its not available (debugging)
                     if af_values and max_af > af_values[0] > min_af:  #default: max=0.9 and min=0.1                  
@@ -281,7 +281,7 @@ def split_bam_by_chromosome(bam, genome_file, tmp_bams, args):
 
 def calculate_chrom_densities_snp_kbp(ref, variant,vcf, output_name):
     #determine SNP count and chromosome lengths
-    hetero_vcf, homo_vcf, hetero_lines, homo_lines= extract_variants(vcf, args.output, args.min_af, args.max_af, args.output_dir, output_name)
+    hetero_vcf, homo_vcf, hetero_lines, homo_lines= extract_variants(vcf, args.sample, args.min_af, args.max_af, args.output_dir, output_name)
 
     Chrom_lengths = parse_chromosomes(ref) #this returns the file of the chr
     chrom_list=list(Chrom_lengths.keys())[:25] #chr1-22 + Mit + sexual chr
@@ -809,7 +809,7 @@ def assess_coverage(args, Chrom_bams, genome_file, Homo_blocks, sample):
         Chrom_covs[chrom]=avg_cov
 
     #creating a TSV with each chromosome coverage
-    OUT = open(f"{args.output_dir}/{args.output}{sample}.chrom_coverage.tsv", "w")
+    OUT = open(f"{args.output_dir}/{args.sample}{sample}.chrom_coverage.tsv", "w")
     for chr in Chrom_covs:
         OUT.write(f"{chr}\t{Chrom_covs[chr]}\n")
     OUT.close()
@@ -889,8 +889,8 @@ def run_in_default_mode(args, tmp_bams, tmp_bams_tumor):
 
     # Extract
     sys.stderr.write(  f"[{at()}] Extracting heterozygous and homozygous SNPs...\n")
-    hetero_vcf_control, homo_vcf_control, hetero_lines_control, homo_lines_control=extract_variants(args.vcfs[0], args.output, args.min_af, args.max_af,args.output_dir, "_control")
-    hetero_vcf_tumor, homo_vcf_tumor, hetero_lines_tumor, homo_lines_tumor=extract_variants(args.vcfs[1], args.output, args.min_af, args.max_af,args.output_dir, "_tumor")
+    hetero_vcf_control, homo_vcf_control, hetero_lines_control, homo_lines_control=extract_variants(args.vcfs[0], args.sample, args.min_af, args.max_af,args.output_dir, "_control")
+    hetero_vcf_tumor, homo_vcf_tumor, hetero_lines_tumor, homo_lines_tumor=extract_variants(args.vcfs[1], args.sample, args.min_af, args.max_af,args.output_dir, "_tumor")
 
     sys.stderr.write(f" Control: Found {len(hetero_lines_control)} heterozygous SNPs and {len(homo_lines_control)} homozygous SNPs\n")
     sys.stderr.write(f" Tumor: Found {len(hetero_lines_tumor)} heterozygous SNPs and {len(homo_lines_tumor)} homozygous SNPs\n")
@@ -908,7 +908,7 @@ def run_in_default_mode(args, tmp_bams, tmp_bams_tumor):
     
     #Genome file for parse later chr lengths
     sys.stderr.write(  f"[{at()}] Creating genome file from reference genome's chromosome lengths...")
-    genome_file=f"{args.output_dir}/{args.output}.genome_file.tsv"
+    genome_file=f"{args.output_dir}/{args.sample}.genome_file.tsv"
     tmp=create_genome_file(args.ref, genome_file)
     sys.stderr.write( "Done\n")
     sys.stderr.write( f" -Genome file created succesfully\n")
@@ -1037,7 +1037,7 @@ def run_in_default_mode(args, tmp_bams, tmp_bams_tumor):
             items = str(line).split("\t") #separate each parameter
             f.write("\t".join(items[:3]) + "\n") #consider only the first three parameters: BED format
 
-    out_control = f"{args.output_dir}/{args.output}.LOH_blocks_control.tsv"
+    out_control = f"{args.output_dir}/{args.sample}.LOH_blocks_control.tsv"
     OUTPUT_c = open(out_control, "w")
     if args.regions:
         header = "chrom\tstart\tend\tavg_coverage\tcovered_fraction\tup_ratio\tdown_ratio\tzygosity\tlength\tblock_type\tHomo_snps\tHetero_snps\tGenes\n"
@@ -1065,7 +1065,7 @@ def run_in_default_mode(args, tmp_bams, tmp_bams_tumor):
         for line in LOH_tumor:
             items = str(line).split("\t") #separate each parameter
             f.write("\t".join(items[:3]) + "\n") #consider only the first three parameters: BED format
-    out_tumor = f"{args.output_dir}/{args.output}.LOH_blocks_tumor.tsv"
+    out_tumor = f"{args.output_dir}/{args.sample}.LOH_blocks_tumor.tsv"
     OUTPUT_t = open(out_tumor, "w")
     if args.regions:
         header = "chrom\tstart\tend\tavg_coverage\tcovered_fraction\tup_ratio\tdown_ratio\tzygosity\tlength\tblock_type\tHomo_snps\tHetero_snps\tGenes\n"
@@ -1100,7 +1100,7 @@ def run_in_default_mode(args, tmp_bams, tmp_bams_tumor):
             items = str(line).split("\t") #separate each parameter
             f.write("\t".join(items[:3]) + "\n") #consider only the first three parameters: BED format
 
-    out_final = f"{args.output_dir}/{args.output}.LOH_blocks_final.tsv"
+    out_final = f"{args.output_dir}/{args.sample}.LOH_blocks_final.tsv"
     OUTPUT_f = open(out_final, "w")
     if args.regions:
         header = "chrom\tstart\tend\tavg_coverage\tcovered_fraction\tup_ratio\tdown_ratio\tzygosity\tlength\tblock_type\tHomo_snps\tHetero_snps\tGenes\n"
@@ -1169,7 +1169,7 @@ def run_in_single_mode(args, tmp_bams, tmp_bams_control):
     
 
     sys.stderr.write(  f"[{at()}] Extracting heterozygous and homozygous SNPs...\n")
-    hetero_vcf, homo_vcf, hetero_lines, homo_lines=extract_variants(args.vcf, args.output, args.min_af, args.max_af,args.output_dir, "_tumor")
+    hetero_vcf, homo_vcf, hetero_lines, homo_lines=extract_variants(args.vcf, args.sample, args.min_af, args.max_af,args.output_dir, "_tumor")
     sys.stderr.write(f" -Found {len(hetero_lines)} heterozygous SNPs and {len(homo_lines)} homozygous SNPs\n")
 
     #divergence among different variants, based on SNP density
@@ -1182,7 +1182,7 @@ def run_in_single_mode(args, tmp_bams, tmp_bams_control):
 
     #Genome file for parse later chr lengths
     sys.stderr.write(  f"[{at()}] Creating genome file from reference genome's chromosome lengths...")
-    genome_file=f"{args.output_dir}/{args.output}.genome_file.tsv"
+    genome_file=f"{args.output_dir}/{args.sample}.genome_file.tsv"
     tmp=create_genome_file(args.ref, genome_file)
     sys.stderr.write( "Done\n")
     sys.stderr.write( f" -Genome file created succesfully\n")
@@ -1260,7 +1260,7 @@ def run_in_single_mode(args, tmp_bams, tmp_bams_control):
             f.write("\t".join(items[:3]) + "\n") #consider only the first three parameters: BED format
             
     sys.stderr.write(f"[{at()}] Writing to output...\n")
-    out = f"{args.output_dir}/{args.output}.LOH_blocks.tsv"
+    out = f"{args.output_dir}/{args.sample}.LOH_blocks.tsv"
     OUTPUT = open(out, "w")
     if args.regions:
         header = "chrom\tstart\tend\tavg_coverage\tcovered_fraction\tup_ratio\tdown_ratio\tzygosity\tlength\tblock_type\tHomo_snps\tHetero_snps\tGenes\n"

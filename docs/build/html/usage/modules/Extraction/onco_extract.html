@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>jloh extract &mdash; jloh 1.1.0 documentation</title>
+  <title>jloh onco_extract &mdash; jloh 1.1.0 documentation</title>
       <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -19,8 +19,8 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="jloh onco_extract" href="onco_extract.html" />
-    <link rel="prev" title="jloh g2g" href="g2g.html" /> 
+    <link rel="next" title="jloh filter" href="../Operations/filter.html" />
+    <link rel="prev" title="jloh extract" href="extract.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -56,13 +56,15 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="stats.html">jloh stats</a></li>
 <li class="toctree-l1"><a class="reference internal" href="g2g.html">jloh g2g</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">jloh extract</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="extract.html">jloh extract</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">jloh onco_extract</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#description">Description</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#usage">Usage</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#parameters">Parameters</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#default-mode">Default mode</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#assign-blocks-mode-hybrids">Assign-blocks mode (hybrids)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#single-sample-mode">Single sample mode</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#common-parameters">Common Parameters</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#input-output">Input/Output</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#variants">Variants</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#blocks">Blocks</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#misc">Misc</a></li>
@@ -72,7 +74,6 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="onco_extract.html">jloh onco_extract</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Operations tools</span></p>
 <ul>
@@ -105,9 +106,9 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">jloh extract</li>
+      <li class="breadcrumb-item active">jloh onco_extract</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../../../_sources/usage/modules/Extraction/extract.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../../../_sources/usage/modules/Extraction/onco_extract.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -115,19 +116,19 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="jloh-extract">
-<span id="id1"></span><h1>jloh extract<a class="headerlink" href="#jloh-extract" title="Link to this heading"></a></h1>
+  <section id="jloh-onco-extract">
+<span id="id1"></span><h1>jloh onco_extract<a class="headerlink" href="#jloh-onco-extract" title="Link to this heading"></a></h1>
 <section id="description">
 <h2>Description<a class="headerlink" href="#description" title="Link to this heading"></a></h2>
-<p>Extract candidate LOH blocks from single-nucleotide polymorphisms (SNPs) called from reads mapped onto a reference genome. Alternatively, from reads derived from a hybrid mapped onto its parental genomes (at least one).</p>
+<p>Extract candidate LOH blocks from single-nucleotide polymorphisms (SNPs) called from reads mapped onto a reference genome using cancer data. Data may be a single set of BAM+VCF or a matched tumor/normal pair (recommended).</p>
 </section>
 <section id="usage">
 <h2>Usage<a class="headerlink" href="#usage" title="Link to this heading"></a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>extract<span class="w"> </span>--vcf<span class="w"> </span>&lt;VCF&gt;<span class="w"> </span>--ref<span class="w"> </span>&lt;FASTA&gt;<span class="w"> </span>--bam<span class="w"> </span>&lt;BAM&gt;<span class="w"> </span><span class="o">[</span>options<span class="o">]</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>onco_extract<span class="w"> </span>--vcfs<span class="w"> </span>&lt;VCF_control&gt;<span class="w"> </span>&lt;VCF_tumor&gt;<span class="w"> </span>--ref<span class="w"> </span>&lt;FASTA&gt;<span class="w"> </span>--bams<span class="w"> </span>&lt;BAM_control&gt;<span class="w"> </span>&lt;BAM_tumor&gt;<span class="w"> </span><span class="o">[</span>options<span class="o">]</span>
 </pre></div>
 </div>
-<p>Or, if using <code class="docutils literal notranslate"><span class="pre">--assign-blocks</span></code>:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>extract<span class="w"> </span>--assign-blocks<span class="w"> </span>--vcfs<span class="w"> </span><span class="o">[</span>&lt;PATH_1&gt;<span class="w"> </span>&lt;PATH_2&gt;<span class="o">]</span><span class="w"> </span>--refs<span class="w"> </span><span class="o">[</span>&lt;PATH_1&gt;<span class="w"> </span>&lt;PATH_2&gt;<span class="o">]</span><span class="w"> </span>--bams<span class="w"> </span><span class="o">[</span>&lt;PATH_1&gt;<span class="w"> </span>&lt;PATH_2&gt;<span class="o">]</span><span class="w"> </span><span class="o">[</span>options<span class="o">]</span>
+<p>Or, if using <code class="docutils literal notranslate"><span class="pre">--single-mode</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>onco_extract<span class="w"> </span>--vcf<span class="w"> </span>&lt;VCF&gt;<span class="w"> </span>--ref<span class="w"> </span>&lt;FASTA&gt;<span class="w"> </span>--bam<span class="w"> </span>&lt;BAM&gt;<span class="w"> </span><span class="o">[</span>options<span class="o">]</span>
 </pre></div>
 </div>
 </section>
@@ -137,14 +138,14 @@
 <h3>Default mode<a class="headerlink" href="#default-mode" title="Link to this heading"></a></h3>
 <dl class="py function">
 <dt class="sig sig-object py">
-<span class="sig-name descname"><span class="pre">--vcf</span> <span class="pre">&lt;PATH&gt;</span></span></dt>
-<dd><p>VCF file containing single-nucleotide polymorphisms (SNPs).</p>
+<span class="sig-name descname"><span class="pre">--vcfs</span> <span class="pre">[&lt;PATH_1&gt;</span> <span class="pre">&lt;PATH_2&gt;]</span></span></dt>
+<dd><p>VCF files (space-separated) from control &amp; tumor, in this order.</p>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py">
-<span class="sig-name descname"><span class="pre">--bam</span> <span class="pre">&lt;PATH&gt;</span></span></dt>
-<dd><p>BAM file containing read mapping records.</p>
+<span class="sig-name descname"><span class="pre">--bams</span> <span class="pre">[&lt;PATH_1&gt;</span> <span class="pre">&lt;PATH_2&gt;]</span></span></dt>
+<dd><p>BAM files from used to call the –vcfs (space-separated).</p>
 </dd></dl>
 
 <dl class="py function">
@@ -154,41 +155,62 @@
 </dd></dl>
 
 </section>
-<section id="assign-blocks-mode-hybrids">
-<h3>Assign-blocks mode (hybrids)<a class="headerlink" href="#assign-blocks-mode-hybrids" title="Link to this heading"></a></h3>
+<section id="single-sample-mode">
+<h3>Single sample mode<a class="headerlink" href="#single-sample-mode" title="Link to this heading"></a></h3>
 <dl class="py function">
 <dt class="sig sig-object py">
-<span class="sig-name descname"><span class="pre">--assign-blocks</span></span></dt>
+<span class="sig-name descname"><span class="pre">--single-mode</span></span></dt>
 <dd><p>Activate block assignment mode.</p>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py">
-<span class="sig-name descname"><span class="pre">--vcfs</span> <span class="pre">[&lt;PATH_1&gt;</span> <span class="pre">&lt;PATH_2&gt;]</span></span></dt>
+<span class="sig-name descname"><span class="pre">--vcf</span> <span class="pre">&lt;PATH_1&gt;</span></span></dt>
 <dd><p>VCF file containing single-nucleotide polymorphisms (SNPs).</p>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py">
-<span class="sig-name descname"><span class="pre">--bams</span> <span class="pre">[&lt;PATH_1&gt;</span> <span class="pre">&lt;PATH_2&gt;]</span></span></dt>
+<span class="sig-name descname"><span class="pre">--bam</span> <span class="pre">&lt;PATH_1&gt;</span></span></dt>
 <dd><p>BAM file containing read mapping records.</p>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py">
-<span class="sig-name descname"><span class="pre">--refs</span> <span class="pre">[&lt;PATH_1&gt;</span> <span class="pre">&lt;PATH_2&gt;]</span></span></dt>
+<span class="sig-name descname"><span class="pre">--refs</span> <span class="pre">&lt;PATH_1&gt;</span></span></dt>
 <dd><p>FASTA file where reads were mapped.</p>
 </dd></dl>
 
 </section>
 <section id="common-parameters">
 <h3>Common Parameters<a class="headerlink" href="#common-parameters" title="Link to this heading"></a></h3>
+<section id="input-output">
+<h4>Input/Output<a class="headerlink" href="#input-output" title="Link to this heading"></a></h4>
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--sample</span> <span class="pre">&lt;STR&gt;</span></span></dt>
+<dd><p>Sample name for output files.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--output-dir</span> <span class="pre">&lt;PATH&gt;</span></span></dt>
+<dd><p>Path to an output directory (created if not existing)</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--regions</span> <span class="pre">&lt;PATH&gt;</span></span></dt>
+<dd><p>Path to a BED file with regions of interest. The BED file <strong>must</strong> contain 4 columns: chromosome, start position, end position, and annotation. Annotation may be anything (gene name, transcript name, exon name, locus) as long as it is an alphanumeric string.</p>
+</dd></dl>
+
+</section>
 <section id="variants">
 <h4>Variants<a class="headerlink" href="#variants" title="Link to this heading"></a></h4>
 <dl class="py function">
 <dt class="sig sig-object py">
-<span class="sig-name descname"><span class="pre">--min-snps-kbp</span> <span class="pre">[&lt;INT&gt;,&lt;INT&gt;]</span></span></dt>
-<dd><p>Comma-separated set of two integer values defining heterozygous and homozygous minimum SNPs/kbp densities. See details at <a class="reference internal" href="../../model_snp_density.html#model-snp-density"><span class="std std-ref">Modelling SNP density</span></a>.</p>
+<span class="sig-name descname"><span class="pre">--max-dist</span> <span class="pre">&lt;INT&gt;</span></span></dt>
+<dd><p>Maximum distance allowed between SNPs for them to still be retained within the same homozygous / heterozygous block.</p>
 </dd></dl>
 
 <dl class="py function">
@@ -220,8 +242,14 @@
 
 <dl class="py function">
 <dt class="sig sig-object py">
-<span class="sig-name descname"><span class="pre">--coarseness</span> <span class="pre">&lt;INT&gt;</span></span></dt>
-<dd><p>Minimum length of initial building blocks that are used to define LOH blocks (i.e. nothing shorter than this will be considered an interesting interval).</p>
+<span class="sig-name descname"><span class="pre">--min-snps</span> <span class="pre">&lt;INT&gt;</span></span></dt>
+<dd><p>Minimum number of homozygous SNPs to consider a block in the final results. Homozygous SNPs are an indicator of LOH when a paired normal sample is present.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">--min-snps-het</span> <span class="pre">&lt;INT&gt;</span></span></dt>
+<dd><p>Minimum number of heterozygous SNPs to discard a block in the final results.</p>
 </dd></dl>
 
 <dl class="py function">
@@ -290,8 +318,8 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="g2g.html" class="btn btn-neutral float-left" title="jloh g2g" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="onco_extract.html" class="btn btn-neutral float-right" title="jloh onco_extract" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="extract.html" class="btn btn-neutral float-left" title="jloh extract" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../Operations/filter.html" class="btn btn-neutral float-right" title="jloh filter" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

@@ -7,9 +7,9 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'jloh'
-copyright = '2023, Matteo Schiavinato'
-author = 'Matteo Schiavinato'
-release = '1.0.0'
+copyright = '2024, Matteo Schiavinato'
+author = 'Matteo Schiavinato, Manuel Ramos'
+release = '1.1.0'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

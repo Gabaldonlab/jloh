@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quick start &mdash; jloh 1.1.0 documentation</title>
+  <title>Working with cancer data &mdash; jloh 1.1.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -19,8 +19,8 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Run JLOH with a test dataset" href="run_test_data.html" />
-    <link rel="prev" title="Installation" href="installation.html" /> 
+    <link rel="next" title="Hybrids with only one known parental" href="one_parent.html" />
+    <link rel="prev" title="Working with hybrids" href="hybrid_wf.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -45,16 +45,11 @@
               <p class="caption" role="heading"><span class="caption-text">Get started</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Quick start</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#requirements">Requirements</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#calculating-snp-density">Calculating SNP density</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#extracting-blocks">Extracting blocks</a></li>
-</ul>
-</li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick start</a></li>
 <li class="toctree-l1"><a class="reference internal" href="run_test_data.html">Run JLOH with a test dataset</a></li>
 <li class="toctree-l1"><a class="reference internal" href="model_snp_density.html">Modelling SNP density</a></li>
 <li class="toctree-l1"><a class="reference internal" href="hybrid_wf.html">Working with hybrids</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cancer_wf.html">Working with cancer data</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Working with cancer data</a></li>
 <li class="toctree-l1"><a class="reference internal" href="one_parent.html">Hybrids with only one known parental</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Extraction tools</span></p>
@@ -95,9 +90,9 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Quick start</li>
+      <li class="breadcrumb-item active">Working with cancer data</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../_sources/usage/quickstart.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../_sources/usage/cancer_wf.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -105,64 +100,17 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="quick-start">
-<span id="quickstart"></span><h1>Quick start<a class="headerlink" href="#quick-start" title="Link to this heading"></a></h1>
-<p>If you’re in a hurry and can’t read too much documentation, here’s a quick way to use JLOH with commonly available files derived from NGS data analysis. If, instead, you’re working with a hybrid organism, make sure you read this section: <a class="reference internal" href="hybrid_wf.html#hybrid-wf"><span class="std std-ref">Working with hybrids</span></a>.</p>
-<section id="requirements">
-<h2>Requirements<a class="headerlink" href="#requirements" title="Link to this heading"></a></h2>
-<p>JLOH is built to work as an addition to any common <strong>variant calling</strong> pipeline. These pipelines are based on two steps: 1) read mapping and 2) variant calling. Regardless of the tool used to map the reads, the most common alignment format is the SAM format (or its binary version BAM). In the calling step, regardless of the tool used to call variants the output is most often in VCF format.</p>
-<p>These are the files you need as input to infer LOH blocks.</p>
-<table class="docutils align-default">
-<thead>
-<tr class="row-odd"><th class="head"><p>File type</p></th>
-<th class="head"><p>Description</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p>FASTA</p></td>
-<td><p>The reference genome sequence where you map your genomic reads.</p></td>
-</tr>
-<tr class="row-odd"><td><p>BAM</p></td>
-<td><p>The output of the mapping step.</p></td>
-</tr>
-<tr class="row-even"><td><p>VCF</p></td>
-<td><p>The file containing all the single-nucleotide polymorphisms (SNPs) called from the BAM file onto the FASTA file.</p></td>
-</tr>
-</tbody>
-</table>
-<p>These three files will highlight the positions in which the genotype represented from the <strong>reads</strong> has lost heterozygosity when compared to the genotype represented by the <strong>reference</strong>.</p>
-</section>
-<section id="calculating-snp-density">
-<h2>Calculating SNP density<a class="headerlink" href="#calculating-snp-density" title="Link to this heading"></a></h2>
-<p>This is done with <a class="reference internal" href="modules/Extraction/stats.html#jloh-stats"><span class="std std-ref">jloh stats</span></a>, for details see <a class="reference internal" href="model_snp_density.html#model-snp-density"><span class="std std-ref">Modelling SNP density</span></a>. Run the command:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>stats<span class="w"> </span>--vcf<span class="w"> </span>my_variants.vcf
-</pre></div>
-</div>
-<p>And choose the thresholds of SNP density for heterozygous and homozygous SNPs.</p>
-</section>
-<section id="extracting-blocks">
-<h2>Extracting blocks<a class="headerlink" href="#extracting-blocks" title="Link to this heading"></a></h2>
-<p>The second step is the inference of LOH blocks. This step is done with <code class="docutils literal notranslate"><span class="pre">jloh</span> <span class="pre">extract</span></code>. At the very minimum, the program requires these parameters:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>jloh<span class="w"> </span>extract<span class="w"> </span>--vcf<span class="w"> </span>my_variants.vcf<span class="w"> </span>--bam<span class="w"> </span>my_mappings.bam<span class="w"> </span>--ref<span class="w"> </span>my_reference_genome.fasta
-</pre></div>
-</div>
-<p>Besides the three input parameters, we encourage you to set at least two other parameters, even though they have default values:</p>
-<blockquote>
-<div><ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">--min-snps-kbp</span> <span class="pre">&lt;N,N&gt;</span></code>: heterozygous/homozygous minimum SNP/kbp densities to label a region as heterozygous/homozygous</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">--threads</span></code>: number of parallel operations</p></li>
-</ul>
-</div></blockquote>
-<p>Among the output files, there is also a table with the inferred LOH blocks which will end with <code class="docutils literal notranslate"><span class="pre">*LOH_blocks.tsv</span></code>. This is the main output of the program.</p>
-</section>
+  <section id="working-with-cancer-data">
+<span id="cancer-wf"></span><h1>Working with cancer data<a class="headerlink" href="#working-with-cancer-data" title="Link to this heading"></a></h1>
+<p>(work in progress)</p>
 </section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="installation.html" class="btn btn-neutral float-left" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="run_test_data.html" class="btn btn-neutral float-right" title="Run JLOH with a test dataset" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="hybrid_wf.html" class="btn btn-neutral float-left" title="Working with hybrids" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="one_parent.html" class="btn btn-neutral float-right" title="Hybrids with only one known parental" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
