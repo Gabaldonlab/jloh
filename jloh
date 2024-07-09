@@ -42,7 +42,7 @@ if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
     2023 
     contact: matteo.schiavinato.90@gmail.com
 
-    v1.0.2
+    v1.1.0
 
     ####
 
@@ -50,6 +50,7 @@ if (sys.argv[1] in ["--help", "-h", "-help", "help", "getopt", "usage"]):
     stats               Estimate heterozygous and homozygous SNP statistics
     g2g                 Align two genomes to find regions that should carry SNPs
     extract             Extract LOH blocks from VCF, BAM and FASTA files
+    onco_extract        Extract LOH blocks from VCF, BAM and FASTA files in a tumor context
 
  -- Operations
     filter              Filter extracted LOH blocks
