@@ -42,7 +42,7 @@ RUN cd /usr/bin \
 
 ##Install and upgrade python dependencies with pip
 RUN python3 -m pip install --upgrade pip \
-    && pip3 install --upgrade numpy pysam biopython pandas pandarallel pybedtools
+    && pip3 install --upgrade numpy pysam biopython pandas pandarallel pybedtools vcfpy psutil
 
 ##Git clone hisat2 and all2vcf
 RUN mkdir -p /root/src \
