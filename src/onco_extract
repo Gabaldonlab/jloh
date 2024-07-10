@@ -898,8 +898,8 @@ def run_in_default_mode(args, tmp_bams, tmp_bams_tumor):
     #divergence among different variants, based on SNP density
     sys.stderr.write(  f"[{at()}]Calculating heterozygous and homozygous SNPs densities...")
 
-    hetero_div_control, homo_div_control=hetero_and_homo_snp_densities(args.ref, args.vcfs[0], "control")
-    hetero_div_tumor, homo_div_tumor=hetero_and_homo_snp_densities(args.ref, args.vcfs[1], "tumor")
+    hetero_div_control, homo_div_control=hetero_and_homo_snp_densities(args.ref, args.vcfs[0], "_control")
+    hetero_div_tumor, homo_div_tumor=hetero_and_homo_snp_densities(args.ref, args.vcfs[1], "_tumor")
     sys.stderr.write(  "Done\n")
     sys.stderr.write(f" Control: \n -Avg. heterozygous SNPs density: {hetero_div_control} SNPs/Kbps\n"
                     f"  -Avg. homozygous SNPs density: {homo_div_control} SNPs/Kbps \n\n")
@@ -1175,7 +1175,7 @@ def run_in_single_mode(args, tmp_bams, tmp_bams_control):
     #divergence among different variants, based on SNP density
     sys.stderr.write(  f"[{at()}]Calculating heterozygous and homozygous SNPs densities...")
 
-    hetero_div, homo_div=hetero_and_homo_snp_densities(args.ref, args.vcf, "tumor")
+    hetero_div, homo_div=hetero_and_homo_snp_densities(args.ref, args.vcf, "_tumor")
     sys.stderr.write(  "Done\n")
     sys.stderr.write(f" -Avg. heterozygous SNPs density: {hetero_div} SNPs/Kbps\n"
                     f" -Avg. homozygous SNPs density: {homo_div} SNPs/Kbps \n\n")
