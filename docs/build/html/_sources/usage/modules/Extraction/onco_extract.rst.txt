@@ -1,4 +1,4 @@
-.. _jloh-onco_extract:
+.. _onco_extract:
 
 jloh onco_extract
 =================

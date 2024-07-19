@@ -49,7 +49,17 @@
 <li class="toctree-l1"><a class="reference internal" href="run_test_data.html">Run JLOH with a test dataset</a></li>
 <li class="toctree-l1"><a class="reference internal" href="model_snp_density.html">Modelling SNP density</a></li>
 <li class="toctree-l1"><a class="reference internal" href="hybrid_wf.html">Working with hybrids</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Working with cancer data</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Working with cancer data</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#remove-secondary-alignments">Remove secondary alignments</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#call-variants">Call variants</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#add-allele-frequency-if-missing">Add allele frequency if missing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#infer-loh-blocks-in-cancer-datasets">Infer LOH blocks in cancer datasets</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#infer-blocks-with-matched-tumor-normal-pairs">Infer blocks with matched tumor/normal pairs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#infer-blocks-with-only-a-tumor-sample">Infer blocks with only a tumor sample</a></li>
+</ul>
+</li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="one_parent.html">Hybrids with only one known parental</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Extraction tools</span></p>
@@ -102,7 +112,77 @@
              
   <section id="working-with-cancer-data">
 <span id="cancer-wf"></span><h1>Working with cancer data<a class="headerlink" href="#working-with-cancer-data" title="Link to this heading"></a></h1>
-<p>(work in progress)</p>
+<p>Another area of research in which LOH has been extensively studied is cancer. Cancer cells exhibit several mutations and events altering its heterozygous levels, including LOH, which contributes to tumor progression and resistance to treatment.</p>
+<img alt="../_images/cancer.png" src="../_images/cancer.png" />
+<p>During this section, we guide you through the necessary steps to obtain successful LOH block interference with cancer datasets.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>If you are working with a tumoral sample that has no matching control, you may follow these guidelines but apply them only to the tumoral sample you have. A distinction in workflow will appear only at the level of running Jloh.</p>
+</div>
+<section id="remove-secondary-alignments">
+<h2>Remove secondary alignments<a class="headerlink" href="#remove-secondary-alignments" title="Link to this heading"></a></h2>
+<p>Most mappers will return more than one mapping location for each read in the output SAM file. Each read derives from a fragment of DNA, and therefore belongs to a unique spot in the genome, not plenty. It is therefore important to remove secondary alignments and keep only the best one in order to avoid coverage inflation and false SNP detection.
+To do so, simply use <cite>samtools &lt;http://www.htslib.org/download/&gt;</cite> and its view module, removing records with the “secondary” bitwise flag (-F 0x0100) and those with the “unmapped” bitwise flag to save disk space (-F 0x4). Here in the example, we’re taking advantage of multithreading (-&#64; 20). We’re also piping the view command to the sort command to sort the output BAM directly by genome coordinate.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">samtools</span> <span class="n">view</span> <span class="o">-@</span> <span class="mi">20</span> <span class="o">-</span><span class="n">h</span> <span class="o">-</span><span class="n">b</span> <span class="o">-</span><span class="n">F</span> <span class="mh">0x0100</span> <span class="o">-</span><span class="n">F</span> <span class="mh">0x4</span> <span class="n">my_alignment</span><span class="o">.</span><span class="n">sam</span> <span class="o">|</span> \
+<span class="n">samtools</span> <span class="n">sort</span> <span class="o">-@</span> <span class="mi">20</span> \
+<span class="o">&gt;</span> <span class="n">my_filtered_alignment</span><span class="o">.</span><span class="n">bam</span>
+</pre></div>
+</div>
+<p>Repeat this operation for both alignments (control and tumoral sample) of the same individual.</p>
+</section>
+<section id="call-variants">
+<h2>Call variants<a class="headerlink" href="#call-variants" title="Link to this heading"></a></h2>
+<p>The variant calling procedure does not need any significant retouch and can be performed any way the user wants, as long as it produces a VCF file that contains both homozygous and heterozygous SNPs at somatic level.</p>
+<p>Some users perform variant calling combining <cite>bcftools &lt;http://www.htslib.org/download/&gt;</cite> mpileup and call. Other users prefer the <cite>GATK &lt;https://gatk.broadinstitute.org/hc/en-us&gt;</cite> pipeline.</p>
+</section>
+<section id="add-allele-frequency-if-missing">
+<h2>Add allele frequency if missing<a class="headerlink" href="#add-allele-frequency-if-missing" title="Link to this heading"></a></h2>
+<p>A final, crucial step before running “onco_extract” is to possess allele frequency (AF) as an annotation in the VCF file in the FORMAT field. This can be done manually with simple scripts but we suggest doing it with <cite>all2vcf &lt;https://github.com/MatteoSchiavinato/all2vcf&gt;</cite>, which has a module called frequency taking care of that exactly. A distribution of <cite>all2vcf &lt;https://github.com/MatteoSchiavinato/all2vcf&gt;</cite> is already included with JLOH (src/all2vcf).</p>
+<p>Once your VCF files contain the AF annotation in the FORMAT field, they’re good to go for running JLOH “onco_extract”.</p>
+</section>
+<section id="infer-loh-blocks-in-cancer-datasets">
+<h2>Infer LOH blocks in cancer datasets<a class="headerlink" href="#infer-loh-blocks-in-cancer-datasets" title="Link to this heading"></a></h2>
+<p>This step is performed by jloh <a class="reference internal" href="modules/Extraction/onco_extract.html#onco-extract"><span class="std std-ref">jloh onco_extract</span></a>. Differently from the default program setup described in <a class="reference internal" href="quickstart.html#quickstart"><span class="std std-ref">Quick start</span></a> and <a class="reference internal" href="run_test_data.html#test-data"><span class="std std-ref">Run JLOH with a test dataset</span></a>, when working with cancer datasets this module is used instead of the extract module.</p>
+<section id="infer-blocks-with-matched-tumor-normal-pairs">
+<h3>Infer blocks with matched tumor/normal pairs<a class="headerlink" href="#infer-blocks-with-matched-tumor-normal-pairs" title="Link to this heading"></a></h3>
+<p>The user will be asked to provide the reference genome (<cite>–ref</cite>), two BAM files (<cite>–bams</cite>) and two VCF files (<cite>–vcfs</cite>) from the paired sample (control, tumor in this order). These are the files you generated in the step above, following this guide.</p>
+<p>Together with these parameters, you can also pass the <cite>–min-snps</cite> and <cite>–min-snps-het</cite> parameters to adjust to your study case and reduce the effect of heterozygous clusters on LOH block calling. If you possess a list of regions of interest, you can also pass the file (BED format) with <cite>–regions</cite>.</p>
+<p>All the other parameters are described in <a class="reference internal" href="modules/Extraction/onco_extract.html#onco-extract"><span class="std std-ref">jloh onco_extract</span></a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>As for now, the last version of JLOH does not include the parallelization of <a class="reference internal" href="modules/Extraction/onco_extract.html#onco-extract"><span class="std std-ref">jloh onco_extract</span></a> nor the use of <a class="reference internal" href="modules/Extraction/stats.html#jloh-stats"><span class="std std-ref">jloh stats</span></a>.</p>
+</div>
+<p>Here’s an example command with a matched tumor/normal pair:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">jloh</span> <span class="n">onco_extract</span> \
+<span class="o">--</span><span class="n">ref</span> <span class="n">genome</span><span class="o">.</span><span class="n">fa</span> \
+<span class="o">--</span><span class="n">bams</span> <span class="n">mapping_control</span><span class="o">.</span><span class="n">bam</span> <span class="n">mapping_tumor</span><span class="o">.</span><span class="n">bam</span> \
+<span class="o">--</span><span class="n">vcfs</span> <span class="n">variants_control</span><span class="o">.</span><span class="n">vcf</span> <span class="n">variants_tumor</span><span class="o">.</span><span class="n">vcf</span> \
+<span class="o">--</span><span class="nb">min</span><span class="o">-</span><span class="n">snps</span> <span class="mi">2</span> \
+<span class="o">--</span><span class="nb">min</span><span class="o">-</span><span class="n">snps</span><span class="o">-</span><span class="n">het</span> <span class="mi">4</span>
+</pre></div>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>By default, <a class="reference internal" href="modules/Extraction/onco_extract.html#onco-extract"><span class="std std-ref">jloh onco_extract</span></a> keeps every candidate block that is at least 100 bp long. As human cancer datasets have overall low heterozygosity levels when compared to other evolutionary contexts (&lt; 1%) this aspect should be taken with care to avoid an increase of false positives. To account for that, the minimum length may be increased with <cite>–min-length</cite>.</p>
+</div>
+</section>
+<section id="infer-blocks-with-only-a-tumor-sample">
+<h3>Infer blocks with only a tumor sample<a class="headerlink" href="#infer-blocks-with-only-a-tumor-sample" title="Link to this heading"></a></h3>
+<p>If you’re working in a cancer setup but only have one sample from the individual (tumoral sample) you can still use jloh.</p>
+<p>When running jloh onco_extract, you should run it in single sample mode (i.e. activate <cite>–single-mode</cite> flag). Pass the BAM and VCF file that you have generated as <cite>–bam</cite> and <cite>–vcf</cite> respectively (note the difference from <cite>–bams</cite> and <cite>–vcfs</cite>).</p>
+<p>Blocks called by jloh should be taken with a grain of salt if no information from the control sample is present, as a larger proportion of false positives will be present.</p>
+<p>Here’s an example command:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">jloh</span> <span class="n">onco_extract</span> \
+<span class="o">--</span><span class="n">single</span><span class="o">-</span><span class="n">mode</span> <span class="kc">True</span> \
+<span class="o">--</span><span class="n">ref</span> <span class="n">genome</span><span class="o">.</span><span class="n">fa</span> \
+<span class="o">--</span><span class="n">bam</span> <span class="n">mapping_tumor</span><span class="o">.</span><span class="n">bam</span> \
+<span class="o">--</span><span class="n">vcf</span> <span class="n">variants_tumor</span><span class="o">.</span><span class="n">vcf</span> \
+<span class="o">--</span><span class="nb">min</span><span class="o">-</span><span class="n">snps</span> <span class="mi">2</span> \
+<span class="o">--</span><span class="nb">min</span><span class="o">-</span><span class="n">snps</span><span class="o">-</span><span class="n">het</span> <span class="mi">4</span>
+</pre></div>
+</div>
+</section>
+</section>
 </section>
 
 
