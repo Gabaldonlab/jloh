@@ -35,13 +35,13 @@ Call variants
 
 The variant calling procedure does not need any significant retouch and can be performed any way the user wants, as long as it produces a VCF file that contains both homozygous and heterozygous SNPs at somatic level.
 
-Some users perform variant calling combining `bcftools <http://www.htslib.org/download/>` mpileup and call. Other users prefer the `GATK <https://gatk.broadinstitute.org/hc/en-us>` pipeline.
+Some users perform variant calling combining `bcftools <http://www.htslib.org/download/>`_ mpileup and call. Other users prefer the `GATK <https://gatk.broadinstitute.org/hc/en-us>`_ pipeline.
 
 
 Add allele frequency if missing
 -------------------------------
 
-A final, crucial step before running “onco_extract” is to possess allele frequency (AF) as an annotation in the VCF file in the FORMAT field. This can be done manually with simple scripts but we suggest doing it with `all2vcf <https://github.com/MatteoSchiavinato/all2vcf>`, which has a module called frequency taking care of that exactly. A distribution of `all2vcf <https://github.com/MatteoSchiavinato/all2vcf>` is already included with JLOH (src/all2vcf).
+A final, crucial step before running “onco_extract” is to possess allele frequency (AF) as an annotation in the VCF file in the FORMAT field. This can be done manually with simple scripts but we suggest doing it with `all2vcf <https://github.com/MatteoSchiavinato/all2vcf>`_, which has a module called frequency taking care of that exactly. A distribution of `all2vcf <https://github.com/MatteoSchiavinato/all2vcf>`_ is already included with JLOH (src/all2vcf).
 
 Once your VCF files contain the AF annotation in the FORMAT field, they’re good to go for running JLOH “onco_extract”.
 
