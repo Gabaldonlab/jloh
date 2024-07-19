@@ -89,6 +89,7 @@ jloh extract --vcf <VCF> --ref <FASTA> --bam <BAM> [options]
 --threads           Number of parallel computing threads                        [4]
 --regions           BED file containing regions to keep in the analysis         [off]
                     Can include regions from both --refs
+--os-scratch        Use the system's TMPDIR                                     [off] 
 
 """)
     sys.exit(0)
@@ -110,6 +111,7 @@ p.add_argument("--sample", default="jloh")
 p.add_argument("--output-dir", default="jloh_out")
 p.add_argument("--threads", default=4, type=int)
 p.add_argument("--regions")
+p.add_argument("--os-scratch", action="store_true")
 # parameters
 p.add_argument("--min-snps-kbp", default="5,1", type=str)
 p.add_argument("--filter-mode", choices=["all","pass"], default="all")
@@ -229,8 +231,9 @@ def hetero_and_homo_snps(vcf):
         dict = { annotations[i]:values[i] for i in range(0, len(annotations)) }
 
         # Manage phased genotypes
-        if dict["GT"][1] == "|":
-            dict["GT"] = dict["GT"].replace("|", "/")
+        if len(dict["GT"]) > 1:
+            if dict["GT"][1] == "|":
+                dict["GT"] = dict["GT"].replace("|", "/")
 
         # if it's a single heterozygous SNP
         if ((len(lst[3]) == len(lst[4]) == 1) and (dict["GT"]=="0/1")):
@@ -575,6 +578,7 @@ def snps_to_bed_blocks(args, het_snps_vcf, homo_snps_vcf, genome_file, min_snps_
     Homo_bed_blocks_ALT = Homo_bed_blocks_ALT.get()
 
     Homo_bed_blocks_REF = get_homo_ref_blocks(Het_bed_blocks, Homo_bed_blocks_ALT, genome_file)
+    Homo_bed_blocks_REF = Homo_bed_blocks_REF.merge(d=merge_len)
     Homo_bed_blocks_REF = count_snps_in_bed_interval(Homo_bed_blocks_REF, homo_snps_vcf)
 
     return Het_bed_blocks, Homo_bed_blocks_REF, Homo_bed_blocks_ALT
@@ -1493,8 +1497,14 @@ def main(args, tmp_bams):
 
 if __name__ == "__main__":
 
-    unique_key = generate_unique_key(args.output_dir)
-    tmpdir = f"{args.output_dir}/tmp_{unique_key}"
+    # use the systems tmpdir or create one in outdir
+    if args.os_scratch:
+        unique_key = generate_unique_key(os.environ["TMPDIR"])
+        tmpdir = f"{os.environ['TMPDIR']}/tmp_{unique_key}"
+        print(tmpdir)
+    else:
+        unique_key = generate_unique_key(args.output_dir)
+        tmpdir = f"{args.output_dir}/tmp_{unique_key}"
     os.makedirs(tmpdir, exist_ok=True)
     os.chmod(tmpdir, 0o777)
     pybedtools.helpers.set_tempdir(tmpdir)

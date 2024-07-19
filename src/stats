@@ -93,8 +93,10 @@ def hetero_and_homo_snps(vcf):
         dict = { annotations[i]:values[i] for i in range(0, len(annotations)) }
 
         # Manage phased genotypes
-        if dict["GT"][1] == "|":
-            dict["GT"] = dict["GT"].replace("|", "/")
+        # Some software output "." even for diploid calling
+        if len(dict["GT"]) > 1:
+            if dict["GT"][1] == "|":
+                dict["GT"] = dict["GT"].replace("|", "/")
 
         # if it's a single heterozygous SNP
         if ((len(lst[3]) == len(lst[4]) == 1) and (dict["GT"]=="0/1")):
@@ -220,13 +222,9 @@ def calculate_chrom_snp_densities(Variants, Chrom_lengths, args):
         w_start = 0 
         w_end = w_start + args.window_size 
         chrom_snps = Snps_by_chrom[chrom]
-
-        
-        # while w_end < Chrom_lengths[chrom]:
-
-        ### DEBUG ###
-        while (w_end <= 700000):
-        ### DEBUG ###
+ 
+        # This will exclude all chromosomes shorter than window length
+        while w_end < Chrom_lengths[chrom]:
             pool.apply_async(get_chrom_snps, args=(args, chrom_snps, chrom, w_start, w_end, queue))
             w_start += args.step_size
             w_end += args.step_size    
