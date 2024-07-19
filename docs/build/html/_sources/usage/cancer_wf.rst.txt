@@ -19,7 +19,7 @@ Remove secondary alignments
 ---------------------------
 
 Most mappers will return more than one mapping location for each read in the output SAM file. Each read derives from a fragment of DNA, and therefore belongs to a unique spot in the genome, not plenty. It is therefore important to remove secondary alignments and keep only the best one in order to avoid coverage inflation and false SNP detection.
-To do so, simply use `samtools <http://www.htslib.org/download/>` and its view module, removing records with the “secondary” bitwise flag (-F 0x0100) and those with the “unmapped” bitwise flag to save disk space (-F 0x4). Here in the example, we’re taking advantage of multithreading (-@ 20). We’re also piping the view command to the sort command to sort the output BAM directly by genome coordinate.
+To do so, simply use `samtools <http://www.htslib.org/download/>`_ and its view module, removing records with the “secondary” bitwise flag (-F 0x0100) and those with the “unmapped” bitwise flag to save disk space (-F 0x4). Here in the example, we’re taking advantage of multithreading (-@ 20). We’re also piping the view command to the sort command to sort the output BAM directly by genome coordinate.
 
 .. code-block::
 
