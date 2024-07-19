@@ -133,11 +133,11 @@ To do so, simply use <cite>samtools &lt;http://www.htslib.org/download/&gt;</cit
 <section id="call-variants">
 <h2>Call variants<a class="headerlink" href="#call-variants" title="Link to this heading"></a></h2>
 <p>The variant calling procedure does not need any significant retouch and can be performed any way the user wants, as long as it produces a VCF file that contains both homozygous and heterozygous SNPs at somatic level.</p>
-<p>Some users perform variant calling combining <cite>bcftools &lt;http://www.htslib.org/download/&gt;</cite> mpileup and call. Other users prefer the <cite>GATK &lt;https://gatk.broadinstitute.org/hc/en-us&gt;</cite> pipeline.</p>
+<p>Some users perform variant calling combining <a class="reference external" href="http://www.htslib.org/download/">bcftools</a> mpileup and call. Other users prefer the <a class="reference external" href="https://gatk.broadinstitute.org/hc/en-us">GATK</a> pipeline.</p>
 </section>
 <section id="add-allele-frequency-if-missing">
 <h2>Add allele frequency if missing<a class="headerlink" href="#add-allele-frequency-if-missing" title="Link to this heading"></a></h2>
-<p>A final, crucial step before running “onco_extract” is to possess allele frequency (AF) as an annotation in the VCF file in the FORMAT field. This can be done manually with simple scripts but we suggest doing it with <cite>all2vcf &lt;https://github.com/MatteoSchiavinato/all2vcf&gt;</cite>, which has a module called frequency taking care of that exactly. A distribution of <cite>all2vcf &lt;https://github.com/MatteoSchiavinato/all2vcf&gt;</cite> is already included with JLOH (src/all2vcf).</p>
+<p>A final, crucial step before running “onco_extract” is to possess allele frequency (AF) as an annotation in the VCF file in the FORMAT field. This can be done manually with simple scripts but we suggest doing it with <a class="reference external" href="https://github.com/MatteoSchiavinato/all2vcf">all2vcf</a>, which has a module called frequency taking care of that exactly. A distribution of <a class="reference external" href="https://github.com/MatteoSchiavinato/all2vcf">all2vcf</a> is already included with JLOH (src/all2vcf).</p>
 <p>Once your VCF files contain the AF annotation in the FORMAT field, they’re good to go for running JLOH “onco_extract”.</p>
 </section>
 <section id="infer-loh-blocks-in-cancer-datasets">
