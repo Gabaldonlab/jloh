@@ -18,7 +18,6 @@ import shutil
 from time import asctime as at
 from operator import itemgetter
 
-
 ss = sys.exit
 
 # help section
@@ -76,7 +75,7 @@ jloh onco_extract --vcf <VCF> --ref <FASTA> --bam <BAM> [options]
 """)
     sys.exit(0)
 
-p = ap.ArgumentParser(description="Lets create a module that creates LOH blocks from BAM(s), VCF(s) and REF as inputs.")
+p = ap.ArgumentParser(description="Detect LOH blocks in tumoral setups from BAM(s), VCF(s) and REF as inputs.")
 
 #default
 p.add_argument("--vcfs", nargs="*")
@@ -118,7 +117,7 @@ args = p.parse_args()
 def check_conditions(args):
 
     """
-    Determine if all input files are present
+    Determine if all input files are present, if not error will raise
     """
 
     if (not args.vcf and not args.vcfs and not args.ref):
@@ -156,12 +155,15 @@ def generate_unique_key(output_dir):
     return unique_key    
 
 
-'''
-Function to extract the variants from the VCF file and check if 1.Is a real SNP, 2. If asked, select those that have pass the filtering and 3. Divide by homo and heterozygous
-'''
 def extract_variants(vcf_input, vcf_output, min_af, max_af, dir, name):
     
-    #check vcf file extension. Its better to allow only uncompressed ones.
+    '''
+    Function to extract the variants from the VCF file and check if:
+    1.Is a real SNP
+    2. If asked, select those that have pass the filtering
+    3. Divide by homo and heterozygous
+    '''
+    #check vcf file extension. Only uncompressed ones are allowed at this version.
     if vcf_input.endswith(".vcf.gz"):
         raise ValueError("ERROR. Please unzip your VCF file to continue")
     elif vcf_input.endswith(".vcf"):
@@ -185,7 +187,7 @@ def extract_variants(vcf_input, vcf_output, min_af, max_af, dir, name):
             if args.filter_mode: #filter-vcf is provided by the user
                  if "PASS" in record.FILTER:  # Check if FILTER annotation is "PASS"
                     af_values = record.calls[0].data.get("AF", [])  # Get AF values, obtain an empty value if its not available (debugging)
-                    if af_values and max_af > af_values[0] > min_af:  #default: max=0.9 and min=0.1                  
+                    if af_values and max_af > af_values[0] > min_af:  #default: max=0.70 and min=0.30                 
                         writer_het.write_record(record)
                         hetero_lines.append(str(record))
                     else: #homo variants
@@ -194,7 +196,7 @@ def extract_variants(vcf_input, vcf_output, min_af, max_af, dir, name):
             else:
                 # --filter-vcf option is not provided, write all variants
                 af_values = record.calls[0].data.get("AF", [])  # Get AF values, obtain an empty value if its not available (debugging)
-                if af_values and max_af > af_values[0] > min_af:  #default: max=0.9 and min=0.1                  
+                if af_values and max_af > af_values[0] > min_af:  #default: max=0.70 and min=0.30                  
                     writer_het.write_record(record)
                     hetero_lines.append(str(record)) #count length of snps found
                 else: #homo variants
@@ -205,7 +207,6 @@ def extract_variants(vcf_input, vcf_output, min_af, max_af, dir, name):
     
     vcf.close()
     return hetero_vcf_output, homo_vcf_output, hetero_lines, homo_lines
-
 
 
 def parse_chromosomes(ref):
@@ -237,9 +238,8 @@ def create_genome_file(ref, out_file):
 
 def create_subset_bam_file(bam, tmp_bams, chrom):
 
-    """
-    Last update: 28/09/2022
-    """
+    
+    #Useful to determine zygosity and coverage of LOH candidates, appart from other functions
 
     if bam.split(".")[-1] == "bam":
         b = pysam.AlignmentFile(bam, "rb")
@@ -268,7 +268,7 @@ def split_bam_by_chromosome(bam, genome_file, tmp_bams, args):
 
     Chroms = pd.read_csv(genome_file, sep="\t", header=None)
     Chroms.columns = ["Chrom", "Length"]
-    Chroms=Chroms["Chrom"].tolist()[:25] #chr1-22 + Mit + sexual chr
+    Chroms=Chroms["Chrom"].tolist()[:25] #chr1-22 + M,X and Y
 
 
     Chrom_bams = {}
@@ -315,7 +315,7 @@ def calculate_chrom_densities_snp_kbp(ref, variant,vcf, output_name):
 
 
 def hetero_and_homo_snp_densities(ref,vcf, name):
-    '''determine the initial densities on the genome on average'''
+    '''determine the densitites of individuals regarding their zygosity'''
 
     # hetero
     Het_snp_densities = calculate_chrom_densities_snp_kbp(args.ref, "hetero",vcf, name)
@@ -354,13 +354,10 @@ def divide_homo_vcf(homo_vcf,args, sample):
     return homo_ALT_vcf_output, homo_REF_vcf_output
 
 
-            
-
 def filter_by_snp_count(args,bt, discard, min_snps_kbp):
+    #modified to allow the use of PD dataframes
     df = pd.DataFrame([str(row).rstrip("\n\r\b").split("\t") for row in bt], columns=['chr', 'start', 'end', 'count']) #divide into columns adding their names
-    
-    
-    df[['start', 'end', 'count']] = df[['start', 'end', 'count']].apply(pd.to_numeric) #as in Rstudio (plotting)
+    df[['start', 'end', 'count']] = df[['start', 'end', 'count']].apply(pd.to_numeric) #to consider it as a number instead of str
     
     # Calculate block length and SNPs per kbp
     df['blocklen'] = df['end'] - df['start'] #new columns of the df
@@ -426,7 +423,7 @@ def snps_to_bed_blocks(args, het_snps_vcf, homo_snps_vcf_ALT, homo_snps_vcf_REF,
     #rescue Bedtool object so other functions created previously still work
     '''
     29/05/2024
-    Debugging method to avoid lack of results in any part
+    Debugging method to avoid raising errors if no information is found in a specific sample
     '''
     merge_length=args.min_length-1
 
@@ -446,7 +443,6 @@ def snps_to_bed_blocks(args, het_snps_vcf, homo_snps_vcf_ALT, homo_snps_vcf_REF,
 
     # combine together het blocks that are nearby
    
-
     return Het_bed_blocks, Homo_bed_blocks_ALT, Homo_bed_blocks_REF
 
 def filter_by_length(bt, min_length):
@@ -456,7 +452,6 @@ def filter_by_length(bt, min_length):
     new_bt = BedTool(lst)
 
     return new_bt
-
 
 
 def add_column(bt, annot):
@@ -504,7 +499,7 @@ def remove_overlapping_regions(bt_A, bt_B, args):
     
 def add_allele_column(args, Het_blocks, Homo_blocks_REF, Homo_blocks_ALT):
 
-    '''This will be sued for trimming with hwt regions + adding allele type'''
+    '''This will be used for trimming with heterozygous regions + adding allele type'''
 
     Homo_blocks_REF = remove_overlapping_regions(Homo_blocks_REF,Het_blocks, args)
 
@@ -594,9 +589,9 @@ def calculate_coverage_of_a_region(chrom, chrom_bam, chrom_len):
 
     """
     v1
-    Last update: 28/09/2022
-
-    New update: 29/04/2024
+    Update: 28/09/2022
+    v2
+    Update: 29/04/2024
     """
     #This will calculate coverage either for whole chromosomes or LOH blocks
     start = 0
@@ -703,7 +698,9 @@ def process_region_coverage(row, chrom_bam, min_frac_cov, hemi, avg_cov, overhan
     Author: Matteo Schiavinato
     Last Update: 28/09/2022
 
-    Last update: 28/04/2024 - Manuel Ramos
+    v3
+    Author: Manuel Ramos
+    Last update: 28/04/2024 
     """
 
     bed = str(row)
@@ -746,16 +743,14 @@ def process_region_coverage(row, chrom_bam, min_frac_cov, hemi, avg_cov, overhan
     return bed_line #this is for creating the bed file for each block
 
 
-
-'''
-It was needed to avoid sorting the files lexicographically, so this function will return a
-tupple (True/False, chromosome number or letter). The python tool sorted will be
-able to compare efficiently, comparing first True(integrers) and then False (strings as M X and Y)'''
-
 def chromosome_sort_key(chromosome):
+    '''It was needed to avoid sorting the files lexicographically, so this function returns a
+    tupple (True/False, chromosome number or letter). The python function will be
+    able to compare efficiently, comparing first True (int) and then False (strings as M, X and Y)'''
+
     if chromosome.startswith('chr'): #this will get the number or M,Y,X
         chromosome = chromosome[3:]
-    try: #to order numerically
+    try: #to order numerically chromosomes
         return (True, int(chromosome))
     except ValueError: #to order M,X and Y
         return (False,chromosome)
@@ -824,13 +819,14 @@ def assess_coverage(args, Chrom_bams, genome_file, Homo_blocks, sample):
         if LOH_blocks_bed:  # Ensure LOH_blocks_bed is not None before appending
             LOH_line.append(LOH_blocks_bed)
 
-    bt = BedTool(LOH_line if LOH_line else [""])  # Ensure bt is created even if LOH_line is empty
+    bt = BedTool(LOH_line if LOH_line else [""])  # Ensure bt is created even if LOH_line is empty (debug)
     
     sort_bt_intervals(bt)
    
     return bt
 
 def find_relevant_regions(args,LOH):
+    #add BED file of regions to find if they intersect with LOH regions
     bt_regions = BedTool(args.regions)
     bt = BedTool(LOH)
 
@@ -847,8 +843,11 @@ def find_relevant_regions(args,LOH):
     merged = BedTool('\n'.join(concatenated_lines), from_string=True)
 
     return merged, bt_inter
+
 def remove_het_snps_in_output(LOH, args):
-    #I want to remove blocks where num het snps is equal to num homo snps and situations where only 1 homo SNP
+    #Remove blocks where:
+    # 1. Number of hetero snps is equal to number homo snps
+    # 2. Situations where only 1 homo SNP is found (remove errors while calling LOH blocks)
     filtered_LOH = []  
     
     for line in LOH:
@@ -866,16 +865,19 @@ def remove_het_snps_in_output(LOH, args):
         filtered_LOH.append(line)
     
     return filtered_LOH
-        
-        
 
 def remove_LOH_control(control, tumor,fraction):
+    '''
+    Added to ensure LOH blocks from the tumoral samples were not found as homozygous clusters in control sample
+    '''
     control = BedTool(control)
     tumor = BedTool(tumor)
-    inter = tumor.intersect(control, v=True, f=fraction)
+    inter = tumor.intersect(control, v=True, f=fraction) #can be modified by the user
     return inter
 
 def run_in_default_mode(args, tmp_bams, tmp_bams_tumor):
+
+    #paired samples within the same individual
     #MODULE PROCESSING
     pid = os.getpid()
     process = psutil.Process(pid)
@@ -924,7 +926,6 @@ def run_in_default_mode(args, tmp_bams, tmp_bams_tumor):
 
     # bed blocks
         #control
-    
     sys.stderr.write( f"[{at()}] Clustering heterozygous and homozygous SNPs into blocks...")
     homo_vcf_ALT_control, homo_vcf_REF_control=divide_homo_vcf(homo_vcf_control, args, "_control")
     Het_blocks_control, Homo_blocks_ALT_control, Homo_blocks_REF_control=snps_to_bed_blocks(args, hetero_vcf_control, homo_vcf_ALT_control,homo_vcf_REF_control, genome_file)
@@ -943,7 +944,6 @@ def run_in_default_mode(args, tmp_bams, tmp_bams_tumor):
     # remove overlaps with heteroblocks from homoblocks
     sys.stderr.write( f"[{at()}] Trimming overlaps with heterozygous SNPs...")
     Homo_blocks_control = add_allele_column(args, Het_blocks_control, Homo_blocks_REF_control, Homo_blocks_ALT_control)
-
 
     Homo_blocks_tumor = add_allele_column(args, Het_blocks_tumor, Homo_blocks_REF_tumor, Homo_blocks_ALT_tumor)
     
@@ -1006,7 +1006,6 @@ def run_in_default_mode(args, tmp_bams, tmp_bams_tumor):
     sys.stderr.write( "Done\n")
 
     sys.stderr.write(f" - Control: {len(LOH_control)} blocks were processed\n")
-    #sys.stderr.write(f" - Tumor {len(LOH_tumor)} blocks were processed\n")
     sys.stderr.write(f" - Tumor: {len(LOH_final)} blocks were processed\n")
 
     #add a new file with regions that intersect
@@ -1142,8 +1141,6 @@ def run_in_default_mode(args, tmp_bams, tmp_bams_tumor):
     memory_usage_change = end_memory_usage - start_memory_usage
 
     # Print the results
-
-
     sys.stderr.write(f"[{at()}] Done!\n  - Files generated can be found on {args.output_dir}\n")
     sys.stderr.write(f"[{at()}] Statistics from the run:\n")
 
@@ -1155,6 +1152,7 @@ def run_in_default_mode(args, tmp_bams, tmp_bams_tumor):
 
 def run_in_single_mode(args, tmp_bams, tmp_bams_control):
 
+    #no control sample is given to JLOH
     #MODULE PROCESSING
     pid = os.getpid()
     process = psutil.Process(pid)
@@ -1230,7 +1228,6 @@ def run_in_single_mode(args, tmp_bams, tmp_bams_control):
     # sort
     LOH = sort_bt_intervals(LOH)
 
-
     # count homozygous SNPs in intervals
     sys.stderr.write(f"[{at()}] Adding heterozygous and homozygous SNP counts in each block...")
     LOH = count_snps_in_bed_interval(LOH, homo_vcf)
@@ -1252,8 +1249,7 @@ def run_in_single_mode(args, tmp_bams, tmp_bams_control):
     LOH = sort_bt_intervals(LOH)
     sys.stderr.write(  "Done\n")
 
-    #create the BED file (0-based) with coordinates and a TSV (1-based) file with whole information
-
+    #create the BED file (0-based) with coordinates and a TSV (1-based) file with complete information
     with open(f"{args.output_dir}/LOH_blocks.bed", 'w') as f:
         for line in LOH:
             items = str(line).split("\t") #separate each parameter
@@ -1309,7 +1305,6 @@ def run_in_single_mode(args, tmp_bams, tmp_bams_control):
     print(f" - Elapsed time: {round(elapsed_time)} minutes")
 
 
-
 def main(args, tmp_bams, tmp_bams2):
 
     """
@@ -1343,7 +1338,7 @@ if __name__ == "__main__":
     tmp_bams = f"{tmpdir}/tmp_bams"
     os.makedirs(tmp_bams, exist_ok=True)
 
-    # This generates a second unique key for the new temp directory
+    # This generates a second unique key for the new temp directory, essential for default mode
     unique_key2 = generate_unique_key(args.output_dir)
     tmp_bams2 = f"{tmpdir}/tmp_bams_{unique_key2}" 
     os.makedirs(tmp_bams2, exist_ok=True)
