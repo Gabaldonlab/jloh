@@ -130,3 +130,7 @@ Misc
 .. function:: --regions <PATH>
 
     BED file containing regions where blocks shall be searched in. This BED file may be created via :ref:`jloh-g2g` or it may be a custom BED file with regions of interest.
+
+.. function:: --os-scratch
+
+    Use the system's temporary directory instead of creating temporary files in the output path.
