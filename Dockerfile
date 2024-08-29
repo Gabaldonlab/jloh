@@ -40,50 +40,54 @@ RUN cd /usr/bin \
     && chmod -R 777 nextflow-21.04.1-all \
     && mv nextflow-21.04.1-all nextflow
 
-##Install and upgrade python dependencies with pip
+# Install and upgrade python dependencies with pip
 RUN python3 -m pip install --upgrade pip \
     && pip3 install --upgrade numpy pysam biopython pandas pandarallel pybedtools vcfpy psutil
 
-##Git clone hisat2 and all2vcf
-RUN mkdir -p /root/src \
-    && cd /root/src \
-    && git clone -b v0.7.8 https://github.com/MatteoSchiavinato/all2vcf \
-    && ln -s /root/src/all2vcf/all2vcf /usr/bin
+# Git clone hisat2 and all2vcf
+WORKDIR /root/src
+RUN git clone -b v0.7.8 https://github.com/MatteoSchiavinato/all2vcf
+RUN echo '#!/bin/bash' >> /bin/all2vcf
+RUN echo '/root/src/all2vcf/all2vcf "$@"' >> /bin/all2vcf
+RUN chmod 777 /bin/all2vcf
 
-RUN cd /root/src \
-    && git clone https://github.com/DaehwanKimLab/hisat2.git \
-    && cd hisat2 \
-    && make \
-    && ln -s /root/src/hisat2/hisat2-* /usr/bin \
-    && ln -s /root/src/hisat2/hisat2 /usr/bin
+RUN git clone https://github.com/DaehwanKimLab/hisat2.git
+RUN cd /root/src/hisat2 && make
+RUN cp -r /root/src/hisat2/hisat2-* /bin/
+RUN cp -r /root/src/hisat2/hisat2 /bin/
+RUN chmod 777 /bin/hisat2*
 
-##Download R from source, compile and set up dependencies. Tends to be a long process
+# Download R from source, compile and set up dependencies. Tends to be a long process
 RUN apt-get upgrade -y gfortran libreadline6-dev libx11-dev libxt-dev libpng-dev libjpeg-dev libcairo2-dev xvfb libzstd-dev libcurl4-openssl-dev texinfo texlive texlive-fonts-extra screen libpcre2-dev \
     && cd /usr/local/src \
     && wget https://cran.r-project.org/src/base/R-3/R-3.6.0.tar.gz \
     && tar zxvf R-3.6.0.tar.gz && rm R-3.6.0.tar.gz && cd R-3.6.0/ \
     && ./configure --enable-R-shlib \
     && make \
-    && make install 
+    && make install
 
 RUN Rscript -e 'install.packages(c("ggplot2", "reshape2", "hash", "png"), repos = "http://cran.us.r-project.org")'
 
-# clone JLOH 
-RUN cd /root/src \
-    && git clone -b v1.0.3 https://github.com/Gabaldonlab/jloh.git \
-    && ln -s /root/src/jloh/jloh /usr/bin
+# Clone JLOH
+WORKDIR /root/src/jloh
+COPY . .
 
-#Change permissions making Docker to Singularity/Apptainer conversions usable
+WORKDIR /bin
+RUN echo '#!/bin/bash' >> /bin/jloh
+RUN echo '/root/src/jloh/jloh "$@"' >> /bin/jloh
+RUN chmod 777 /bin/jloh
+
+# Change permissions making Docker to Singularity/Apptainer conversions usable
 RUN chmod 755 /root
 
-#Purge unnecessary dependencies
+# Purge unnecessary dependencies
 RUN apt purge -y git make g++ zlib1g-dev python3-pip automake wget curl make zlib1g-dev libbz2-dev libncurses5-dev libncursesw5-dev liblzma-dev libzstd-dev libreadline6-dev libxt-dev \
     && rm -rf /var/lib/apt/lists/*
 
-#Check R version
+# Check R version
 RUN R --version
 
-#Running the tests"
+# Running the tests"
 RUN jloh stats --vcf /root/src/jloh/test_data/out.ff.vcf
 RUN jloh extract --vcf /root/src/jloh/test_data/out.ff.vcf --bam /root/src/jloh/test_data/out.fs.bam --ref /root/src/jloh/test_data/S_para.chrXII.fa --min-snps-kbp 2,5 --output-dir /root/src/jloh/test_data/jloh_out
 RUN jloh plot --one-ref --loh /root/src/jloh/test_data/jloh_out/jloh.LOH_blocks.tsv --het /root/src/jloh/test_data/jloh_out/jloh.exp.het_blocks.bed --contrast max
