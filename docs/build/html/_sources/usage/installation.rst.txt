@@ -19,7 +19,7 @@ If everything went smoothly, you should be able to run JLOH simply by running:
 
 .. code-block:: bash
 
-    docker run --rm -t -i cgenomics/jloh --help
+    docker run --rm -t -i cgenomics/jloh jloh --help
 
 
 
