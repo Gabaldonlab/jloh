@@ -211,8 +211,12 @@ def hetero_and_homo_snps(vcf):
     Last update: 04/03/2022
     """
 
-    # read SNPs
-    INPUT = open(vcf, "r")
+    # read SNPs - handle both compressed and uncompressed VCF files
+    import gzip
+    if vcf.endswith('.gz'):
+        INPUT = gzip.open(vcf, "rt")
+    else:
+        INPUT = open(vcf, "r")
     Lines = [ line for line in INPUT ]
     Header = [ line for line in Lines if line[0] == "#" ]
     Vcf_lines = [ line for line in Lines if line[0] != "#" ]
@@ -403,8 +407,18 @@ def hetero_and_homo_snp_densities(het_snps_vcf, homo_snps_vcf, ref):
     Last update: 15/03/2022
     """
 
-    Hetero_lines = [ line for line in open(het_snps_vcf, "r") if line[0] != "#" ]
-    Homo_lines = [ line for line in open(homo_snps_vcf, "r") if line[0] != "#" ]
+    # Handle both compressed and uncompressed VCF files
+    import gzip
+
+    if het_snps_vcf.endswith('.gz'):
+        Hetero_lines = [ line for line in gzip.open(het_snps_vcf, "rt") if line[0] != "#" ]
+    else:
+        Hetero_lines = [ line for line in open(het_snps_vcf, "r") if line[0] != "#" ]
+
+    if homo_snps_vcf.endswith('.gz'):
+        Homo_lines = [ line for line in gzip.open(homo_snps_vcf, "rt") if line[0] != "#" ]
+    else:
+        Homo_lines = [ line for line in open(homo_snps_vcf, "r") if line[0] != "#" ]
 
     # hetero
     Het_snp_densities = calculate_chrom_snp_densities(Hetero_lines, ref)
