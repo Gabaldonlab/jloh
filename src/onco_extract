@@ -154,7 +154,6 @@ def generate_unique_key(output_dir):
 
     return unique_key    
 
-
 def extract_variants(vcf_input, vcf_output, min_af, max_af, dir, name):
     
     '''
@@ -171,7 +170,6 @@ def extract_variants(vcf_input, vcf_output, min_af, max_af, dir, name):
     else:
         raise ValueError("ERROR. Please provide a valid VCF file as input")
 
-
     #store the paths of the file that are going to be created to use them afterwards
     hetero_vcf_output = f"{dir}/hetero_{vcf_output}{name}.vcf"
     homo_vcf_output = f"{dir}/homo_{vcf_output}{name}.vcf"
@@ -187,27 +185,64 @@ def extract_variants(vcf_input, vcf_output, min_af, max_af, dir, name):
             if args.filter_mode: #filter-vcf is provided by the user
                  if "PASS" in record.FILTER:  # Check if FILTER annotation is "PASS"
                     af_values = record.calls[0].data.get("AF", [])  # Get AF values, obtain an empty value if its not available (debugging)
-                    if af_values and max_af > af_values[0] > min_af:  #default: max=0.70 and min=0.30                 
-                        writer_het.write_record(record)
-                        hetero_lines.append(str(record))
-                    else: #homo variants
-                        writer_homo.write_record(record)
-                        homo_lines.append(str(record))
+                    # Fix: Handle both float and list cases
+                    if af_values:
+                        if isinstance(af_values, (int, float)):
+                            af_check = af_values
+                        else:
+                            af_check = af_values[0]
+
+                        if max_af > af_check > min_af:  #default: max=0.70 and min=0.30
+                            writer_het.write_record(record)
+                            hetero_lines.append(str(record))
+                        else: #homo variants
+                            writer_homo.write_record(record)
+                            homo_lines.append(str(record))
             else:
                 # --filter-vcf option is not provided, write all variants
                 af_values = record.calls[0].data.get("AF", [])  # Get AF values, obtain an empty value if its not available (debugging)
-                if af_values and max_af > af_values[0] > min_af:  #default: max=0.70 and min=0.30                  
-                    writer_het.write_record(record)
-                    hetero_lines.append(str(record)) #count length of snps found
-                else: #homo variants
-                    writer_homo.write_record(record)
-                    homo_lines.append(str(record))
+                # Fix: Handle both float and list cases
+                if af_values:
+                    if isinstance(af_values, (int, float)):
+                        af_check = af_values
+                    else:
+                        af_check = af_values[0]
+
+                    if max_af > af_check > min_af:  #default: max=0.70 and min=0.30
+                        writer_het.write_record(record)
+                        hetero_lines.append(str(record)) #count length of snps found
+                    else: #homo variants
+                        writer_homo.write_record(record)
+                        homo_lines.append(str(record))
         else:
             continue
     
     vcf.close()
     return hetero_vcf_output, homo_vcf_output, hetero_lines, homo_lines
 
+def divide_homo_vcf(homo_vcf,args, sample):
+    vcf=vcfpy.Reader.from_path(homo_vcf, "r")
+    homo_ALT_vcf_output = f"{args.output_dir}/homo_ALT{sample}.vcf"
+    homo_REF_vcf_output =  f"{args.output_dir}/homo_REF{sample}.vcf"
+    writer_ALT=vcfpy.Writer.from_path(homo_ALT_vcf_output, vcf.header)
+    writer_REF=vcfpy.Writer.from_path(homo_REF_vcf_output, vcf.header)
+
+    for record in vcf:
+        af_values = record.calls[0].data.get("AF", [])  # Get AF values, obtain an empty value if its not available (debugging)
+        # Fix: Handle both float and list cases
+        if af_values:
+            if isinstance(af_values, (int, float)):
+                af_check = af_values
+            else:
+                af_check = af_values[0]
+
+            if af_check > args.max_af:
+                writer_ALT.write_record(record)
+            elif af_check < args.min_af:
+                writer_REF.write_record(record)
+            else:
+                continue
+    return homo_ALT_vcf_output, homo_REF_vcf_output
 
 def parse_chromosomes(ref):
 
@@ -345,12 +380,19 @@ def divide_homo_vcf(homo_vcf,args, sample):
 
     for record in vcf:
         af_values = record.calls[0].data.get("AF", [])  # Get AF values, obtain an empty value if its not available (debugging)
-        if af_values and af_values[0] >args.max_af:
-            writer_ALT.write_record(record)
-        elif af_values and af_values[0] <args.min_af:
-            writer_REF.write_record(record)
-        else:
-            continue
+        # Fix: Handle both float and list cases
+        if af_values:
+            if isinstance(af_values, (int, float)):
+                af_check = af_values
+            else:
+                af_check = af_values[0]
+
+            if af_check > args.max_af:
+                writer_ALT.write_record(record)
+            elif af_check < args.min_af:
+                writer_REF.write_record(record)
+            else:
+                continue
     return homo_ALT_vcf_output, homo_REF_vcf_output
 
 
